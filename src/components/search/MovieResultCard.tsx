@@ -3,12 +3,12 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Film, Tv, Star, Send } from 'lucide-react';
+import { Film, Tv, Star } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState, useEffect } from 'react';
 import { Skeleton } from '../ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
-import { SendRecommendationButton } from './SendRecommendationButton';
+import { AddToWatchlistButton } from '../watchlists/AddToWatchlistButton';
 
 interface SearchResult {
   id: number;
@@ -46,10 +46,13 @@ export function MovieResultCard({ item, isWatched, onToggleWatched }: MovieResul
   const href = `/search/${item.media_type}/${item.id}?title=${encodeURIComponent(title)}&poster=${item.poster_path}&rating=${item.vote_average}&year=${releaseYear || ''}`;
 
   const movieDetails = {
-    id: String(item.id),
+    id: item.id,
     media_type: item.media_type,
     title: title,
     poster: item.poster_path,
+    vote_average: item.vote_average,
+    release_date: item.release_date,
+    first_air_date: item.first_air_date,
   };
 
   useEffect(() => {
@@ -161,7 +164,7 @@ export function MovieResultCard({ item, isWatched, onToggleWatched }: MovieResul
                         Watched
                     </label>
                 </div>
-                <SendRecommendationButton movie={movieDetails} isIconOnly={true} />
+                <AddToWatchlistButton movie={movieDetails} isIconOnly={true} />
             </div>
         </div>
       </CardContent>

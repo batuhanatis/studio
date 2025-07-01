@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Star, Eye } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { SendRecommendationButton } from '@/components/search/SendRecommendationButton';
+import { AddToWatchlistButton } from '@/components/watchlists/AddToWatchlistButton';
 import { Rating } from '@/components/discover/Rating';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
@@ -193,10 +193,13 @@ export default function DetailPage() {
   const decodedTitle = decodeURIComponent(title);
 
   const movieDetails = {
-    id: id,
+    id: Number(id),
     media_type: media_type,
     title: decodedTitle,
     poster: poster,
+    vote_average: parseFloat(ratingFromSearch),
+    release_date: media_type === 'movie' ? yearFromSearch : undefined,
+    first_air_date: media_type === 'tv' ? yearFromSearch : undefined,
   };
 
   return (
@@ -265,7 +268,7 @@ export default function DetailPage() {
             )}
             
             <div className="mt-6 space-y-4">
-              <SendRecommendationButton movie={movieDetails} />
+              <AddToWatchlistButton movie={movieDetails} />
 
               <Card>
                 <CardContent className="space-y-4 p-4">

@@ -10,6 +10,7 @@ import { Rating } from './Rating';
 import { Eye, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Skeleton } from '../ui/skeleton';
+import { AddToWatchlistButton } from '../watchlists/AddToWatchlistButton';
 
 interface Movie {
   id: number;
@@ -110,6 +111,16 @@ export function DiscoverCard({ movie, rating = 0, isWatched = false, onRate, onT
   const posterUrl = movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'https://placehold.co/500x750.png';
   const releaseYear = movie.release_date?.substring(0, 4) || movie.first_air_date?.substring(0, 4);
   const href = `/search/${movie.media_type}/${movie.id}?title=${encodeURIComponent(title)}&poster=${movie.poster_path}&rating=${movie.vote_average}&year=${releaseYear || ''}`;
+  
+  const movieDetails = {
+    id: movie.id,
+    media_type: movie.media_type,
+    title: title,
+    poster: movie.poster_path,
+    vote_average: movie.vote_average,
+    release_date: movie.release_date,
+    first_air_date: movie.first_air_date,
+  };
 
   return (
     <Card className="relative w-full max-w-sm mx-auto overflow-hidden shadow-2xl">
@@ -170,20 +181,23 @@ export function DiscoverCard({ movie, rating = 0, isWatched = false, onRate, onT
             <p className="text-sm font-semibold">Rate this {movie.media_type === 'movie' ? 'movie' : 'show'}</p>
             <Rating rating={rating} onRatingChange={onRate} />
           </div>
-          <div className="flex items-center space-x-2">
-             <Checkbox
-                id={`watched-${movie.id}`}
-                checked={isWatched}
-                onCheckedChange={onToggleWatched}
-                className="border-white text-white data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-             />
-             <label
-                htmlFor={`watched-${movie.id}`}
-                className="flex items-center gap-2 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-             >
-                <Eye className="h-4 w-4" />
-                Mark as Watched
-             </label>
+          <div className="flex items-center space-x-4">
+             <div className="flex items-center space-x-2">
+                 <Checkbox
+                    id={`watched-${movie.id}`}
+                    checked={isWatched}
+                    onCheckedChange={onToggleWatched}
+                    className="border-white text-white data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                 />
+                 <label
+                    htmlFor={`watched-${movie.id}`}
+                    className="flex items-center gap-2 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                 >
+                    <Eye className="h-4 w-4" />
+                    Mark as Watched
+                 </label>
+             </div>
+             <AddToWatchlistButton movie={movieDetails} isIconOnly={true} />
            </div>
         </CardFooter>
       </div>

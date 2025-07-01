@@ -5,7 +5,7 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Film, LogOut, Users, Gift, Compass, Sparkles, Combine } from 'lucide-react';
+import { Film, LogOut, Users, Gift, Compass, Sparkles, List } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
@@ -46,6 +46,12 @@ export function Header() {
             <Link href="/foryou">
               <Sparkles className="mr-2 h-4 w-4" />
               For You
+            </Link>
+          </Button>
+           <Button asChild variant="ghost" size="sm">
+            <Link href="/watchlists">
+              <List className="mr-2 h-4 w-4" />
+              Watchlists
             </Link>
           </Button>
            <Button asChild variant="ghost" size="sm">
