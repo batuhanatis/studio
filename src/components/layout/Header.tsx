@@ -1,10 +1,11 @@
+
 'use client';
 
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Film, LogOut, Users, Gift } from 'lucide-react';
+import { Film, LogOut, Users, Gift, Compass } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
@@ -35,6 +36,12 @@ export function Header() {
           </h1>
         </Link>
         <div className="flex items-center gap-1">
+           <Button asChild variant="ghost" size="sm">
+            <Link href="/discover">
+              <Compass className="mr-2 h-4 w-4" />
+              Discover
+            </Link>
+          </Button>
            <Button asChild variant="ghost" size="sm">
             <Link href="/recommendations">
               <Gift className="mr-2 h-4 w-4" />

@@ -1,14 +1,20 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Star } from 'lucide-react';
+import { ArrowLeft, Star, Eye } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { SendRecommendationButton } from '@/components/search/SendRecommendationButton';
-import { LikeButton } from '@/components/search/LikeButton';
+import { Rating } from '@/components/discover/Rating';
+import { useAuth } from '@/hooks/useAuth';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -21,15 +27,21 @@ interface WatchProvider {
 export default function DetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const id = params.id as string;
   const media_type = params.media_type as 'movie' | 'tv';
   const title = searchParams.get('title') || 'Untitled';
   const poster = searchParams.get('poster');
-  const rating = searchParams.get('rating') || '0';
+  const ratingFromSearch = searchParams.get('rating') || '0';
 
   const [platforms, setPlatforms] = useState<WatchProvider[] | null>(null);
   const [loadingProviders, setLoadingProviders] = useState(true);
+  
+  const [userRating, setUserRating] = useState(0);
+  const [isWatched, setIsWatched] = useState(false);
+  const [loadingUserData, setLoadingUserData] = useState(true);
 
   useEffect(() => {
     async function getWatchProviders(id: string, type: 'movie' | 'tv') {
@@ -69,6 +81,53 @@ export default function DetailPage() {
       getWatchProviders(id, media_type);
     }
   }, [id, media_type]);
+  
+  useEffect(() => {
+    if (!user || !id) return;
+    setLoadingUserData(true);
+    const userDocRef = doc(db, 'users', user.uid);
+    getDoc(userDocRef).then((docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const ratedMovie = (data.ratedMovies || []).find((m: any) => m.movieId === id && m.mediaType === media_type);
+            const watchedMovie = (data.watchedMovies || []).some((m: any) => m.movieId === id && m.mediaType === media_type);
+            setUserRating(ratedMovie?.rating || 0);
+            setIsWatched(watchedMovie);
+        }
+        setLoadingUserData(false);
+    });
+  }, [user, id, media_type]);
+
+  const handleRateMovie = async (rating: number) => {
+    if (!user) return;
+    const movieIdentifier = { movieId: id, mediaType: media_type };
+    
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userDocRef);
+    const currentRatings = userDoc.data()?.ratedMovies || [];
+    
+    const newRatings = [...currentRatings.filter((r: any) => r.movieId !== id || r.mediaType !== media_type), {...movieIdentifier, rating}];
+    setUserRating(rating);
+
+    try {
+      await updateDoc(userDocRef, { ratedMovies: newRatings });
+      toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
+    } catch (error) {
+       toast({ variant: 'destructive', title: 'Error', description: 'Could not save rating.' });
+    }
+  };
+  
+  const handleToggleWatched = async (watched: boolean) => {
+    if (!user) return;
+    const movieIdentifier = { movieId: id, mediaType: media_type };
+    setIsWatched(watched);
+    
+    if (watched) {
+        await updateDoc(doc(db, 'users', user.uid), { watchedMovies: arrayUnion(movieIdentifier) });
+    } else {
+        await updateDoc(doc(db, 'users', user.uid), { watchedMovies: arrayRemove(movieIdentifier) });
+    }
+  };
 
   const posterUrl = poster && poster !== 'null'
     ? `https://image.tmdb.org/t/p/w500${poster}`
@@ -116,14 +175,38 @@ export default function DetailPage() {
               <span className="text-sm">·</span>
                <div className="flex items-center gap-1">
                  <Star className="h-4 w-4 text-amber-500" />
-                 <span className="font-semibold text-foreground">{parseFloat(rating).toFixed(1)}</span>
+                 <span className="font-semibold text-foreground">{parseFloat(ratingFromSearch).toFixed(1)}</span>
                  <span>/ 10</span>
                </div>
             </div>
-
-            <div className="mt-6 flex items-center gap-2">
-              <SendRecommendationButton movie={movieDetails} />
-              <LikeButton movieId={id} mediaType={media_type} />
+            
+            <div className="mt-6 flex flex-col items-start gap-4">
+              <div className="flex items-center gap-2">
+                <SendRecommendationButton movie={movieDetails} />
+              </div>
+              
+              {!loadingUserData && (
+                <>
+                  <div className="flex flex-col items-start gap-2">
+                      <p className="text-sm font-semibold text-muted-foreground">Your Rating</p>
+                      <Rating rating={userRating} onRatingChange={handleRateMovie} starSize={24} />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id={`watched-detail-${id}`}
+                        checked={isWatched}
+                        onCheckedChange={handleToggleWatched}
+                    />
+                    <label
+                        htmlFor={`watched-detail-${id}`}
+                        className="flex items-center gap-2 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                        <Eye className="h-4 w-4" />
+                        Mark as Watched
+                    </label>
+                  </div>
+                </>
+              )}
             </div>
             
             <div className="mt-8">

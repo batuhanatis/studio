@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, Keyboard, Film } from 'lucide-react';
+import { Loader2, Search, Keyboard, Film, Star } from 'lucide-react';
 import { MovieResultCard } from './MovieResultCard';
 
 interface SearchResult {
@@ -18,6 +19,12 @@ interface SearchResult {
   media_type: 'movie' | 'tv';
   vote_average: number;
   popularity: number;
+}
+
+interface UserRatingData {
+    movieId: string;
+    mediaType: 'movie' | 'tv';
+    rating: number;
 }
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
@@ -51,12 +58,13 @@ export function MovieFinder() {
 
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          const likedMovies = userData.likedMovies || [];
+          const ratedMovies: UserRatingData[] = userData.ratedMovies || [];
+          const highlyRated = ratedMovies.filter(r => r.rating >= 4);
 
-          if (likedMovies.length > 0) {
-            const lastLiked = likedMovies[likedMovies.length - 1];
+          if (highlyRated.length > 0) {
+            const seedMovie = highlyRated[Math.floor(Math.random() * highlyRated.length)];
             const res = await fetch(
-              `https://api.themoviedb.org/3/${lastLiked.mediaType}/${lastLiked.movieId}/recommendations?api_key=${API_KEY}&language=en-US`,
+              `https://api.themoviedb.org/3/${seedMovie.mediaType}/${seedMovie.movieId}/recommendations?api_key=${API_KEY}&language=en-US`,
               { signal }
             );
             if (signal.aborted || !res.ok) {
@@ -67,7 +75,7 @@ export function MovieFinder() {
             if (signal.aborted) return;
             
             const recommendedItems = (data.results || [])
-              .map((item: any) => ({ ...item, media_type: lastLiked.mediaType }))
+              .map((item: any) => ({ ...item, media_type: seedMovie.mediaType }))
               .filter((item: any) => item.poster_path)
               .sort((a: SearchResult, b: SearchResult) => b.popularity - a.popularity)
               .slice(0, 10);
@@ -196,9 +204,9 @@ export function MovieFinder() {
 
     return (
       <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-        <Film className="h-16 w-16" />
+        <Star className="h-16 w-16" />
         <p className="text-lg">Welcome to Movie Finder!</p>
-        <p className="text-sm">Like some movies to get personalized recommendations.</p>
+        <p className="text-sm">Go to the Discover page to rate movies and get personalized recommendations.</p>
       </div>
     );
   };
@@ -252,7 +260,7 @@ export function MovieFinder() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Start typing to search or like movies for recommendations..."
+            placeholder="Start typing to search..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="h-12 w-full rounded-full bg-card py-3 pl-10 pr-4 text-base shadow-sm"
