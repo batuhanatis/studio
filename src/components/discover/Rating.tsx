@@ -28,7 +28,7 @@ export function Rating({ rating, onRatingChange, starSize = 28 }: RatingProps) {
           <Star
             className={cn(
               'transition-colors',
-              (hoverRating || rating) >= star ? 'text-amber-400 fill-amber-400' : 'text-white/50'
+              (hoverRating || rating) >= star ? 'text-amber-400 fill-amber-400' : 'text-muted-foreground'
             )}
             style={{ width: starSize, height: starSize }}
           />
