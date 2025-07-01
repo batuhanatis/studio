@@ -17,6 +17,7 @@ interface Movie {
   poster_path: string | null;
   media_type: 'movie' | 'tv';
   overview: string;
+  vote_average: number;
 }
 
 interface UserMovieData {
@@ -43,69 +44,82 @@ export function DiscoverFeed() {
   const [userWatched, setUserWatched] = useState<UserMovieData[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
 
-  useEffect(() => {
-    async function fetchMovies() {
-      setLoading(true);
-      try {
-        const movieRes = await fetch(
-          `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`
-        );
-        const tvRes = await fetch(
-          `https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`
-        );
+  const fetchAndSetMovies = useCallback(async () => {
+    setLoading(true);
+    try {
+      let initialMovies: Movie[] = [];
+      const userDocRef = user ? doc(db, 'users', user.uid) : null;
+      const userDoc = userDocRef ? await getDoc(userDocRef) : null;
+      
+      const userData = userDoc?.data();
+      const ratedMovies: UserRatingData[] = userData?.ratedMovies || [];
+      const watchedMovies: UserMovieData[] = userData?.watchedMovies || [];
+      const seenMovieIds = new Set([...ratedMovies.map(m => m.movieId), ...watchedMovies.map(m => m.movieId)]);
+      
+      const highlyRated = ratedMovies.filter(r => r.rating >= 4);
 
-        if (!movieRes.ok || !tvRes.ok) throw new Error('Failed to fetch from TMDB');
+      if (highlyRated.length > 0) {
+        const seedMovie = highlyRated[Math.floor(Math.random() * highlyRated.length)];
+        const res = await fetch(`https://api.themoviedb.org/3/${seedMovie.mediaType}/${seedMovie.movieId}/recommendations?api_key=${API_KEY}&language=en-US`);
+        if (res.ok) {
+            const data = await res.json();
+            initialMovies = (data.results || [])
+                .map((m: any) => ({...m, media_type: m.media_type || seedMovie.mediaType}))
+                .filter((m: Movie) => m.poster_path && m.overview && !seenMovieIds.has(String(m.id)));
+        }
+      }
+
+      if (initialMovies.length < 10) {
+        const movieRes = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
+        const tvRes = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
         
         const movieData = await movieRes.json();
         const tvData = await tvRes.json();
 
-        const combined = [
-          ...movieData.results.map((m: any) => ({ ...m, media_type: 'movie' })),
-          ...tvData.results.map((t: any) => ({ ...t, media_type: 'tv' })),
-        ]
-          .filter(item => item.poster_path && item.overview)
-          .sort(() => 0.5 - Math.random()); // Shuffle
+        const popular = [
+            ...movieData.results.map((m: any) => ({ ...m, media_type: 'movie' })),
+            ...tvData.results.map((t: any) => ({ ...t, media_type: 'tv' })),
+        ].filter(item => item.poster_path && item.overview && !seenMovieIds.has(String(item.id)));
+        
+        const existingIds = new Set(initialMovies.map(r => r.id));
+        const uniquePopular = popular.filter(p => !existingIds.has(p.id));
 
-        setMovies(combined);
-      } catch (error) {
+        initialMovies.push(...uniquePopular);
+      }
+      
+      setMovies(initialMovies.sort(() => 0.5 - Math.random()));
+    } catch (error) {
         console.error("Error fetching discover feed:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load movies.' });
-      } finally {
+        setMovies([]);
+    } finally {
         setLoading(false);
-      }
     }
-    fetchMovies();
-  }, [toast]);
+  }, [user, toast]);
+
+  useEffect(() => {
+    fetchAndSetMovies();
+  }, [fetchAndSetMovies]);
 
   useEffect(() => {
     if (!user) {
       setLoadingUserData(false);
       return;
     }
-
-    const fetchUserData = async () => {
-      setLoadingUserData(true);
-      try {
-        const userDocRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setUserRatings(data.ratedMovies || []);
-          setUserWatched(data.watchedMovies || []);
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+            const data = doc.data();
+            setUserRatings(data.ratedMovies || []);
+            setUserWatched(data.watchedMovies || []);
         }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-        toast({
-          variant: 'destructive',
-          title: 'Connection Error',
-          description: 'Could not load your saved ratings.',
-        });
-      } finally {
         setLoadingUserData(false);
-      }
-    };
-    
-    fetchUserData();
+    }, (error) => {
+        console.error("Error fetching user data snapshot:", error);
+        toast({ variant: 'destructive', title: 'Connection Error', description: 'Could not load your saved ratings.' });
+        setLoadingUserData(false);
+    });
+    return () => unsubscribe();
   }, [user, toast]);
 
   const handleRateMovie = async (movieId: number, mediaType: 'movie' | 'tv', rating: number) => {
@@ -120,8 +134,28 @@ export function DiscoverFeed() {
       const userDocRef = doc(db, 'users', user.uid);
       await updateDoc(userDocRef, { ratedMovies: newRatings });
       toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
+      
+      if (rating >= 4) {
+        const res = await fetch(`https://api.themoviedb.org/3/${mediaType}/${movieId}/recommendations?api_key=${API_KEY}&language=en-US`);
+        if (res.ok) {
+            const data = await res.json();
+            const seenMovieIds = new Set([
+                ...newRatings.map(m => m.movieId), 
+                ...userWatched.map(m => m.movieId),
+                ...movies.map(m => String(m.id))
+            ]);
+            const newRecs = (data.results || [])
+                .map((m: any) => ({...m, media_type: m.media_type || mediaType}))
+                .filter((m: Movie) => m.poster_path && m.overview && !seenMovieIds.has(String(m.id)));
+            
+            if (newRecs.length > 0) {
+                setMovies(prev => [...prev, ...newRecs.sort(() => 0.5 - Math.random())]);
+                toast({ title: "We've found more for you!", description: "New recommendations added to your queue."});
+            }
+        }
+      }
     } catch (error) {
-       setUserRatings(originalRatings); // Revert on error
+       setUserRatings(originalRatings);
        toast({ variant: 'destructive', title: 'Error', description: 'Could not save rating.' });
     }
   };
@@ -145,7 +179,7 @@ export function DiscoverFeed() {
         await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
       }
     } catch (error) {
-      setUserWatched(originalWatched); // Revert on error
+      setUserWatched(originalWatched);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };
@@ -161,29 +195,6 @@ export function DiscoverFeed() {
   }, [emblaApi]);
 
 
-  if (loading || loadingUserData) {
-    return (
-      <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p>Loading your next discovery...</p>
-      </div>
-    );
-  }
-
-  if (movies.length === 0) {
-    return (
-      <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-        <Film className="h-16 w-16" />
-        <p className="text-lg">Could not load movies.</p>
-        <p className="text-sm">Please try again later.</p>
-      </div>
-    );
-  }
-
-  const currentMovie = movies[currentIndex];
-  const currentRating = userRatings.find(r => r.movieId === String(currentMovie?.id) && r.mediaType === currentMovie?.media_type)?.rating || 0;
-  const currentIsWatched = userWatched.some(m => m.movieId === String(currentMovie?.id) && m.mediaType === currentMovie?.media_type);
-
   return (
     <div className="w-full">
        <div className="text-center mb-8">
@@ -194,25 +205,36 @@ export function DiscoverFeed() {
                 Rate movies and shows to get better recommendations.
             </p>
         </div>
-        <div className="overflow-hidden" ref={emblaRef}>
-            <div className="flex">
-            {movies.map((movie, index) => (
-                <div className="relative flex-[0_0_100%]" key={movie.id}>
-                    <DiscoverCard
-                        movie={movie}
-                        rating={userRatings.find(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type)?.rating || 0}
-                        isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
-                        onRate={(rating) => handleRateMovie(movie.id, movie.media_type, rating)}
-                        onToggleWatched={(watched) => handleToggleWatched(movie.id, movie.media_type, watched)}
-                        onPrev={scrollPrev}
-                        onNext={scrollNext}
-                        isFirst={index === 0}
-                        isLast={index === movies.length - 1}
-                    />
-                </div>
-            ))}
+        
+        { (loading || loadingUserData) && movies.length === 0 ? (
+            <DiscoverCard />
+        ) : !loading && movies.length === 0 ? (
+             <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
+                <Film className="h-16 w-16" />
+                <p className="text-lg">No New Movies to Discover</p>
+                <p className="text-sm">You've rated all available movies, or we couldn't find any. Try again later!</p>
             </div>
-      </div>
+        ) : (
+            <div className="overflow-hidden" ref={emblaRef}>
+                <div className="flex">
+                {movies.map((movie, index) => (
+                    <div className="relative flex-[0_0_100%]" key={`${movie.id}-${index}`}>
+                        <DiscoverCard
+                            movie={movie}
+                            rating={userRatings.find(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type)?.rating || 0}
+                            isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
+                            onRate={(rating) => handleRateMovie(movie.id, movie.media_type, rating)}
+                            onToggleWatched={(watched) => handleToggleWatched(movie.id, movie.media_type, watched)}
+                            onPrev={scrollPrev}
+                            onNext={scrollNext}
+                            isFirst={index === 0}
+                            isLast={index === movies.length - 1}
+                        />
+                    </div>
+                ))}
+                </div>
+            </div>
+        )}
     </div>
   );
 }
