@@ -307,7 +307,7 @@ export function MovieFinder() {
 
   return (
     <div className="flex flex-col items-center gap-8">
-      <div className="w-full text-center">
+      <div className="w-full text-left sm:text-center">
         <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
           Find Movies & TV Shows
         </h1>

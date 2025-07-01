@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -198,7 +197,7 @@ export function ForYouFeed() {
 
   return (
     <div className="space-y-8">
-      <div className="text-center">
+      <div className="text-left sm:text-center">
         <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
           For You
         </h1>

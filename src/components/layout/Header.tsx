@@ -1,13 +1,18 @@
-
 'use client';
 
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Film, LogOut, Users, Gift, Compass, Sparkles, List } from 'lucide-react';
+import { Film, LogOut, Users, Gift, Compass, Sparkles, List, Menu } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetClose,
+} from '@/components/ui/sheet';
 
 export function Header() {
   const router = useRouter();
@@ -26,6 +31,86 @@ export function Header() {
     }
   };
 
+  const navLinks = (
+    <>
+      <Button asChild variant="ghost" size="sm">
+        <Link href="/discover">
+          <Compass className="mr-2 h-4 w-4" />
+          Discover
+        </Link>
+      </Button>
+      <Button asChild variant="ghost" size="sm">
+        <Link href="/foryou">
+          <Sparkles className="mr-2 h-4 w-4" />
+          For You
+        </Link>
+      </Button>
+      <Button asChild variant="ghost" size="sm">
+        <Link href="/watchlists">
+          <List className="mr-2 h-4 w-4" />
+          Watchlists
+        </Link>
+      </Button>
+      <Button asChild variant="ghost" size="sm">
+        <Link href="/recommendations">
+          <Gift className="mr-2 h-4 w-4" />
+          Recommendations
+        </Link>
+      </Button>
+      <Button asChild variant="ghost" size="sm">
+        <Link href="/friends">
+          <Users className="mr-2 h-4 w-4" />
+          Friends
+        </Link>
+      </Button>
+      <Button variant="ghost" size="sm" onClick={handleLogout}>
+        <LogOut className="mr-2 h-4 w-4" />
+        Logout
+      </Button>
+    </>
+  );
+
+  const mobileNavLinks = (
+    <nav className="flex flex-col gap-2">
+        <SheetClose asChild>
+            <Link href="/discover" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+                <Compass className="h-5 w-5" />
+                <span className="font-medium">Discover</span>
+            </Link>
+        </SheetClose>
+        <SheetClose asChild>
+            <Link href="/foryou" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+                <Sparkles className="h-5 w-5" />
+                <span className="font-medium">For You</span>
+            </Link>
+        </SheetClose>
+        <SheetClose asChild>
+            <Link href="/watchlists" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+                <List className="h-5 w-5" />
+                <span className="font-medium">Watchlists</span>
+            </Link>
+        </SheetClose>
+        <SheetClose asChild>
+            <Link href="/recommendations" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+                <Gift className="h-5 w-5" />
+                <span className="font-medium">Recommendations</span>
+            </Link>
+        </SheetClose>
+        <SheetClose asChild>
+            <Link href="/friends" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+                <Users className="h-5 w-5" />
+                <span className="font-medium">Friends</span>
+            </Link>
+        </SheetClose>
+        <SheetClose asChild>
+            <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+                <LogOut className="h-5 w-5" />
+                <span className="font-medium">Logout</span>
+            </button>
+        </SheetClose>
+    </nav>
+  );
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card/80 backdrop-blur">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -35,41 +120,31 @@ export function Header() {
             Movie Finder
           </h1>
         </Link>
-        <div className="flex items-center gap-1">
-           <Button asChild variant="ghost" size="sm">
-            <Link href="/discover">
-              <Compass className="mr-2 h-4 w-4" />
-              Discover
-            </Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/foryou">
-              <Sparkles className="mr-2 h-4 w-4" />
-              For You
-            </Link>
-          </Button>
-           <Button asChild variant="ghost" size="sm">
-            <Link href="/watchlists">
-              <List className="mr-2 h-4 w-4" />
-              Watchlists
-            </Link>
-          </Button>
-           <Button asChild variant="ghost" size="sm">
-            <Link href="/recommendations">
-              <Gift className="mr-2 h-4 w-4" />
-              Recommendations
-            </Link>
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/friends">
-              <Users className="mr-2 h-4 w-4" />
-              Friends
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+        
+        {/* Desktop Navigation */}
+        <div className="hidden items-center gap-1 md:flex">
+          {navLinks}
+        </div>
+        
+        {/* Mobile Navigation */}
+        <div className="md:hidden">
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                        <Menu className="h-6 w-6" />
+                        <span className="sr-only">Open menu</span>
+                    </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[250px] p-4">
+                     <Link href="/search" className="mb-6 flex items-center gap-2">
+                        <Film className="h-7 w-7 text-primary" />
+                        <h1 className="text-xl font-bold font-headline tracking-tight text-foreground">
+                            Movie Finder
+                        </h1>
+                    </Link>
+                    {mobileNavLinks}
+                </SheetContent>
+            </Sheet>
         </div>
       </div>
     </header>
