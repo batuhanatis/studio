@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image';
-import Link from 'next/link';
 
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Search, Film, Tv, Star, Keyboard } from 'lucide-react';
+import { Loader2, Search, Keyboard } from 'lucide-react';
+import { MovieResultCard } from './MovieResultCard';
 
 interface SearchResult {
   id: number;
@@ -162,39 +160,9 @@ export function MovieFinder() {
 
       {results.length > 0 && !isLoading && (
         <div className="w-full max-w-4xl space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {results.map((item) => {
-            const title = item.title || item.name || 'Untitled';
-            const href = `/search/${item.media_type}/${item.id}?title=${encodeURIComponent(title)}&poster=${item.poster_path}&rating=${item.vote_average}`;
-            return (
-            <Link href={href} key={item.id} className="block">
-                <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200">
-                <CardContent className="p-0 flex">
-                    <div className="relative w-28 h-40 md:w-32 md:h-48 flex-shrink-0 bg-muted">
-                    <Image
-                        src={`https://image.tmdb.org/t/p/w200${item.poster_path}`}
-                        alt={title}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 112px, 128px"
-                        data-ai-hint="movie poster"
-                    />
-                    </div>
-                    <div className="p-4 flex flex-col justify-center gap-1">
-                    <h3 className="text-lg font-bold font-headline">{title}</h3>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        {item.media_type === 'movie' ? <Film className="h-4 w-4" /> : <Tv className="h-4 w-4" />}
-                        <span>{item.media_type === 'movie' ? 'Movie' : 'TV Show'}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-foreground mt-2">
-                        <Star className="h-4 w-4 text-amber-500" />
-                        <span className="font-semibold">{item.vote_average > 0 ? `${item.vote_average.toFixed(1)}` : 'N/A'}</span>
-                        <span className="text-muted-foreground">/ 10</span>
-                    </div>
-                    </div>
-                </CardContent>
-                </Card>
-            </Link>
-          )})}
+          {results.map((item) => (
+             <MovieResultCard key={item.id} item={item} />
+          ))}
         </div>
       )}
     </div>
