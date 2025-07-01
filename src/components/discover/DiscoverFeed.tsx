@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Film } from 'lucide-react';
 import useEmblaCarousel from 'embla-carousel-react';
@@ -78,24 +78,42 @@ export function DiscoverFeed() {
   }, [toast]);
 
   useEffect(() => {
-    if (!user) return;
-    setLoadingUserData(true);
-    const userDocRef = doc(db, 'users', user.uid);
-    getDoc(userDocRef).then((docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setUserRatings(data.ratedMovies || []);
-        setUserWatched(data.watchedMovies || []);
-      }
+    if (!user) {
       setLoadingUserData(false);
-    });
-  }, [user]);
+      return;
+    }
+
+    const fetchUserData = async () => {
+      setLoadingUserData(true);
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setUserRatings(data.ratedMovies || []);
+          setUserWatched(data.watchedMovies || []);
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        toast({
+          variant: 'destructive',
+          title: 'Connection Error',
+          description: 'Could not load your saved ratings.',
+        });
+      } finally {
+        setLoadingUserData(false);
+      }
+    };
+    
+    fetchUserData();
+  }, [user, toast]);
 
   const handleRateMovie = async (movieId: number, mediaType: 'movie' | 'tv', rating: number) => {
     if (!user) return;
     const movieIdentifier = { movieId: String(movieId), mediaType };
     
-    const newRatings = [...userRatings.filter(r => r.movieId !== String(movieId) || r.mediaType !== mediaType), {...movieIdentifier, rating}];
+    const originalRatings = [...userRatings];
+    const newRatings = [...originalRatings.filter(r => r.movieId !== String(movieId) || r.mediaType !== mediaType), {...movieIdentifier, rating}];
     setUserRatings(newRatings);
 
     try {
@@ -103,6 +121,7 @@ export function DiscoverFeed() {
       await updateDoc(userDocRef, { ratedMovies: newRatings });
       toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
     } catch (error) {
+       setUserRatings(originalRatings); // Revert on error
        toast({ variant: 'destructive', title: 'Error', description: 'Could not save rating.' });
     }
   };
@@ -111,12 +130,23 @@ export function DiscoverFeed() {
     if (!user) return;
     const movieIdentifier = { movieId: String(movieId), mediaType };
     
+    const originalWatched = [...userWatched];
     if (isWatched) {
         setUserWatched(prev => [...prev, movieIdentifier]);
-        await updateDoc(doc(db, 'users', user.uid), { watchedMovies: arrayUnion(movieIdentifier) });
     } else {
         setUserWatched(prev => prev.filter(m => m.movieId !== String(movieId) || m.mediaType !== mediaType));
-        await updateDoc(doc(db, 'users', user.uid), { watchedMovies: arrayRemove(movieIdentifier) });
+    }
+
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      if (isWatched) {
+        await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
+      } else {
+        await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
+      }
+    } catch (error) {
+      setUserWatched(originalWatched); // Revert on error
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };
 

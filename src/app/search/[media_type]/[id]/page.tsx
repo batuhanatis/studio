@@ -83,36 +83,50 @@ export default function DetailPage() {
   }, [id, media_type]);
   
   useEffect(() => {
-    if (!user || !id) return;
-    setLoadingUserData(true);
-    const userDocRef = doc(db, 'users', user.uid);
-    getDoc(userDocRef).then((docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            const ratedMovie = (data.ratedMovies || []).find((m: any) => m.movieId === id && m.mediaType === media_type);
-            const watchedMovie = (data.watchedMovies || []).some((m: any) => m.movieId === id && m.mediaType === media_type);
-            setUserRating(ratedMovie?.rating || 0);
-            setIsWatched(watchedMovie);
-        }
+    if (!user || !id) {
         setLoadingUserData(false);
-    });
-  }, [user, id, media_type]);
+        return;
+    }
+    
+    const fetchUserData = async () => {
+        setLoadingUserData(true);
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            const docSnap = await getDoc(userDocRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const ratedMovie = (data.ratedMovies || []).find((m: any) => m.movieId === id && m.mediaType === media_type);
+                const watchedMovie = (data.watchedMovies || []).some((m: any) => m.movieId === id && m.mediaType === media_type);
+                setUserRating(ratedMovie?.rating || 0);
+                setIsWatched(watchedMovie);
+            }
+        } catch (error) {
+            console.error("Error fetching user data for detail page:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not load your rating.' });
+        } finally {
+            setLoadingUserData(false);
+        }
+    };
+
+    fetchUserData();
+  }, [user, id, media_type, toast]);
 
   const handleRateMovie = async (rating: number) => {
     if (!user) return;
     const movieIdentifier = { movieId: id, mediaType: media_type };
-    
-    const userDocRef = doc(db, 'users', user.uid);
-    const userDoc = await getDoc(userDocRef);
-    const currentRatings = userDoc.data()?.ratedMovies || [];
-    
-    const newRatings = [...currentRatings.filter((r: any) => r.movieId !== id || r.mediaType !== media_type), {...movieIdentifier, rating}];
+    const originalRating = userRating;
     setUserRating(rating);
 
     try {
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      const currentRatings = userDoc.data()?.ratedMovies || [];
+      const newRatings = [...currentRatings.filter((r: any) => r.movieId !== id || r.mediaType !== media_type), {...movieIdentifier, rating}];
+      
       await updateDoc(userDocRef, { ratedMovies: newRatings });
       toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
     } catch (error) {
+       setUserRating(originalRating);
        toast({ variant: 'destructive', title: 'Error', description: 'Could not save rating.' });
     }
   };
@@ -120,12 +134,19 @@ export default function DetailPage() {
   const handleToggleWatched = async (watched: boolean) => {
     if (!user) return;
     const movieIdentifier = { movieId: id, mediaType: media_type };
+    const originalWatched = isWatched;
     setIsWatched(watched);
     
-    if (watched) {
-        await updateDoc(doc(db, 'users', user.uid), { watchedMovies: arrayUnion(movieIdentifier) });
-    } else {
-        await updateDoc(doc(db, 'users', user.uid), { watchedMovies: arrayRemove(movieIdentifier) });
+    try {
+        const userDocRef = doc(db, 'users', user.uid);
+        if (watched) {
+            await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
+        } else {
+            await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
+        }
+    } catch (error) {
+        setIsWatched(originalWatched);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };
 
