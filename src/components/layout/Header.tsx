@@ -5,7 +5,7 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Film, LogOut, Users, Gift, Compass, Sparkles } from 'lucide-react';
+import { Film, LogOut, Users, Gift, Compass, Sparkles, Combine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 

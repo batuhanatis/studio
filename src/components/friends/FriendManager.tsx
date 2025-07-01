@@ -20,12 +20,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
-import { Loader2, UserPlus, Check, X, Users, Mail } from 'lucide-react';
+import { Loader2, UserPlus, Check, X, Users, Mail, Combine } from 'lucide-react';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 
 interface UserProfile {
@@ -260,6 +261,13 @@ export function FriendManager() {
                        <AvatarFallback>{getInitials(friend.email)}</AvatarFallback>
                     </Avatar>
                     <span className="font-medium">{friend.email}</span>
+                    <div className="ml-auto">
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={`/blend/${friend.uid}`}>
+                                <Combine className="mr-2 h-4 w-4" /> Blend
+                            </Link>
+                        </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
