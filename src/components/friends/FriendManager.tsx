@@ -15,7 +15,6 @@ import {
   getDocs,
   onSnapshot,
   writeBatch,
-  serverTimestamp,
 } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -56,41 +55,63 @@ export function FriendManager() {
     const userDocRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userDocRef, async (snapshot) => {
       const userData = snapshot.data();
-      if (!userData) return;
 
-      if (userData.friendRequestsReceived && userData.friendRequestsReceived.length > 0) {
-        setLoading(prev => ({ ...prev, requests: true }));
-        const requestProfiles = await Promise.all(
-          userData.friendRequestsReceived.map(async (uid: string) => {
-            const userDoc = await getDoc(doc(db, 'users', uid));
-            return userDoc.exists() ? (userDoc.data() as UserProfile) : null;
-          })
-        );
-        setRequests(requestProfiles.filter(Boolean) as UserProfile[]);
-        setLoading(prev => ({ ...prev, requests: false }));
-      } else {
+      if (!userData) {
         setRequests([]);
+        setFriends([]);
+        setLoading({ requests: false, friends: false, action: false });
+        return;
+      }
+
+      // Fetch friend requests
+      setLoading(prev => ({ ...prev, requests: true }));
+      try {
+        if (userData.friendRequestsReceived?.length > 0) {
+          const requestUids: string[] = userData.friendRequestsReceived;
+          const requestProfiles = await Promise.all(
+            requestUids.map(async (uid) => {
+              const userDoc = await getDoc(doc(db, 'users', uid));
+              return userDoc.exists() ? (userDoc.data() as UserProfile) : null;
+            })
+          );
+          setRequests(requestProfiles.filter(Boolean) as UserProfile[]);
+        } else {
+          setRequests([]);
+        }
+      } catch (error) {
+        console.error("Error fetching friend requests:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load friend requests.' });
+        setRequests([]);
+      } finally {
         setLoading(prev => ({ ...prev, requests: false }));
       }
 
-      if (userData.friends && userData.friends.length > 0) {
-        setLoading(prev => ({ ...prev, friends: true }));
-        const friendProfiles = await Promise.all(
-          userData.friends.map(async (uid: string) => {
-            const userDoc = await getDoc(doc(db, 'users', uid));
-            return userDoc.exists() ? (userDoc.data() as UserProfile) : null;
-          })
-        );
-        setFriends(friendProfiles.filter(Boolean) as UserProfile[]);
-        setLoading(prev => ({ ...prev, friends: false }));
-      } else {
+      // Fetch friends
+      setLoading(prev => ({ ...prev, friends: true }));
+      try {
+        if (userData.friends?.length > 0) {
+          const friendUids: string[] = userData.friends;
+          const friendProfiles = await Promise.all(
+            friendUids.map(async (uid) => {
+              const userDoc = await getDoc(doc(db, 'users', uid));
+              return userDoc.exists() ? (userDoc.data() as UserProfile) : null;
+            })
+          );
+          setFriends(friendProfiles.filter(Boolean) as UserProfile[]);
+        } else {
+          setFriends([]);
+        }
+      } catch (error) {
+        console.error("Error fetching friends list:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load friends list.' });
         setFriends([]);
+      } finally {
         setLoading(prev => ({ ...prev, friends: false }));
       }
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, toast]);
 
   const handleAddFriend = async (values: z.infer<typeof addFriendSchema>) => {
     if (!user || values.email === user.email) {
