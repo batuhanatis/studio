@@ -17,6 +17,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -264,33 +266,60 @@ export default function DetailPage() {
               </>
             )}
             
-            <div className="mt-6 flex flex-col items-start gap-4">
-              <div className="flex items-center gap-2">
-                <SendRecommendationButton movie={movieDetails} />
-              </div>
-              
-              {!loadingUserData && (
-                <>
-                  <div className="flex flex-col items-start gap-2">
-                      <p className="text-sm font-semibold text-muted-foreground">Your Rating</p>
-                      <Rating rating={userRating} onRatingChange={handleRateMovie} starSize={24} />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                        id={`watched-detail-${id}`}
-                        checked={isWatched}
-                        onCheckedChange={handleToggleWatched}
-                    />
-                    <label
-                        htmlFor={`watched-detail-${id}`}
-                        className="flex items-center gap-2 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                        <Eye className="h-4 w-4" />
-                        Mark as Watched
-                    </label>
-                  </div>
-                </>
-              )}
+            <div className="mt-6 space-y-4">
+              <SendRecommendationButton movie={movieDetails} />
+
+              <Card>
+                <CardContent className="space-y-4 p-4">
+                  {loadingUserData ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-20" />
+                        <div className="flex gap-1">
+                          <Skeleton className="h-6 w-6" />
+                          <Skeleton className="h-6 w-6" />
+                          <Skeleton className="h-6 w-6" />
+                          <Skeleton className="h-6 w-6" />
+                          <Skeleton className="h-6 w-6" />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center space-x-2">
+                        <Skeleton className="h-4 w-4" />
+                        <Skeleton className="h-4 w-28" />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold text-muted-foreground">
+                          Your Rating
+                        </p>
+                        <Rating
+                          rating={userRating}
+                          onRatingChange={handleRateMovie}
+                          starSize={24}
+                        />
+                      </div>
+                      <Separator />
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`watched-detail-${id}`}
+                          checked={isWatched}
+                          onCheckedChange={handleToggleWatched}
+                        />
+                        <label
+                          htmlFor={`watched-detail-${id}`}
+                          className="flex cursor-pointer items-center gap-2 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Mark as Watched
+                        </label>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
             </div>
             
             <div className="mt-8">
