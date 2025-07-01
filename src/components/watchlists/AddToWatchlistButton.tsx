@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, collection, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, onSnapshot, runTransaction } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -74,33 +74,48 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     if (!user) return;
     setAddingToList(listId);
     
+    const userDocRef = doc(db, 'users', user.uid);
+
     try {
-      const userDocRef = doc(db, 'users', user.uid);
-      const docSnap = await getDoc(userDocRef);
-      if (!docSnap.exists()) throw new Error("User not found");
+      const result = await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userDocRef);
+        if (!userDoc.exists()) {
+          throw new Error("User profile not found. Cannot add to list.");
+        }
 
-      const currentWatchlists: Watchlist[] = docSnap.data().watchlists || [];
-      const listIndex = currentWatchlists.findIndex(l => l.id === listId);
+        const currentWatchlists: Watchlist[] = userDoc.data().watchlists || [];
+        const listIndex = currentWatchlists.findIndex(l => l.id === listId);
 
-      if (listIndex === -1) throw new Error("Watchlist not found");
+        if (listIndex === -1) {
+          throw new Error("Watchlist not found. It might have been deleted.");
+        }
 
-      const targetList = currentWatchlists[listIndex];
-      const movieExists = targetList.movies.some(m => m.id === movie.id && m.media_type === movie.media_type);
+        const targetList = currentWatchlists[listIndex];
+        const movieExists = targetList.movies.some(m => m.id === movie.id && m.media_type === movie.media_type);
 
-      if (movieExists) {
-        toast({ variant: 'default', title: 'Already Added', description: `"${movie.title}" is already in "${targetList.name}".` });
-        setIsOpen(false);
-        return;
-      }
+        if (movieExists) {
+          return { status: 'exists', listName: targetList.name };
+        }
+        
+        const updatedMovies = [...targetList.movies, movie];
+        const updatedList = { ...targetList, movies: updatedMovies };
+        
+        const updatedWatchlists = [...currentWatchlists];
+        updatedWatchlists[listIndex] = updatedList;
+
+        transaction.update(userDocRef, { watchlists: updatedWatchlists });
+        return { status: 'added', listName: targetList.name };
+      });
       
-      const updatedMovies = [...targetList.movies, movie];
-      currentWatchlists[listIndex] = { ...targetList, movies: updatedMovies };
-
-      await setDoc(userDocRef, { watchlists: currentWatchlists }, { merge: true });
-      toast({ title: 'Success!', description: `Added "${movie.title}" to "${targetList.name}".` });
+      if (result.status === 'exists') {
+        toast({ variant: 'default', title: 'Already Added', description: `"${movie.title}" is already in "${result.listName}".` });
+      } else if (result.status === 'added') {
+        toast({ title: 'Success!', description: `Added "${movie.title}" to "${result.listName}".` });
+      }
       setIsOpen(false);
 
     } catch (error: any) {
+      console.error("Transaction failed: ", error);
       toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not add to list.' });
     } finally {
       setAddingToList(null);
@@ -111,32 +126,39 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     if (!user || !newListName.trim()) return;
     setIsCreating(true);
     
-    try {
-      const userDocRef = doc(db, 'users', user.uid);
-      const docSnap = await getDoc(userDocRef);
-      if (!docSnap.exists()) throw new Error("User not found");
-      
-      const newId = doc(collection(db, 'users')).id;
-      const newList: Watchlist = {
+    const userDocRef = doc(db, 'users', user.uid);
+    const newId = doc(collection(db, 'users')).id;
+    const newList: Watchlist = {
         id: newId,
         name: newListName.trim(),
         movies: [movie]
-      };
+    };
 
-      const currentWatchlists = docSnap.data().watchlists || [];
-      const updatedWatchlists = [...currentWatchlists, newList];
-      
-      await setDoc(userDocRef, { watchlists: updatedWatchlists }, { merge: true });
-      toast({ title: 'Success!', description: `Created list "${newList.name}" and added "${movie.title}".` });
-      setNewListName('');
-      setIsOpen(false);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userDocRef);
+            const currentWatchlists = userDoc.exists() ? userDoc.data().watchlists || [] : [];
+            const updatedWatchlists = [...currentWatchlists, newList];
+            
+            if (userDoc.exists()) {
+                transaction.update(userDocRef, { watchlists: updatedWatchlists });
+            } else {
+                transaction.set(userDocRef, { watchlists: updatedWatchlists });
+            }
+        });
+
+        toast({ title: 'Success!', description: `Created list "${newList.name}" and added "${movie.title}".` });
+        setNewListName('');
+        setIsOpen(false);
       
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not create list.' });
+        console.error("Transaction failed: ", error);
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not create list.' });
     } finally {
-      setIsCreating(false);
+        setIsCreating(false);
     }
   };
+
 
   const buttonContent = isIconOnly ? (
     <ListPlus className="h-4 w-4" />

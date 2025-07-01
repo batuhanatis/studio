@@ -12,7 +12,7 @@ import { AddToWatchlistButton } from '@/components/watchlists/AddToWatchlistButt
 import { Rating } from '@/components/discover/Rating';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc, runTransaction } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -149,47 +149,69 @@ export default function DetailPage() {
 
   const handleRateMovie = async (rating: number) => {
     if (!user) return;
-    const movieIdentifier = { movieId: id, mediaType: media_type };
+    const userDocRef = doc(db, 'users', user.uid);
 
     try {
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
-      const currentRatings = userDoc.data()?.ratedMovies || [];
-      const newRatings = [...currentRatings.filter((r: any) => r.movieId !== id || r.mediaType !== media_type), {...movieIdentifier, rating}];
-      
-      await setDoc(userDocRef, { ratedMovies: newRatings }, { merge: true });
+      await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userDocRef);
+        
+        const currentRatings = userDoc.exists() ? userDoc.data().ratedMovies || [] : [];
+        const movieIdentifier = { movieId: id, mediaType: media_type };
+        const newRatings = [
+            ...currentRatings.filter((r: any) => r.movieId !== id || r.mediaType !== media_type), 
+            {...movieIdentifier, rating}
+        ];
+        
+        if (userDoc.exists()) {
+            transaction.update(userDocRef, { ratedMovies: newRatings });
+        } else {
+            transaction.set(userDocRef, { ratedMovies: newRatings });
+        }
+      });
       toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
     } catch (error) {
+       console.error("Transaction failed: ", error);
        toast({ variant: 'destructive', title: 'Error', description: 'Could not save rating.' });
     }
   };
   
   const handleToggleWatched = async (watched: boolean) => {
     if (!user) return;
+    const userDocRef = doc(db, 'users', user.uid);
     const movieIdentifier = { movieId: id, mediaType: media_type };
-    
-    try {
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        const currentWatched = userDoc.data()?.watchedMovies || [];
-        
-        let updatedWatched;
-        const movieExists = currentWatched.some((m: any) => m.movieId === id && m.mediaType === media_type);
 
-        if (watched) {
-            if (!movieExists) {
-                updatedWatched = [...currentWatched, movieIdentifier];
+    try {
+        await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userDocRef);
+            
+            const currentWatched = userDoc.exists() ? userDoc.data().watchedMovies || [] : [];
+            let updatedWatched;
+            const movieExists = currentWatched.some((m: any) => m.movieId === id && m.mediaType === media_type);
+
+            if (watched) {
+                if (!movieExists) {
+                    updatedWatched = [...currentWatched, movieIdentifier];
+                } else {
+                    updatedWatched = currentWatched; // No change needed
+                }
             } else {
-                updatedWatched = currentWatched;
+                updatedWatched = currentWatched.filter((m: any) => m.movieId !== id || m.mediaType !== media_type);
             }
-        } else {
-            updatedWatched = currentWatched.filter((m: any) => m.movieId !== id || m.mediaType !== media_type);
-        }
-        await setDoc(userDocRef, { watchedMovies: updatedWatched }, { merge: true });
+            
+            if (updatedWatched !== currentWatched) {
+                 if (userDoc.exists()) {
+                    transaction.update(userDocRef, { watchedMovies: updatedWatched });
+                } else {
+                    transaction.set(userDocRef, { watchedMovies: updatedWatched });
+                }
+            }
+        });
     } catch (error) {
+        console.error("Transaction failed: ", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };
+
 
   const posterUrl = poster && poster !== 'null'
     ? `https://image.tmdb.org/t/p/w500${poster}`
