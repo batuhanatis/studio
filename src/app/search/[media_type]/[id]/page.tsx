@@ -8,6 +8,7 @@ import { ArrowLeft, Star } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { SendRecommendationButton } from '@/components/search/SendRecommendationButton';
+import { LikeButton } from '@/components/search/LikeButton';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -120,8 +121,9 @@ export default function DetailPage() {
                </div>
             </div>
 
-            <div className="mt-6">
+            <div className="mt-6 flex items-center gap-2">
               <SendRecommendationButton movie={movieDetails} />
+              <LikeButton movieId={id} mediaType={media_type} />
             </div>
             
             <div className="mt-8">

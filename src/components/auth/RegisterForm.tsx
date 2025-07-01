@@ -66,6 +66,7 @@ export function RegisterForm() {
           friends: [],
           friendRequestsSent: [],
           friendRequestsReceived: [],
+          likedMovies: [],
         });
       }
 

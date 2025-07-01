@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, Keyboard } from 'lucide-react';
+import { Loader2, Search, Keyboard, Film } from 'lucide-react';
 import { MovieResultCard } from './MovieResultCard';
 
 interface SearchResult {
@@ -24,7 +27,76 @@ export function MovieFinder() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [recommendations, setRecommendations] = useState<SearchResult[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(true);
+  
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    const fetchRecommendations = async () => {
+      setLoadingRecs(true);
+      if (!user) {
+        setLoadingRecs(false);
+        return;
+      }
+      
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (signal.aborted) return;
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const likedMovies = userData.likedMovies || [];
+
+          if (likedMovies.length > 0) {
+            const lastLiked = likedMovies[likedMovies.length - 1];
+            const res = await fetch(
+              `https://api.themoviedb.org/3/${lastLiked.mediaType}/${lastLiked.movieId}/recommendations?api_key=${API_KEY}&language=en-US`,
+              { signal }
+            );
+            if (signal.aborted || !res.ok) {
+              setRecommendations([]);
+              return;
+            }
+            const data = await res.json();
+            if (signal.aborted) return;
+            
+            const recommendedItems = (data.results || [])
+              .map((item: any) => ({ ...item, media_type: lastLiked.mediaType }))
+              .filter((item: any) => item.poster_path)
+              .sort((a: SearchResult, b: SearchResult) => b.popularity - a.popularity)
+              .slice(0, 10);
+            setRecommendations(recommendedItems);
+          } else {
+            setRecommendations([]);
+          }
+        }
+      } catch (error) {
+        if (!signal.aborted) {
+          console.error("Failed to fetch recommendations:", error);
+          setRecommendations([]);
+        }
+      } finally {
+        if (!signal.aborted) {
+          setLoadingRecs(false);
+        }
+      }
+    };
+
+    if (query.trim().length === 0 && !hasSearched) {
+      fetchRecommendations();
+    } else {
+      setLoadingRecs(true);
+      setRecommendations([]);
+    }
+
+    return () => controller.abort();
+  }, [query, hasSearched, user]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -72,7 +144,7 @@ export function MovieFinder() {
         }
       } catch (error: any) {
         if (error.name === 'AbortError') {
-          return; // This is expected when a new search is initiated.
+          return;
         }
         if (!signal.aborted) {
           console.error('Error fetching movie data:', error);
@@ -98,6 +170,38 @@ export function MovieFinder() {
       controller.abort();
     };
   }, [query, toast]);
+
+  const renderRecommendations = () => {
+    if (query.trim().length > 0 || hasSearched) return null;
+
+    if (loadingRecs) {
+      return (
+        <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p>Loading recommendations for you...</p>
+        </div>
+      );
+    }
+    
+    if (recommendations.length > 0) {
+      return (
+        <div className="w-full max-w-4xl space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <h2 className="text-2xl font-bold font-headline mb-4">Recommended For You</h2>
+          {recommendations.map((item) => (
+            <MovieResultCard key={item.id} item={item} />
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
+        <Film className="h-16 w-16" />
+        <p className="text-lg">Welcome to Movie Finder!</p>
+        <p className="text-sm">Like some movies to get personalized recommendations.</p>
+      </div>
+    );
+  };
 
   const renderStatus = () => {
     if (isLoading) {
@@ -148,7 +252,7 @@ export function MovieFinder() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Start typing to search..."
+            placeholder="Start typing to search or like movies for recommendations..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="h-12 w-full rounded-full bg-card py-3 pl-10 pr-4 text-base shadow-sm"
@@ -156,6 +260,7 @@ export function MovieFinder() {
         </div>
       </form>
 
+      {renderRecommendations()}
       {renderStatus()}
 
       {results.length > 0 && !isLoading && (
