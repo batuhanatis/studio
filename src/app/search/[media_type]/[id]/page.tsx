@@ -1,3 +1,7 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Star } from 'lucide-react';
@@ -13,49 +17,57 @@ interface WatchProvider {
   logo_path: string;
 }
 
-interface DetailPageProps {
-  params: {
-    id: string;
-    media_type: 'movie' | 'tv';
-  };
-  searchParams: {
-    title: string;
-    poster: string;
-    rating: string;
-  };
-}
+export default function DetailPage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
 
-async function getWatchProviders(id: string, type: 'movie' | 'tv') {
-  try {
-    const res = await fetch(
-      `https://api.themoviedb.org/3/${type}/${id}/watch/providers?api_key=${API_KEY}`
-    );
-    if (!res.ok) throw new Error('Failed to fetch providers');
-    
-    const json = await res.json();
-    const tr = json.results?.TR;
-    if (!tr) return [];
+  const id = params.id as string;
+  const media_type = params.media_type as 'movie' | 'tv';
+  const title = searchParams.get('title') || 'Untitled';
+  const poster = searchParams.get('poster');
+  const rating = searchParams.get('rating') || '0';
 
-    const allProviders: WatchProvider[] = [
-      ...(tr.flatrate || []),
-      ...(tr.buy || []),
-      ...(tr.rent || []),
-    ];
+  const [platforms, setPlatforms] = useState<WatchProvider[] | null>(null);
+  const [loadingProviders, setLoadingProviders] = useState(true);
 
-    const unique = allProviders.filter(
-      (v, i, a) => a.findIndex((t) => t.provider_id === v.provider_id) === i
-    );
-    return unique;
-  } catch (error) {
-    console.error('Error fetching watch providers:', error);
-    return [];
-  }
-}
+  useEffect(() => {
+    async function getWatchProviders(id: string, type: 'movie' | 'tv') {
+      setLoadingProviders(true);
+      try {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/${type}/${id}/watch/providers?api_key=${API_KEY}`
+        );
+        if (!res.ok) throw new Error('Failed to fetch providers');
+        
+        const json = await res.json();
+        const tr = json.results?.TR;
+        if (!tr) {
+          setPlatforms([]);
+          return;
+        }
 
-export default async function DetailPage({ params, searchParams }: DetailPageProps) {
-  const { id, media_type } = params;
-  const { title, poster, rating } = searchParams;
-  const platforms = await getWatchProviders(id, media_type);
+        const allProviders: WatchProvider[] = [
+          ...(tr.flatrate || []),
+          ...(tr.buy || []),
+          ...(tr.rent || []),
+        ];
+
+        const unique = allProviders.filter(
+          (v, i, a) => a.findIndex((t) => t.provider_id === v.provider_id) === i
+        );
+        setPlatforms(unique);
+      } catch (error) {
+        console.error('Error fetching watch providers:', error);
+        setPlatforms([]);
+      } finally {
+        setLoadingProviders(false);
+      }
+    }
+
+    if (id && media_type) {
+      getWatchProviders(id, media_type);
+    }
+  }, [id, media_type]);
 
   const posterUrl = poster && poster !== 'null'
     ? `https://image.tmdb.org/t/p/w500${poster}`
@@ -64,10 +76,10 @@ export default async function DetailPage({ params, searchParams }: DetailPagePro
   const decodedTitle = decodeURIComponent(title);
 
   const movieDetails = {
-    id: params.id,
-    media_type: params.media_type,
+    id: id,
+    media_type: media_type,
     title: decodedTitle,
-    poster: searchParams.poster,
+    poster: poster,
   };
 
   return (
@@ -114,27 +126,29 @@ export default async function DetailPage({ params, searchParams }: DetailPagePro
             
             <div className="mt-8">
               <h2 className="text-xl font-bold font-headline">Watch in Türkiye</h2>
-              {platforms === null ? (
+              {loadingProviders ? (
                 <div className="mt-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-              ) : platforms.length === 0 ? (
+              ) : platforms && platforms.length === 0 ? (
                 <p className="mt-4 text-muted-foreground">No streaming platforms found.</p>
               ) : (
-                <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
-                  {platforms.map((p) => (
-                    <div key={p.provider_id} className="flex items-center gap-3 rounded-lg bg-card p-3 shadow-sm">
-                      <div className="relative h-10 w-10 overflow-hidden rounded-md bg-white">
-                        <Image
-                          src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
-                          alt={`${p.provider_name} logo`}
-                          fill
-                          className="object-contain"
-                          sizes="40px"
-                        />
+                platforms && (
+                  <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+                    {platforms.map((p) => (
+                      <div key={p.provider_id} className="flex items-center gap-3 rounded-lg bg-card p-3 shadow-sm">
+                        <div className="relative h-10 w-10 overflow-hidden rounded-md bg-white">
+                          <Image
+                            src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                            alt={`${p.provider_name} logo`}
+                            fill
+                            className="object-contain"
+                            sizes="40px"
+                          />
+                        </div>
+                        <span className="text-sm font-medium">{p.provider_name}</span>
                       </div>
-                      <span className="text-sm font-medium">{p.provider_name}</span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )
               )}
             </div>
           </div>

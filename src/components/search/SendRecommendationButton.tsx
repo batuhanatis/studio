@@ -29,7 +29,7 @@ interface MovieDetails {
   id: string;
   media_type: 'movie' | 'tv';
   title: string;
-  poster: string;
+  poster: string | null;
 }
 
 interface UserProfile {
