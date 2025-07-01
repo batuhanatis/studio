@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import Link from 'next/link';
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Search, Film, Tv, Star } from 'lucide-react';
@@ -29,53 +28,59 @@ export function MovieFinder() {
   const [hasSearched, setHasSearched] = useState(false);
   const { toast } = useToast();
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (query.length < 3) {
+  useEffect(() => {
+    if (query.trim() === '') {
       setResults([]);
       setHasSearched(false);
+      setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     setHasSearched(true);
-    setResults([]);
-    try {
-      const res = await fetch(
-        `https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(
-          query
-        )}&include_adult=false`
-      );
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.status_message || 'Failed to fetch from TMDB');
+    const searchMovies = async () => {
+      if (query.trim().length < 3) {
+        setResults([]);
+        setIsLoading(false);
+        return;
       }
 
-      const data = await res.json();
-      const sortedResults = (data.results || [])
-        .filter((item: any) => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path)
-        .sort((a: SearchResult, b: SearchResult) => b.popularity - a.popularity);
-      setResults(sortedResults);
-    } catch (error: any) {
-      console.error('Error fetching movie data:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Search Failed',
-        description: error.message || 'Could not fetch movie data. Please try again.',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const onChangeSearch = (text: string) => {
-    setQuery(text);
-    if (text.length === 0) {
-      setResults([]);
-      setHasSearched(false);
-    }
-  }
+      try {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(
+            query
+          )}&include_adult=false`
+        );
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.status_message || 'Failed to fetch from TMDB');
+        }
+
+        const data = await res.json();
+        const sortedResults = (data.results || [])
+          .filter((item: any) => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path)
+          .sort((a: SearchResult, b: SearchResult) => b.popularity - a.popularity);
+        setResults(sortedResults);
+      } catch (error: any) {
+        console.error('Error fetching movie data:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Search Failed',
+          description: error.message || 'Could not fetch movie data. Please try again.',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      searchMovies();
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(debounceTimer);
+  }, [query, toast]);
 
   return (
     <div className="flex flex-col items-center gap-8">
@@ -88,28 +93,17 @@ export function MovieFinder() {
         </p>
       </div>
 
-      <form onSubmit={handleSearch} className="w-full max-w-2xl">
+      <form onSubmit={(e) => e.preventDefault()} className="w-full max-w-2xl">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="e.g., The Matrix, Breaking Bad..."
+            placeholder="Start typing to search..."
             value={query}
-            onChange={(e) => onChangeSearch(e.target.value)}
-            className="h-12 w-full rounded-full bg-card py-3 pl-10 pr-32 text-base shadow-sm"
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-12 w-full rounded-full bg-card py-3 pl-10 pr-4 text-base shadow-sm"
             disabled={isLoading}
           />
-          <Button
-            type="submit"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-accent px-4 py-2 text-sm font-semibold hover:bg-accent/90"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              'Search'
-            )}
-          </Button>
         </div>
       </form>
 
