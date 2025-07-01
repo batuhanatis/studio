@@ -1,8 +1,9 @@
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Clapperboard, Star } from 'lucide-react';
+import { ArrowLeft, Star } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { SendRecommendationButton } from '@/components/search/SendRecommendationButton';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -41,7 +42,6 @@ async function getWatchProviders(id: string, type: 'movie' | 'tv') {
       ...(tr.rent || []),
     ];
 
-    // Filter for unique providers
     const unique = allProviders.filter(
       (v, i, a) => a.findIndex((t) => t.provider_id === v.provider_id) === i
     );
@@ -62,6 +62,13 @@ export default async function DetailPage({ params, searchParams }: DetailPagePro
     : 'https://placehold.co/500x750.png';
 
   const decodedTitle = decodeURIComponent(title);
+
+  const movieDetails = {
+    id: params.id,
+    media_type: params.media_type,
+    title: decodedTitle,
+    poster: searchParams.poster,
+  };
 
   return (
     <div className="min-h-screen w-full bg-background">
@@ -99,6 +106,10 @@ export default async function DetailPage({ params, searchParams }: DetailPagePro
                  <span className="font-semibold text-foreground">{parseFloat(rating).toFixed(1)}</span>
                  <span>/ 10</span>
                </div>
+            </div>
+
+            <div className="mt-6">
+              <SendRecommendationButton movie={movieDetails} />
             </div>
             
             <div className="mt-8">
