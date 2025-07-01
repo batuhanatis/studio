@@ -195,11 +195,13 @@ export function MovieFinder() {
     
     if (recommendations.length > 0) {
       return (
-        <div className="w-full max-w-4xl space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h2 className="text-2xl font-bold font-headline mb-4">Recommended For You</h2>
-          {recommendations.map((item) => (
-            <MovieResultCard key={item.id} item={item} />
-          ))}
+        <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <h2 className="text-2xl font-bold font-headline">Recommended For You</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {recommendations.map((item) => (
+                <MovieResultCard key={item.id} item={item} />
+            ))}
+          </div>
         </div>
       );
     }
@@ -274,10 +276,12 @@ export function MovieFinder() {
       {renderStatus()}
 
       {results.length > 0 && !isLoading && (
-        <div className="w-full max-w-4xl space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {results.map((item) => (
-             <MovieResultCard key={item.id} item={item} />
-          ))}
+        <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {results.map((item) => (
+                <MovieResultCard key={item.id} item={item} />
+            ))}
+           </div>
         </div>
       )}
     </div>

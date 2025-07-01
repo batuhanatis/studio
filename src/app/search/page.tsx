@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
@@ -31,7 +32,7 @@ export default function SearchPage() {
   return (
     <div className="min-h-screen w-full">
       <Header />
-      <main className="container mx-auto max-w-4xl px-4 py-8">
+      <main className="container mx-auto max-w-7xl px-4 py-8">
         <MovieFinder />
       </main>
     </div>
