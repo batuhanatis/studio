@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, collection, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -70,7 +71,7 @@ export function WatchlistsManager() {
       const docSnap = await getDoc(userDocRef);
       const currentWatchlists = docSnap.exists() ? (docSnap.data().watchlists || []) : [];
       
-      await updateDoc(userDocRef, { watchlists: [...currentWatchlists, newList] });
+      await setDoc(userDocRef, { watchlists: [...currentWatchlists, newList] }, { merge: true });
       toast({ title: 'Success!', description: `Created list "${newList.name}".` });
       setNewListName('');
     } catch (error) {
@@ -90,7 +91,7 @@ export function WatchlistsManager() {
         const updatedWatchlists = currentWatchlists.map(list =>
             list.id === editingList.id ? { ...list, name: editedName.trim() } : list
         );
-        await updateDoc(userDocRef, { watchlists: updatedWatchlists });
+        await setDoc(userDocRef, { watchlists: updatedWatchlists }, { merge: true });
         toast({ title: 'Success!', description: 'List name updated.' });
         setEditingList(null);
     } catch (error) {
@@ -108,7 +109,7 @@ export function WatchlistsManager() {
         const docSnap = await getDoc(userDocRef);
         const currentWatchlists: Watchlist[] = docSnap.data()?.watchlists || [];
         const updatedWatchlists = currentWatchlists.filter(list => list.id !== deletingList.id);
-        await updateDoc(userDocRef, { watchlists: updatedWatchlists });
+        await setDoc(userDocRef, { watchlists: updatedWatchlists }, { merge: true });
         toast({ title: 'Success!', description: 'List deleted.' });
         setDeletingList(null);
     } catch (error) {

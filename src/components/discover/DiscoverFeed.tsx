@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Film } from 'lucide-react';
 import useEmblaCarousel from 'embla-carousel-react';
@@ -150,13 +150,13 @@ export function DiscoverFeed() {
     if (!user) return;
     const movieIdentifier = { movieId: String(movieId), mediaType };
     
-    const originalRatings = [...userRatings];
-    const newRatings = [...originalRatings.filter(r => r.movieId !== String(movieId) || r.mediaType !== mediaType), {...movieIdentifier, rating}];
-    setUserRatings(newRatings);
-
     try {
       const userDocRef = doc(db, 'users', user.uid);
-      await updateDoc(userDocRef, { ratedMovies: newRatings });
+      const userDoc = await getDoc(userDocRef);
+      const currentRatings = userDoc.data()?.ratedMovies || [];
+      const newRatings = [...currentRatings.filter((r: any) => r.movieId !== String(movieId) || r.mediaType !== mediaType), {...movieIdentifier, rating}];
+      
+      await setDoc(userDocRef, { ratedMovies: newRatings }, { merge: true });
       toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
       
       if (rating >= 4) {
@@ -179,7 +179,6 @@ export function DiscoverFeed() {
         }
       }
     } catch (error) {
-       setUserRatings(originalRatings);
        toast({ variant: 'destructive', title: 'Error', description: 'Could not save rating.' });
     }
   };
@@ -188,22 +187,27 @@ export function DiscoverFeed() {
     if (!user) return;
     const movieIdentifier = { movieId: String(movieId), mediaType };
     
-    const originalWatched = [...userWatched];
-    if (isWatched) {
-        setUserWatched(prev => [...prev, movieIdentifier]);
-    } else {
-        setUserWatched(prev => prev.filter(m => m.movieId !== String(movieId) || m.mediaType !== mediaType));
-    }
-
     try {
       const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      const currentWatched = userDoc.data()?.watchedMovies || [];
+      
+      let updatedWatched;
+      const movieExists = currentWatched.some((m: any) => m.movieId === String(movieId) && m.mediaType === mediaType);
+      
       if (isWatched) {
-        await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
+          if (!movieExists) {
+              updatedWatched = [...currentWatched, movieIdentifier];
+          } else {
+              updatedWatched = currentWatched;
+          }
       } else {
-        await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
+          updatedWatched = currentWatched.filter((m: any) => m.movieId !== String(movieId) || m.mediaType !== mediaType);
       }
+      
+      await setDoc(userDocRef, { watchedMovies: updatedWatched }, { merge: true });
+
     } catch (error) {
-      setUserWatched(originalWatched);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };

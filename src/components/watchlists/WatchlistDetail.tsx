@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { getWatchlistRecommendations } from '@/ai/flows/watchlist-recommendations';
 import { MovieResultCard } from '@/components/search/MovieResultCard';
@@ -129,18 +130,24 @@ export function WatchlistDetail({ listId }: { listId: string }) {
     if (!user) return;
     const movieIdentifier = { movieId: String(movieId), mediaType };
     
-    const docRef = doc(db, 'users', user.uid);
     try {
-        const docSnap = await getDoc(docRef);
+        const userDocRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(userDocRef);
         const currentWatched: UserMovieData[] = docSnap.data()?.watchedMovies || [];
         
         let updatedWatched: UserMovieData[];
+        const movieExists = currentWatched.some(m => m.movieId === String(movieId) && m.mediaType === mediaType);
+
         if (isWatched) {
-            updatedWatched = [...currentWatched, movieIdentifier];
+            if (!movieExists) {
+                updatedWatched = [...currentWatched, movieIdentifier];
+            } else {
+                updatedWatched = currentWatched;
+            }
         } else {
             updatedWatched = currentWatched.filter(m => !(m.movieId === String(movieId) && m.mediaType === mediaType));
         }
-        await updateDoc(docRef, { watchedMovies: updatedWatched });
+        await setDoc(userDocRef, { watchedMovies: updatedWatched }, { merge: true });
     } catch (e) {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }

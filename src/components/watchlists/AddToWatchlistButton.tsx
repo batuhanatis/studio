@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, collection, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -95,7 +96,7 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
       const updatedMovies = [...targetList.movies, movie];
       currentWatchlists[listIndex] = { ...targetList, movies: updatedMovies };
 
-      await updateDoc(userDocRef, { watchlists: currentWatchlists });
+      await setDoc(userDocRef, { watchlists: currentWatchlists }, { merge: true });
       toast({ title: 'Success!', description: `Added "${movie.title}" to "${targetList.name}".` });
       setIsOpen(false);
 
@@ -125,7 +126,7 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
       const currentWatchlists = docSnap.data().watchlists || [];
       const updatedWatchlists = [...currentWatchlists, newList];
       
-      await updateDoc(userDocRef, { watchlists: updatedWatchlists });
+      await setDoc(userDocRef, { watchlists: updatedWatchlists }, { merge: true });
       toast({ title: 'Success!', description: `Created list "${newList.name}" and added "${movie.title}".` });
       setNewListName('');
       setIsOpen(false);

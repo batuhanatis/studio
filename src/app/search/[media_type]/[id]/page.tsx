@@ -12,7 +12,7 @@ import { AddToWatchlistButton } from '@/components/watchlists/AddToWatchlistButt
 import { Rating } from '@/components/discover/Rating';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -150,8 +150,6 @@ export default function DetailPage() {
   const handleRateMovie = async (rating: number) => {
     if (!user) return;
     const movieIdentifier = { movieId: id, mediaType: media_type };
-    const originalRating = userRating;
-    setUserRating(rating);
 
     try {
       const userDocRef = doc(db, 'users', user.uid);
@@ -159,10 +157,9 @@ export default function DetailPage() {
       const currentRatings = userDoc.data()?.ratedMovies || [];
       const newRatings = [...currentRatings.filter((r: any) => r.movieId !== id || r.mediaType !== media_type), {...movieIdentifier, rating}];
       
-      await updateDoc(userDocRef, { ratedMovies: newRatings });
+      await setDoc(userDocRef, { ratedMovies: newRatings }, { merge: true });
       toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
     } catch (error) {
-       setUserRating(originalRating);
        toast({ variant: 'destructive', title: 'Error', description: 'Could not save rating.' });
     }
   };
@@ -170,18 +167,26 @@ export default function DetailPage() {
   const handleToggleWatched = async (watched: boolean) => {
     if (!user) return;
     const movieIdentifier = { movieId: id, mediaType: media_type };
-    const originalWatched = isWatched;
-    setIsWatched(watched);
     
     try {
         const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        const currentWatched = userDoc.data()?.watchedMovies || [];
+        
+        let updatedWatched;
+        const movieExists = currentWatched.some((m: any) => m.movieId === id && m.mediaType === media_type);
+
         if (watched) {
-            await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
+            if (!movieExists) {
+                updatedWatched = [...currentWatched, movieIdentifier];
+            } else {
+                updatedWatched = currentWatched;
+            }
         } else {
-            await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
+            updatedWatched = currentWatched.filter((m: any) => m.movieId !== id || m.mediaType !== media_type);
         }
+        await setDoc(userDocRef, { watchedMovies: updatedWatched }, { merge: true });
     } catch (error) {
-        setIsWatched(originalWatched);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };

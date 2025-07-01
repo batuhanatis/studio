@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 
 import { Input } from '@/components/ui/input';
 import { Loader2, Search, Keyboard, Film, Star } from 'lucide-react';
@@ -211,22 +211,27 @@ export function MovieFinder() {
     if (!user) return;
     const movieIdentifier = { movieId: String(movieId), mediaType };
 
-    const originalWatched = [...watched];
-    if (isWatched) {
-        setWatched(prev => [...prev, movieIdentifier]);
-    } else {
-        setWatched(prev => prev.filter(m => m.movieId !== String(movieId) || m.mediaType !== mediaType));
-    }
-
     try {
       const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      const currentWatched = userDoc.data()?.watchedMovies || [];
+      
+      let updatedWatched;
+      const movieExists = currentWatched.some((m: any) => m.movieId === String(movieId) && m.mediaType === mediaType);
+
       if (isWatched) {
-        await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
+        if (!movieExists) {
+            updatedWatched = [...currentWatched, movieIdentifier];
+        } else {
+            updatedWatched = currentWatched;
+        }
       } else {
-        await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
+        updatedWatched = currentWatched.filter((m: any) => m.movieId !== String(movieId) || m.mediaType !== mediaType);
       }
+      
+      await setDoc(userDocRef, { watchedMovies: updatedWatched }, { merge: true });
+
     } catch (error) {
-      setWatched(originalWatched);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };
