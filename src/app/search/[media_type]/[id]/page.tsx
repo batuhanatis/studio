@@ -12,7 +12,7 @@ import { SendRecommendationButton } from '@/components/search/SendRecommendation
 import { Rating } from '@/components/discover/Rating';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -126,27 +126,25 @@ export default function DetailPage() {
         return;
     }
     
-    const fetchUserData = async () => {
-        setLoadingUserData(true);
-        try {
-            const userDocRef = doc(db, 'users', user.uid);
-            const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                const ratedMovie = (data.ratedMovies || []).find((m: any) => m.movieId === id && m.mediaType === media_type);
-                const watchedMovie = (data.watchedMovies || []).some((m: any) => m.movieId === id && m.mediaType === media_type);
-                setUserRating(ratedMovie?.rating || 0);
-                setIsWatched(watchedMovie);
-            }
-        } catch (error) {
-            console.error("Error fetching user data for detail page:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not load your rating.' });
-        } finally {
-            setLoadingUserData(false);
-        }
-    };
+    setLoadingUserData(true);
+    const userDocRef = doc(db, 'users', user.uid);
 
-    fetchUserData();
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const ratedMovie = (data.ratedMovies || []).find((m: any) => m.movieId === id && m.mediaType === media_type);
+            const watchedMovie = (data.watchedMovies || []).some((m: any) => m.movieId === id && m.mediaType === media_type);
+            setUserRating(ratedMovie?.rating || 0);
+            setIsWatched(watchedMovie);
+        }
+        setLoadingUserData(false);
+    }, (error) => {
+        console.error("Error fetching user data snapshot:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your rating.' });
+        setLoadingUserData(false);
+    });
+
+    return () => unsubscribe();
   }, [user, id, media_type, toast]);
 
   const handleRateMovie = async (rating: number) => {
