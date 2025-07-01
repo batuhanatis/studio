@@ -72,14 +72,12 @@ export function WatchlistsManager() {
     try {
         await runTransaction(db, async (transaction) => {
             const userDoc = await transaction.get(userDocRef);
-            const currentWatchlists = userDoc.exists() ? userDoc.data().watchlists || [] : [];
-            const updatedWatchlists = [...currentWatchlists, newList];
-
-            if (userDoc.exists()) {
-                transaction.update(userDocRef, { watchlists: updatedWatchlists });
-            } else {
-                transaction.set(userDocRef, { watchlists: updatedWatchlists });
+            if (!userDoc.exists()) {
+              throw new Error("User document does not exist!");
             }
+            const currentWatchlists = userDoc.data().watchlists || [];
+            const updatedWatchlists = [...currentWatchlists, newList];
+            transaction.update(userDocRef, { watchlists: updatedWatchlists });
         });
         
         toast({ title: 'Success!', description: `Created list "${newList.name}".` });
@@ -130,7 +128,7 @@ export function WatchlistsManager() {
             if (!userDoc.exists()) {
                  throw new Error("User profile not found.");
             }
-            const currentWatchlists: Watchlist[] = userDoc.data()?.watchlists || [];
+            const currentWatchlists: Watchlist[] = userDoc.data().watchlists || [];
             const updatedWatchlists = currentWatchlists.filter(list => list.id !== deletingList.id);
             transaction.update(userDocRef, { watchlists: updatedWatchlists });
         });

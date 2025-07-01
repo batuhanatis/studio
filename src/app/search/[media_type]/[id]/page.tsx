@@ -154,19 +154,18 @@ export default function DetailPage() {
     try {
       await runTransaction(db, async (transaction) => {
         const userDoc = await transaction.get(userDocRef);
+        if (!userDoc.exists()) {
+          throw new Error("User document does not exist!");
+        }
         
-        const currentRatings = userDoc.exists() ? userDoc.data().ratedMovies || [] : [];
+        const currentRatings = userDoc.data().ratedMovies || [];
         const movieIdentifier = { movieId: id, mediaType: media_type };
         const newRatings = [
             ...currentRatings.filter((r: any) => r.movieId !== id || r.mediaType !== media_type), 
             {...movieIdentifier, rating}
         ];
         
-        if (userDoc.exists()) {
-            transaction.update(userDocRef, { ratedMovies: newRatings });
-        } else {
-            transaction.set(userDocRef, { ratedMovies: newRatings });
-        }
+        transaction.update(userDocRef, { ratedMovies: newRatings });
       });
       toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
     } catch (error) {
@@ -183,8 +182,11 @@ export default function DetailPage() {
     try {
         await runTransaction(db, async (transaction) => {
             const userDoc = await transaction.get(userDocRef);
+            if (!userDoc.exists()) {
+                throw new Error("User document does not exist!");
+            }
             
-            const currentWatched = userDoc.exists() ? userDoc.data().watchedMovies || [] : [];
+            const currentWatched = userDoc.data().watchedMovies || [];
             let updatedWatched;
             const movieExists = currentWatched.some((m: any) => m.movieId === id && m.mediaType === media_type);
 
@@ -192,19 +194,17 @@ export default function DetailPage() {
                 if (!movieExists) {
                     updatedWatched = [...currentWatched, movieIdentifier];
                 } else {
-                    updatedWatched = currentWatched; // No change needed
+                    return; // No change needed, exit transaction.
                 }
             } else {
-                updatedWatched = currentWatched.filter((m: any) => m.movieId !== id || m.mediaType !== media_type);
-            }
-            
-            if (updatedWatched !== currentWatched) {
-                 if (userDoc.exists()) {
-                    transaction.update(userDocRef, { watchedMovies: updatedWatched });
+                if (movieExists) {
+                    updatedWatched = currentWatched.filter((m: any) => m.movieId !== id || m.mediaType !== media_type);
                 } else {
-                    transaction.set(userDocRef, { watchedMovies: updatedWatched });
+                    return; // No change needed, exit transaction.
                 }
             }
+            
+            transaction.update(userDocRef, { watchedMovies: updatedWatched });
         });
     } catch (error) {
         console.error("Transaction failed: ", error);
