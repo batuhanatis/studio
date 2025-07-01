@@ -3,10 +3,12 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Film, Tv, Star } from 'lucide-react';
+import { Film, Tv, Star, Send } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState, useEffect } from 'react';
 import { Skeleton } from '../ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
+import { SendRecommendationButton } from './SendRecommendationButton';
 
 interface SearchResult {
   id: number;
@@ -26,9 +28,15 @@ interface WatchProvider {
   logo_path: string;
 }
 
+interface MovieResultCardProps {
+  item: SearchResult;
+  isWatched: boolean;
+  onToggleWatched: (watched: boolean) => void;
+}
+
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
-export function MovieResultCard({ item }: { item: SearchResult }) {
+export function MovieResultCard({ item, isWatched, onToggleWatched }: MovieResultCardProps) {
   const [platforms, setPlatforms] = useState<WatchProvider[] | null>(null);
   const [loadingProviders, setLoadingProviders] = useState(true);
 
@@ -36,6 +44,13 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
   const releaseYear = item.release_date?.substring(0, 4) || item.first_air_date?.substring(0, 4);
   const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://placehold.co/500x750.png';
   const href = `/search/${item.media_type}/${item.id}?title=${encodeURIComponent(title)}&poster=${item.poster_path}&rating=${item.vote_average}&year=${releaseYear || ''}`;
+
+  const movieDetails = {
+    id: String(item.id),
+    media_type: item.media_type,
+    title: title,
+    poster: item.poster_path,
+  };
 
   useEffect(() => {
     let isCancelled = false;
@@ -130,6 +145,23 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
                 <Star className="h-4 w-4 text-amber-500" />
                 <span className="font-semibold">{item.vote_average > 0 ? `${item.vote_average.toFixed(1)}` : 'N/A'}</span>
                 <span className="text-muted-foreground text-xs">/ 10</span>
+            </div>
+            <div className="flex items-center justify-between mt-2 border-t border-border pt-2">
+                <div className="flex items-center gap-2">
+                    <Checkbox
+                        id={`watched-card-${item.id}`}
+                        checked={isWatched}
+                        onCheckedChange={onToggleWatched}
+                        aria-label="Mark as watched"
+                    />
+                    <label
+                        htmlFor={`watched-card-${item.id}`}
+                        className="text-xs text-muted-foreground cursor-pointer"
+                    >
+                        Watched
+                    </label>
+                </div>
+                <SendRecommendationButton movie={movieDetails} isIconOnly={true} />
             </div>
         </div>
       </CardContent>

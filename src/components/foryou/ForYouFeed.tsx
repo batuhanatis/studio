@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Film } from 'lucide-react';
 import { MovieResultCard } from '@/components/search/MovieResultCard';
@@ -123,6 +123,30 @@ export function ForYouFeed() {
     });
     return () => unsubscribe();
   }, [user]);
+
+  const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
+    if (!user) return;
+    const movieIdentifier = { movieId: String(movieId), mediaType };
+    
+    const originalWatched = [...watched];
+    if (isWatched) {
+        setWatched(prev => [...prev, movieIdentifier]);
+    } else {
+        setWatched(prev => prev.filter(m => m.movieId !== String(movieId) || m.mediaType !== mediaType));
+    }
+
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      if (isWatched) {
+        await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
+      } else {
+        await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
+      }
+    } catch (error) {
+      setWatched(originalWatched);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
+    }
+  };
   
   const watchedIds = new Set(watched.map(item => String(item.movieId)));
   const filteredMovies = filters.hideWatched
@@ -162,7 +186,12 @@ export function ForYouFeed() {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredMovies.map((item) => (
-            <MovieResultCard key={item.id} item={item} />
+            <MovieResultCard
+              key={item.id}
+              item={item}
+              isWatched={watchedIds.has(String(item.id))}
+              onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
+            />
           ))}
         </div>
       )}
