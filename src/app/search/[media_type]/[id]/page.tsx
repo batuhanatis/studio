@@ -12,7 +12,7 @@ import { AddToWatchlistButton } from '@/components/watchlists/AddToWatchlistButt
 import { Rating } from '@/components/discover/Rating';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, setDoc, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, runTransaction, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -180,34 +180,13 @@ export default function DetailPage() {
     const movieIdentifier = { movieId: id, mediaType: media_type };
 
     try {
-        await runTransaction(db, async (transaction) => {
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) {
-                throw new Error("User document does not exist!");
-            }
-            
-            const currentWatched = userDoc.data().watchedMovies || [];
-            let updatedWatched;
-            const movieExists = currentWatched.some((m: any) => m.movieId === id && m.mediaType === media_type);
-
-            if (watched) {
-                if (!movieExists) {
-                    updatedWatched = [...currentWatched, movieIdentifier];
-                } else {
-                    return; // No change needed, exit transaction.
-                }
-            } else {
-                if (movieExists) {
-                    updatedWatched = currentWatched.filter((m: any) => m.movieId !== id || m.mediaType !== media_type);
-                } else {
-                    return; // No change needed, exit transaction.
-                }
-            }
-            
-            transaction.update(userDocRef, { watchedMovies: updatedWatched });
-        });
+      if (watched) {
+        await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
+      } else {
+        await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
+      }
     } catch (error) {
-        console.error("Transaction failed: ", error);
+        console.error("Toggle watched failed: ", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };

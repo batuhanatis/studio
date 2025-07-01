@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, collection, onSnapshot, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, collection, updateDoc, arrayUnion } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Loader2, Plus, ListPlus } from 'lucide-react';
+import type { Unsubscribe } from 'firebase/firestore';
 
 interface MovieDetails {
   id: number;
@@ -52,22 +53,25 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
-    if (!user || !isOpen) return;
-
-    setLoading(true);
-    const userDocRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setWatchlists(data.watchlists || []);
-      }
-      setLoading(false);
-    }, () => {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your lists.' });
-        setLoading(false);
-    });
-
-    return () => unsubscribe();
+    let unsubscribe: Unsubscribe | undefined;
+    if (user && isOpen) {
+        setLoading(true);
+        const userDocRef = doc(db, 'users', user.uid);
+        unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setWatchlists(docSnap.data().watchlists || []);
+            }
+            setLoading(false);
+        }, () => {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not load your lists.' });
+            setLoading(false);
+        });
+    }
+    return () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    };
   }, [isOpen, user, toast]);
 
   const handleAddToList = async (listId: string) => {
@@ -77,24 +81,25 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     const userDocRef = doc(db, 'users', user.uid);
 
     try {
-      const result = await runTransaction(db, async (transaction) => {
+      await runTransaction(db, async (transaction) => {
         const userDoc = await transaction.get(userDocRef);
         if (!userDoc.exists()) {
-          throw new Error("User profile not found. Cannot add to list.");
+          throw new Error("User profile not found.");
         }
 
         const currentWatchlists: Watchlist[] = userDoc.data().watchlists || [];
         const listIndex = currentWatchlists.findIndex(l => l.id === listId);
 
         if (listIndex === -1) {
-          throw new Error("Watchlist not found. It might have been deleted.");
+          throw new Error("Watchlist not found.");
         }
 
         const targetList = currentWatchlists[listIndex];
         const movieExists = targetList.movies.some(m => m.id === movie.id && m.media_type === movie.media_type);
 
         if (movieExists) {
-          return { status: 'exists', listName: targetList.name };
+          toast({ variant: 'default', title: 'Already Added', description: `"${movie.title}" is already in "${targetList.name}".` });
+          return;
         }
         
         const updatedMovies = [...targetList.movies, movie];
@@ -104,19 +109,16 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
         updatedWatchlists[listIndex] = updatedList;
 
         transaction.update(userDocRef, { watchlists: updatedWatchlists });
-        return { status: 'added', listName: targetList.name };
+        toast({ title: 'Success!', description: `Added "${movie.title}" to "${targetList.name}".` });
       });
       
-      if (result.status === 'exists') {
-        toast({ variant: 'default', title: 'Already Added', description: `"${movie.title}" is already in "${result.listName}".` });
-      } else if (result.status === 'added') {
-        toast({ title: 'Success!', description: `Added "${movie.title}" to "${result.listName}".` });
-      }
       setIsOpen(false);
 
     } catch (error: any) {
       console.error("Transaction failed: ", error);
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not add to list.' });
+      if(!error.message?.includes('Already Added')) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not add to list.' });
+      }
     } finally {
       setAddingToList(null);
     }
@@ -127,7 +129,7 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     setIsCreating(true);
     
     const userDocRef = doc(db, 'users', user.uid);
-    const newId = doc(collection(db, 'users')).id;
+    const newId = doc(collection(db, 'temp_id')).id;
     const newList: Watchlist = {
         id: newId,
         name: newListName.trim(),
@@ -135,16 +137,8 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     };
 
     try {
-        await runTransaction(db, async (transaction) => {
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) {
-                throw new Error("User profile not found. Cannot create list.");
-            }
-
-            const currentWatchlists = userDoc.data().watchlists || [];
-            const updatedWatchlists = [...currentWatchlists, newList];
-            
-            transaction.update(userDocRef, { watchlists: updatedWatchlists });
+        await updateDoc(userDocRef, {
+            watchlists: arrayUnion(newList)
         });
 
         toast({ title: 'Success!', description: `Created list "${newList.name}" and added "${movie.title}".` });
@@ -152,7 +146,7 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
         setIsOpen(false);
       
     } catch (error: any) {
-        console.error("Transaction failed: ", error);
+        console.error("Create and add failed: ", error);
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not create list.' });
     } finally {
         setIsCreating(false);

@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc, collection, getDoc, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -66,26 +66,20 @@ export function WatchlistsManager() {
     setIsCreating(true);
 
     const userDocRef = doc(db, 'users', user.uid);
-    const newId = doc(collection(db, 'users')).id;
+    const newId = doc(collection(db, 'temp_id')).id; // Generate a unique ID
     const newList: Watchlist = { id: newId, name: newListName.trim(), movies: [] };
 
     try {
-        await runTransaction(db, async (transaction) => {
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) {
-              throw new Error("User document does not exist!");
-            }
-            const currentWatchlists = userDoc.data().watchlists || [];
-            const updatedWatchlists = [...currentWatchlists, newList];
-            transaction.update(userDocRef, { watchlists: updatedWatchlists });
-        });
+      await updateDoc(userDocRef, {
+        watchlists: arrayUnion(newList)
+      });
         
-        toast({ title: 'Success!', description: `Created list "${newList.name}".` });
-        setNewListName('');
-        setIsCreateDialogOpen(false);
+      toast({ title: 'Success!', description: `Created list "${newList.name}".` });
+      setNewListName('');
+      setIsCreateDialogOpen(false);
     } catch (error) {
-      console.error("Transaction failed: ", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not create list.' });
+      console.error("Create list failed: ", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not create list. Please check your connection.' });
     } finally {
       setIsCreating(false);
     }
@@ -96,22 +90,21 @@ export function WatchlistsManager() {
     setIsUpdating(true);
     const userDocRef = doc(db, 'users', user.uid);
     try {
-        await runTransaction(db, async (transaction) => {
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) {
-                throw new Error("User profile not found.");
-            }
-            const currentWatchlists: Watchlist[] = userDoc.data().watchlists || [];
-            const updatedWatchlists = currentWatchlists.map(list =>
-                list.id === editingList.id ? { ...list, name: editedName.trim() } : list
-            );
-            transaction.update(userDocRef, { watchlists: updatedWatchlists });
-        });
+        const userDoc = await getDoc(userDocRef);
+        if (!userDoc.exists()) {
+            throw new Error("User profile not found.");
+        }
+        const currentWatchlists: Watchlist[] = userDoc.data().watchlists || [];
+        const updatedWatchlists = currentWatchlists.map(list =>
+            list.id === editingList.id ? { ...list, name: editedName.trim() } : list
+        );
+        
+        await updateDoc(userDocRef, { watchlists: updatedWatchlists });
 
         toast({ title: 'Success!', description: 'List name updated.' });
         setEditingList(null);
     } catch (error: any) {
-        console.error("Transaction failed: ", error);
+        console.error("Update name failed: ", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update list name.' });
     } finally {
         setIsUpdating(false);
@@ -123,20 +116,14 @@ export function WatchlistsManager() {
     setIsDeleting(true);
     const userDocRef = doc(db, 'users', user.uid);
     try {
-        await runTransaction(db, async (transaction) => {
-            const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) {
-                 throw new Error("User profile not found.");
-            }
-            const currentWatchlists: Watchlist[] = userDoc.data().watchlists || [];
-            const updatedWatchlists = currentWatchlists.filter(list => list.id !== deletingList.id);
-            transaction.update(userDocRef, { watchlists: updatedWatchlists });
+        await updateDoc(userDocRef, {
+            watchlists: arrayRemove(deletingList)
         });
         
         toast({ title: 'Success!', description: 'List deleted.' });
         setDeletingList(null);
     } catch (error: any) {
-        console.error("Transaction failed: ", error);
+        console.error("Delete list failed: ", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not delete list.' });
     } finally {
         setIsDeleting(false);
