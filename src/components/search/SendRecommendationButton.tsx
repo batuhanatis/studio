@@ -50,27 +50,38 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
     if (isOpen && user) {
       const fetchFriends = async () => {
         setLoading(true);
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          if (userData.friends && userData.friends.length > 0) {
-            const friendProfiles = await Promise.all(
-              userData.friends.map(async (uid: string) => {
-                const friendDoc = await getDoc(doc(db, 'users', uid));
-                return friendDoc.exists() ? (friendDoc.data() as UserProfile) : null;
-              })
-            );
-            setFriends(friendProfiles.filter(Boolean) as UserProfile[]);
-          } else {
-            setFriends([]);
-          }
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              if (userData.friends && userData.friends.length > 0) {
+                const friendProfiles = await Promise.all(
+                  userData.friends.map(async (uid: string) => {
+                    const friendDoc = await getDoc(doc(db, 'users', uid));
+                    return friendDoc.exists() ? (friendDoc.data() as UserProfile) : null;
+                  })
+                );
+                setFriends(friendProfiles.filter(Boolean) as UserProfile[]);
+              } else {
+                setFriends([]);
+              }
+            }
+        } catch (error) {
+            console.error("Error fetching friends list:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not load your friends list. Please check your connection.'
+            });
+            setIsOpen(false);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
       };
       fetchFriends();
     }
-  }, [isOpen, user]);
+  }, [isOpen, user, toast]);
 
   const handleSend = async (friendId: string) => {
     if (!user) return;
