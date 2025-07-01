@@ -19,6 +19,8 @@ interface Movie {
   media_type: 'movie' | 'tv';
   overview: string;
   vote_average: number;
+  release_date?: string;
+  first_air_date?: string;
 }
 
 interface WatchProvider {
@@ -106,7 +108,8 @@ export function DiscoverCard({ movie, rating = 0, isWatched = false, onRate, onT
 
   const title = movie.title || movie.name || 'Untitled';
   const posterUrl = movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'https://placehold.co/500x750.png';
-  const href = `/search/${movie.media_type}/${movie.id}?title=${encodeURIComponent(title)}&poster=${movie.poster_path}&rating=${movie.vote_average}`;
+  const releaseYear = movie.release_date?.substring(0, 4) || movie.first_air_date?.substring(0, 4);
+  const href = `/search/${movie.media_type}/${movie.id}?title=${encodeURIComponent(title)}&poster=${movie.poster_path}&rating=${movie.vote_average}&year=${releaseYear || ''}`;
 
   return (
     <Card className="relative w-full max-w-sm mx-auto overflow-hidden shadow-2xl">
@@ -135,6 +138,8 @@ export function DiscoverCard({ movie, rating = 0, isWatched = false, onRate, onT
               <span className="font-semibold drop-shadow-sm">{movie.vote_average.toFixed(1)}</span>
               <span className="text-white/80">/ 10</span>
             </div>
+            {releaseYear && <span className="text-white/80">·</span>}
+            {releaseYear && <span className="drop-shadow-sm">{releaseYear}</span>}
           </div>
           <CardDescription className="line-clamp-2 text-white/90 drop-shadow-sm mt-1">
             {movie.overview}

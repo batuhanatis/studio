@@ -18,6 +18,8 @@ interface Movie {
   media_type: 'movie' | 'tv';
   overview: string;
   vote_average: number;
+  release_date?: string;
+  first_air_date?: string;
 }
 
 interface UserMovieData {

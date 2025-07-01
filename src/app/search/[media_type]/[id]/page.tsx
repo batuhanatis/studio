@@ -15,6 +15,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -35,9 +36,13 @@ export default function DetailPage() {
   const title = searchParams.get('title') || 'Untitled';
   const poster = searchParams.get('poster');
   const ratingFromSearch = searchParams.get('rating') || '0';
+  const yearFromSearch = searchParams.get('year');
 
   const [platforms, setPlatforms] = useState<WatchProvider[] | null>(null);
   const [loadingProviders, setLoadingProviders] = useState(true);
+  
+  const [overview, setOverview] = useState<string | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(true);
   
   const [userRating, setUserRating] = useState(0);
   const [isWatched, setIsWatched] = useState(false);
@@ -79,6 +84,28 @@ export default function DetailPage() {
 
     if (id && media_type) {
       getWatchProviders(id, media_type);
+    }
+  }, [id, media_type]);
+
+  useEffect(() => {
+    async function getDetails(id: string, type: 'movie' | 'tv') {
+      setLoadingDetails(true);
+      try {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/${type}/${id}?api_key=${API_KEY}`
+        );
+        if (!res.ok) throw new Error('Failed to fetch details');
+        const data = await res.json();
+        setOverview(data.overview || 'No description available.');
+      } catch (error) {
+        console.error('Error fetching details:', error);
+        setOverview('Could not load description.');
+      } finally {
+        setLoadingDetails(false);
+      }
+    }
+    if (id && media_type) {
+      getDetails(id, media_type);
     }
   }, [id, media_type]);
   
@@ -193,6 +220,12 @@ export default function DetailPage() {
             <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">{decodedTitle}</h1>
             <div className="mt-2 flex items-center gap-2 text-muted-foreground">
               {media_type === 'movie' ? 'Movie' : 'TV Show'}
+              {yearFromSearch && yearFromSearch !== 'null' && (
+                <>
+                  <span className="text-sm">·</span>
+                  <span>{yearFromSearch}</span>
+                </>
+              )}
               <span className="text-sm">·</span>
                <div className="flex items-center gap-1">
                  <Star className="h-4 w-4 text-amber-500" />
@@ -200,6 +233,16 @@ export default function DetailPage() {
                  <span>/ 10</span>
                </div>
             </div>
+
+            {loadingDetails ? (
+              <div className="mt-4 space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+            ) : (
+              <p className="mt-4 text-muted-foreground">{overview}</p>
+            )}
             
             <div className="mt-6 flex flex-col items-start gap-4">
               <div className="flex items-center gap-2">

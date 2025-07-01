@@ -19,6 +19,8 @@ interface SearchResult {
   media_type: 'movie' | 'tv';
   vote_average: number;
   popularity: number;
+  release_date?: string;
+  first_air_date?: string;
 }
 
 interface UserRatingData {

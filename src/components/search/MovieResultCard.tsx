@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -17,6 +18,8 @@ interface SearchResult {
   media_type: 'movie' | 'tv';
   vote_average: number;
   popularity: number;
+  release_date?: string;
+  first_air_date?: string;
 }
 
 interface WatchProvider {
@@ -83,7 +86,8 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
   }, [item.id, item.media_type]);
   
   const title = item.title || item.name || 'Untitled';
-  const href = `/search/${item.media_type}/${item.id}?title=${encodeURIComponent(title)}&poster=${item.poster_path}&rating=${item.vote_average}`;
+  const releaseYear = item.release_date?.substring(0, 4) || item.first_air_date?.substring(0, 4);
+  const href = `/search/${item.media_type}/${item.id}?title=${encodeURIComponent(title)}&poster=${item.poster_path}&rating=${item.vote_average}&year=${releaseYear || ''}`;
 
   const movieDetails = {
     id: String(item.id),
@@ -115,6 +119,8 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
             <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                 {item.media_type === 'movie' ? <Film className="h-4 w-4" /> : <Tv className="h-4 w-4" />}
                 <span>{item.media_type === 'movie' ? 'Movie' : 'TV Show'}</span>
+                {releaseYear && <span className="text-xs">·</span>}
+                {releaseYear && <span className="text-sm">{releaseYear}</span>}
             </div>
             <div className="flex items-center gap-1 text-sm text-foreground mt-2">
                 <Star className="h-4 w-4 text-amber-500" />
