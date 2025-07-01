@@ -11,6 +11,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 import {
   Dialog,
@@ -22,7 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Send, User } from 'lucide-react';
+import { Loader2, Send, Users, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 
 interface MovieDetails {
@@ -61,6 +62,8 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
               })
             );
             setFriends(friendProfiles.filter(Boolean) as UserProfile[]);
+          } else {
+            setFriends([]);
           }
         }
         setLoading(false);
@@ -140,9 +143,15 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
             </ul>
           ) : (
             <div className="text-center text-sm text-muted-foreground flex flex-col items-center gap-3 py-4">
-                <User className="h-8 w-8"/>
-                <p>You have no friends to send this to.</p>
-                <p>Add friends from the "Friends" page.</p>
+              <Users className="h-12 w-12 text-muted-foreground/50"/>
+              <p className="font-semibold text-lg text-foreground">No friends yet!</p>
+              <p>Add friends to share movies with them.</p>
+              <Button asChild className="mt-4" onClick={() => setIsOpen(false)}>
+                  <Link href="/friends">
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Add Friends
+                  </Link>
+              </Button>
             </div>
           )}
         </div>

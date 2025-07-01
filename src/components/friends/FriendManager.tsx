@@ -243,7 +243,11 @@ export function FriendManager() {
                 ))}
               </ul>
             ) : (
-              <p className="text-center text-sm text-muted-foreground">You haven't added any friends yet.</p>
+              <div className="flex flex-col items-center justify-center gap-3 py-8 text-center text-muted-foreground">
+                <Users className="h-12 w-12" />
+                <p className="font-semibold text-base text-card-foreground">You haven't added any friends yet.</p>
+                <p className="text-sm">Use the form above to send a friend request.</p>
+              </div>
             )}
           </CardContent>
         </Card>
