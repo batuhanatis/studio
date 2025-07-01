@@ -48,14 +48,25 @@ export function DiscoverFeed() {
     setLoading(true);
     try {
       let initialMovies: Movie[] = [];
-      const userDocRef = user ? doc(db, 'users', user.uid) : null;
-      const userDoc = userDocRef ? await getDoc(userDocRef) : null;
+      let ratedMovies: UserRatingData[] = [];
+      let watchedMovies: UserMovieData[] = [];
+
+      if (user) {
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            ratedMovies = userData.ratedMovies || [];
+            watchedMovies = userData.watchedMovies || [];
+          }
+        } catch (dbError) {
+          console.warn("Could not fetch user ratings, falling back to popular titles.", dbError);
+          // Gracefully continue without user data, popular titles will be fetched.
+        }
+      }
       
-      const userData = userDoc?.data();
-      const ratedMovies: UserRatingData[] = userData?.ratedMovies || [];
-      const watchedMovies: UserMovieData[] = userData?.watchedMovies || [];
       const seenMovieIds = new Set([...ratedMovies.map(m => m.movieId), ...watchedMovies.map(m => m.movieId)]);
-      
       const highlyRated = ratedMovies.filter(r => r.rating >= 4);
 
       if (highlyRated.length > 0) {
@@ -69,9 +80,13 @@ export function DiscoverFeed() {
         }
       }
 
-      if (initialMovies.length < 10) {
+      if (initialMovies.length < 20) {
         const movieRes = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
         const tvRes = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
+        
+        if (!movieRes.ok || !tvRes.ok) {
+            throw new Error("Failed to fetch from TMDB API");
+        }
         
         const movieData = await movieRes.json();
         const tvData = await tvRes.json();
@@ -87,6 +102,13 @@ export function DiscoverFeed() {
         initialMovies.push(...uniquePopular);
       }
       
+      if (initialMovies.length === 0 && seenMovieIds.size > 0) {
+         // This is the correct case for the "no new movies" message.
+      } else if (initialMovies.length === 0) {
+        // If we still have no movies, it means the TMDB API calls likely failed.
+        throw new Error("Failed to fetch any movies from the API.");
+      }
+
       setMovies(initialMovies.sort(() => 0.5 - Math.random()));
     } catch (error) {
         console.error("Error fetching discover feed:", error);
