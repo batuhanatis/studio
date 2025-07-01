@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { getWatchlistRecommendations } from '@/ai/flows/watchlist-recommendations';
 import { MovieResultCard } from '@/components/search/MovieResultCard';
@@ -19,7 +19,8 @@ interface MovieDetails {
   id: number;
   media_type: 'movie' | 'tv';
   title: string;
-  poster: string | null;
+  poster_path: string | null;
+  poster?: string | null;
   vote_average: number;
   release_date?: string;
   first_air_date?: string;
@@ -30,6 +31,7 @@ interface Watchlist {
   id: string;
   name: string;
   movies: MovieDetails[];
+  userId: string;
 }
 
 interface UserMovieData {
@@ -38,7 +40,6 @@ interface UserMovieData {
 }
 
 interface MovieApiResult extends MovieDetails {
-    poster_path: string | null;
     name?: string;
     popularity: number;
     genre_ids: number[];
@@ -69,24 +70,25 @@ export function WatchlistDetail({ listId }: { listId: string }) {
   useEffect(() => {
     if (!user) return;
     setLoading(prev => ({...prev, list: true}));
-    const userDocRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+    const listDocRef = doc(db, 'watchlists', listId);
+    
+    const unsubscribe = onSnapshot(listDocRef, (docSnap) => {
       if (docSnap.exists()) {
-        const lists: Watchlist[] = docSnap.data().watchlists || [];
-        const currentList = lists.find(l => l.id === listId);
-        if (currentList) {
-          setWatchlist(currentList);
+        const listData = docSnap.data();
+        if (listData.userId === user.uid) {
+          setWatchlist({ ...listData, id: docSnap.id } as Watchlist);
         } else {
-          setError("Watchlist not found. It may have been deleted.");
+          setError("You don't have permission to view this list.");
         }
       } else {
-        setError("Could not find your profile.");
+        setError("Watchlist not found. It may have been deleted.");
       }
       setLoading(prev => ({...prev, list: false}));
     }, () => {
         setError("Failed to load watchlist due to a connection error.");
         setLoading(prev => ({...prev, list: false}));
     });
+
     return () => unsubscribe();
   }, [user, listId]);
   
@@ -147,7 +149,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
         } else {
             updatedWatched = currentWatched.filter(m => !(m.movieId === String(movieId) && m.mediaType === mediaType));
         }
-        await setDoc(userDocRef, { watchedMovies: updatedWatched }, { merge: true });
+        await updateDoc(userDocRef, { watchedMovies: updatedWatched });
     } catch (e) {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
@@ -214,7 +216,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
                 {recommendations.map((item) => (
                     <MovieResultCard
                         key={item.id}
-                        item={item}
+                        item={{...item, poster: item.poster_path}}
                         isWatched={watchedIds.has(String(item.id))}
                         onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
                     />

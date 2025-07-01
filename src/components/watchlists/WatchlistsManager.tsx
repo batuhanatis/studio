@@ -4,7 +4,18 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove, collection } from 'firebase/firestore';
+import {
+  doc,
+  onSnapshot,
+  updateDoc,
+  collection,
+  query,
+  where,
+  addDoc,
+  deleteDoc,
+  serverTimestamp,
+  getDoc,
+} from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -28,6 +39,7 @@ interface Watchlist {
   id: string;
   name: string;
   movies: MovieDetails[];
+  userId: string;
 }
 
 export function WatchlistsManager() {
@@ -45,19 +57,23 @@ export function WatchlistsManager() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+        setLoading(false);
+        return;
+    };
     setLoading(true);
-    const userDocRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setWatchlists(docSnap.data().watchlists || []);
-      }
+    const q = query(collection(db, 'watchlists'), where('userId', '==', user.uid));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const lists = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Watchlist));
+      setWatchlists(lists);
       setLoading(false);
     }, (error) => {
       console.error("Error fetching watchlists:", error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not load watchlists.' });
       setLoading(false);
     });
+
     return () => unsubscribe();
   }, [user, toast]);
 
@@ -65,15 +81,15 @@ export function WatchlistsManager() {
     if (!user || !newListName.trim()) return;
     setIsCreating(true);
 
-    const userDocRef = doc(db, 'users', user.uid);
-    const newId = doc(collection(db, 'temp_id')).id; // Generate a unique ID
-    const newList: Watchlist = { id: newId, name: newListName.trim(), movies: [] };
+    const newList = { 
+        name: newListName.trim(), 
+        movies: [],
+        userId: user.uid,
+        createdAt: serverTimestamp(),
+    };
 
     try {
-      await updateDoc(userDocRef, {
-        watchlists: arrayUnion(newList)
-      });
-        
+      await addDoc(collection(db, 'watchlists'), newList);
       toast({ title: 'Success!', description: `Created list "${newList.name}".` });
       setNewListName('');
       setIsCreateDialogOpen(false);
@@ -88,19 +104,9 @@ export function WatchlistsManager() {
   const handleUpdateName = async () => {
     if (!user || !editingList || !editedName.trim()) return;
     setIsUpdating(true);
-    const userDocRef = doc(db, 'users', user.uid);
+    const listDocRef = doc(db, 'watchlists', editingList.id);
     try {
-        const userDoc = await getDoc(userDocRef);
-        if (!userDoc.exists()) {
-            throw new Error("User profile not found.");
-        }
-        const currentWatchlists: Watchlist[] = userDoc.data().watchlists || [];
-        const updatedWatchlists = currentWatchlists.map(list =>
-            list.id === editingList.id ? { ...list, name: editedName.trim() } : list
-        );
-        
-        await updateDoc(userDocRef, { watchlists: updatedWatchlists });
-
+        await updateDoc(listDocRef, { name: editedName.trim() });
         toast({ title: 'Success!', description: 'List name updated.' });
         setEditingList(null);
     } catch (error: any) {
@@ -114,12 +120,9 @@ export function WatchlistsManager() {
   const handleDeleteList = async () => {
     if (!user || !deletingList) return;
     setIsDeleting(true);
-    const userDocRef = doc(db, 'users', user.uid);
+    const listDocRef = doc(db, 'watchlists', deletingList.id);
     try {
-        await updateDoc(userDocRef, {
-            watchlists: arrayRemove(deletingList)
-        });
-        
+        await deleteDoc(listDocRef);
         toast({ title: 'Success!', description: 'List deleted.' });
         setDeletingList(null);
     } catch (error: any) {

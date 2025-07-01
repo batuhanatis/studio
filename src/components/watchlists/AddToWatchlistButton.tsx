@@ -4,7 +4,18 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, runTransaction, collection, updateDoc, arrayUnion } from 'firebase/firestore';
+import {
+  doc,
+  onSnapshot,
+  runTransaction,
+  collection,
+  updateDoc,
+  arrayUnion,
+  query,
+  where,
+  addDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,6 +46,7 @@ interface Watchlist {
   id: string;
   name: string;
   movies: MovieDetails[];
+  userId: string;
 }
 
 interface AddToWatchlistButtonProps {
@@ -56,11 +68,11 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     let unsubscribe: Unsubscribe | undefined;
     if (user && isOpen) {
         setLoading(true);
-        const userDocRef = doc(db, 'users', user.uid);
-        unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setWatchlists(docSnap.data().watchlists || []);
-            }
+        const q = query(collection(db, 'watchlists'), where('userId', '==', user.uid));
+        
+        unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const lists = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Watchlist));
+            setWatchlists(lists);
             setLoading(false);
         }, () => {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not load your lists.' });
@@ -78,47 +90,39 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     if (!user) return;
     setAddingToList(listId);
     
-    const userDocRef = doc(db, 'users', user.uid);
+    const listDocRef = doc(db, 'watchlists', listId);
+    let listName = 'this list';
 
     try {
       await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userDocRef);
-        if (!userDoc.exists()) {
-          throw new Error("User profile not found.");
-        }
+        const listDoc = await transaction.get(listDocRef);
+        if (!listDoc.exists()) throw new Error("Watchlist not found.");
 
-        const currentWatchlists: Watchlist[] = userDoc.data().watchlists || [];
-        const listIndex = currentWatchlists.findIndex(l => l.id === listId);
-
-        if (listIndex === -1) {
-          throw new Error("Watchlist not found.");
-        }
-
-        const targetList = currentWatchlists[listIndex];
-        const movieExists = targetList.movies.some(m => m.id === movie.id && m.media_type === movie.media_type);
+        const listData = listDoc.data() as Watchlist;
+        listName = listData.name;
+        const movieExists = listData.movies.some(m => m.id === movie.id && m.media_type === movie.media_type);
 
         if (movieExists) {
-          toast({ variant: 'default', title: 'Already Added', description: `"${movie.title}" is already in "${targetList.name}".` });
+          // No need to throw an error, just inform the user.
           return;
         }
         
-        const updatedMovies = [...targetList.movies, movie];
-        const updatedList = { ...targetList, movies: updatedMovies };
-        
-        const updatedWatchlists = [...currentWatchlists];
-        updatedWatchlists[listIndex] = updatedList;
-
-        transaction.update(userDocRef, { watchlists: updatedWatchlists });
-        toast({ title: 'Success!', description: `Added "${movie.title}" to "${targetList.name}".` });
+        transaction.update(listDocRef, { movies: arrayUnion(movie) });
       });
-      
-      setIsOpen(false);
 
-    } catch (error: any) {
-      console.error("Transaction failed: ", error);
-      if(!error.message?.includes('Already Added')) {
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not add to list.' });
+      const list = watchlists.find(l => l.id === listId);
+      const movieExistsInState = list?.movies.some(m => m.id === movie.id && m.media_type === movie.media_type);
+
+      if (movieExistsInState) {
+        toast({ title: 'Already Added', description: `"${movie.title}" is already in "${listName}".` });
+      } else {
+        toast({ title: 'Success!', description: `Added "${movie.title}" to "${listName}".` });
       }
+
+      setIsOpen(false);
+    } catch (error: any) {
+      console.error("Add to list failed: ", error);
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not add to list.' });
     } finally {
       setAddingToList(null);
     }
@@ -128,19 +132,15 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     if (!user || !newListName.trim()) return;
     setIsCreating(true);
     
-    const userDocRef = doc(db, 'users', user.uid);
-    const newId = doc(collection(db, 'temp_id')).id;
-    const newList: Watchlist = {
-        id: newId,
+    const newList = {
+        userId: user.uid,
         name: newListName.trim(),
-        movies: [movie]
+        movies: [movie],
+        createdAt: serverTimestamp(),
     };
 
     try {
-        await updateDoc(userDocRef, {
-            watchlists: arrayUnion(newList)
-        });
-
+        await addDoc(collection(db, 'watchlists'), newList);
         toast({ title: 'Success!', description: `Created list "${newList.name}" and added "${movie.title}".` });
         setNewListName('');
         setIsOpen(false);
