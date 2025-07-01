@@ -77,8 +77,8 @@ export function DiscoverFeed() {
         const tvData = await tvRes.json();
 
         const popular = [
-            ...movieData.results.map((m: any) => ({ ...m, media_type: 'movie' })),
-            ...tvData.results.map((t: any) => ({ ...t, media_type: 'tv' })),
+            ...(movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' })),
+            ...(tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' })),
         ].filter(item => item.poster_path && item.overview && !seenMovieIds.has(String(item.id)));
         
         const existingIds = new Set(initialMovies.map(r => r.id));
