@@ -7,6 +7,7 @@ import { Film, Tv, Star } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SendRecommendationButton } from './SendRecommendationButton';
 
 interface SearchResult {
   id: number;
@@ -84,11 +85,18 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
   const title = item.title || item.name || 'Untitled';
   const href = `/search/${item.media_type}/${item.id}?title=${encodeURIComponent(title)}&poster=${item.poster_path}&rating=${item.vote_average}`;
 
+  const movieDetails = {
+    id: String(item.id),
+    media_type: item.media_type,
+    title: title,
+    poster: item.poster_path,
+  };
+
   return (
-    <Link href={href} className="block">
-      <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200">
-        <CardContent className="p-0 flex">
-          <div className="relative w-28 h-40 md:w-32 md:h-48 flex-shrink-0 bg-muted">
+    <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200">
+      <CardContent className="p-0 flex w-full">
+        <Link href={href} className="block flex-shrink-0">
+          <div className="relative w-28 h-40 md:w-32 md:h-48 bg-muted">
             <Image
               src={`https://image.tmdb.org/t/p/w200${item.poster_path}`}
               alt={title}
@@ -98,21 +106,25 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
               data-ai-hint="movie poster"
             />
           </div>
-          <div className="p-4 flex flex-col justify-between gap-1 flex-grow">
-            <div>
-                <h3 className="text-lg font-bold font-headline line-clamp-2">{title}</h3>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                    {item.media_type === 'movie' ? <Film className="h-4 w-4" /> : <Tv className="h-4 w-4" />}
-                    <span>{item.media_type === 'movie' ? 'Movie' : 'TV Show'}</span>
-                </div>
-                <div className="flex items-center gap-1 text-sm text-foreground mt-2">
-                    <Star className="h-4 w-4 text-amber-500" />
-                    <span className="font-semibold">{item.vote_average > 0 ? `${item.vote_average.toFixed(1)}` : 'N/A'}</span>
-                    <span className="text-muted-foreground">/ 10</span>
-                </div>
+        </Link>
+        <div className="p-4 flex flex-col justify-between gap-1 flex-grow">
+          <div>
+            <Link href={href}>
+                <h3 className="text-lg font-bold font-headline line-clamp-2 hover:underline">{title}</h3>
+            </Link>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                {item.media_type === 'movie' ? <Film className="h-4 w-4" /> : <Tv className="h-4 w-4" />}
+                <span>{item.media_type === 'movie' ? 'Movie' : 'TV Show'}</span>
             </div>
+            <div className="flex items-center gap-1 text-sm text-foreground mt-2">
+                <Star className="h-4 w-4 text-amber-500" />
+                <span className="font-semibold">{item.vote_average > 0 ? `${item.vote_average.toFixed(1)}` : 'N/A'}</span>
+                <span className="text-muted-foreground">/ 10</span>
+            </div>
+          </div>
 
-            <div className="mt-2">
+          <div className="mt-2 flex items-end justify-between">
+            <div className="flex-grow">
               <h4 className="text-xs font-semibold text-muted-foreground mb-1.5">Available on:</h4>
               {loadingProviders ? (
                 <div className="flex items-center gap-2">
@@ -122,7 +134,7 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
                 </div>
               ) : platforms && platforms.length > 0 ? (
                 <div className="flex items-center gap-2 flex-wrap">
-                    {platforms.slice(0, 4).map((p) => (
+                    {platforms.slice(0, 3).map((p) => (
                         <div key={p.provider_id} className="relative h-8 w-8 overflow-hidden rounded-md bg-white/80 shadow-sm" title={p.provider_name}>
                           <Image
                             src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
@@ -133,9 +145,9 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
                           />
                         </div>
                     ))}
-                     {platforms.length > 4 && (
+                     {platforms.length > 3 && (
                         <div className="flex items-center justify-center h-8 w-8 rounded-md bg-muted text-muted-foreground text-xs font-bold">
-                            +{platforms.length - 4}
+                            +{platforms.length - 3}
                         </div>
                     )}
                 </div>
@@ -143,9 +155,12 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
                 <div className="text-xs text-muted-foreground">No streaming info found.</div>
               )}
             </div>
+            <div className="flex-shrink-0 ml-4">
+                <SendRecommendationButton movie={movieDetails} isIconOnly />
+            </div>
           </div>
-        </CardContent>
-      </Card>
-    </Link>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

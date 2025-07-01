@@ -37,7 +37,7 @@ interface UserProfile {
   email: string;
 }
 
-export function SendRecommendationButton({ movie }: { movie: MovieDetails }) {
+export function SendRecommendationButton({ movie, isIconOnly = false }: { movie: MovieDetails, isIconOnly?: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
@@ -98,9 +98,15 @@ export function SendRecommendationButton({ movie }: { movie: MovieDetails }) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">
-          <Send className="mr-2 h-4 w-4" /> Send to a Friend
-        </Button>
+        {isIconOnly ? (
+            <Button variant="outline" size="icon" aria-label="Send to a Friend">
+                <Send className="h-4 w-4" />
+            </Button>
+        ) : (
+            <Button variant="outline">
+                <Send className="mr-2 h-4 w-4" /> Send to a Friend
+            </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
