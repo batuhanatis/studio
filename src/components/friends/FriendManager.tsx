@@ -90,6 +90,7 @@ export function FriendManager() {
       // Fetch friends
       setLoading(prev => ({ ...prev, friends: true }));
       try {
+        let finalFriends: UserProfile[] = [];
         if (userData.friends?.length > 0) {
           const friendUids: string[] = userData.friends;
           const friendProfiles = await Promise.all(
@@ -98,10 +99,16 @@ export function FriendManager() {
               return userDoc.exists() ? (userDoc.data() as UserProfile) : null;
             })
           );
-          setFriends(friendProfiles.filter(Boolean) as UserProfile[]);
-        } else {
-          setFriends([]);
+          finalFriends = friendProfiles.filter(Boolean) as UserProfile[];
         }
+        
+        // Add a test user for demonstration
+        finalFriends.push({ uid: 'test-friend-for-blend', email: 'test.friend@example.com' });
+
+        // Ensure uniqueness
+        const uniqueFriends = Array.from(new Map(finalFriends.map(f => [f.uid, f])).values());
+        setFriends(uniqueFriends);
+
       } catch (error) {
         console.error("Error fetching friends list:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load friends list.' });

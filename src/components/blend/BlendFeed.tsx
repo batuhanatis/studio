@@ -34,6 +34,18 @@ interface UserMovieData {
   mediaType: 'movie' | 'tv';
 }
 
+const MOCK_FRIEND_ID = 'test-friend-for-blend';
+const MOCK_FRIEND_PROFILE: UserProfile = {
+  uid: MOCK_FRIEND_ID,
+  email: 'test.friend@example.com',
+  ratedMovies: [
+    { movieId: '603', mediaType: 'movie', rating: 5 }, // The Matrix
+    { movieId: '27205', mediaType: 'movie', rating: 5 }, // Inception
+    { movieId: '155', mediaType: 'movie', rating: 4 }, // The Dark Knight
+    { movieId: '13', mediaType: 'movie', rating: 5 }, // Forrest Gump
+  ],
+};
+
 export function BlendFeed({ friendId }: { friendId: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -87,11 +99,18 @@ export function BlendFeed({ friendId }: { friendId: string }) {
     setLoading(true);
 
     try {
-      // 1. Fetch friend and current user data
-      setLoadingMessage('Finding your friend...');
-      const friendDoc = await getDoc(doc(db, 'users', friendId));
-      if (!friendDoc.exists()) throw new Error("Could not find your friend's profile.");
-      const friendData = friendDoc.data() as UserProfile;
+      let friendData: UserProfile;
+
+      if (friendId === MOCK_FRIEND_ID) {
+        setLoadingMessage('Finding your friend (mock)...');
+        friendData = MOCK_FRIEND_PROFILE;
+      } else {
+        // 1. Fetch friend data
+        setLoadingMessage('Finding your friend...');
+        const friendDoc = await getDoc(doc(db, 'users', friendId));
+        if (!friendDoc.exists()) throw new Error("Could not find your friend's profile.");
+        friendData = friendDoc.data() as UserProfile;
+      }
       setFriendProfile(friendData);
 
       setLoadingMessage('Analyzing your movie tastes...');
@@ -103,7 +122,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
       const friendHighRatings = (friendData.ratedMovies || []).filter((m: any) => m.rating >= 4);
 
       if (currentUserHighRatings.length === 0 || friendHighRatings.length === 0) {
-        throw new Error("You both need to rate at least one movie 4+ stars to create a Blend.");
+        throw new Error("You both need to rate at least one movie 4+ stars to create a Blend. The test user likes The Matrix, Inception, and The Dark Knight.");
       }
 
       // 2. Get movie titles for high ratings
