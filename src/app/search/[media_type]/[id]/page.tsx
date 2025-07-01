@@ -16,6 +16,7 @@ import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firest
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -23,6 +24,11 @@ interface WatchProvider {
   provider_id: number;
   provider_name: string;
   logo_path: string;
+}
+
+interface Genre {
+    id: number;
+    name: string;
 }
 
 export default function DetailPage() {
@@ -42,6 +48,7 @@ export default function DetailPage() {
   const [loadingProviders, setLoadingProviders] = useState(true);
   
   const [overview, setOverview] = useState<string | null>(null);
+  const [genres, setGenres] = useState<Genre[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(true);
   
   const [userRating, setUserRating] = useState(0);
@@ -97,9 +104,11 @@ export default function DetailPage() {
         if (!res.ok) throw new Error('Failed to fetch details');
         const data = await res.json();
         setOverview(data.overview || 'No description available.');
+        setGenres(data.genres || []);
       } catch (error) {
         console.error('Error fetching details:', error);
         setOverview('Could not load description.');
+        setGenres([]);
       } finally {
         setLoadingDetails(false);
       }
@@ -239,9 +248,20 @@ export default function DetailPage() {
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-5/6" />
+                <div className="flex gap-2 pt-2">
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                    <Skeleton className="h-6 w-24 rounded-full" />
+                </div>
               </div>
             ) : (
-              <p className="mt-4 text-muted-foreground">{overview}</p>
+              <>
+                <div className="mt-4 flex flex-wrap gap-2">
+                    {genres.map(genre => (
+                        <Badge key={genre.id} variant="secondary">{genre.name}</Badge>
+                    ))}
+                </div>
+                <p className="mt-4 text-muted-foreground">{overview}</p>
+              </>
             )}
             
             <div className="mt-6 flex flex-col items-start gap-4">

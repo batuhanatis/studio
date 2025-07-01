@@ -87,6 +87,7 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
   
   const title = item.title || item.name || 'Untitled';
   const releaseYear = item.release_date?.substring(0, 4) || item.first_air_date?.substring(0, 4);
+  const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : 'https://placehold.co/200x300.png';
   const href = `/search/${item.media_type}/${item.id}?title=${encodeURIComponent(title)}&poster=${item.poster_path}&rating=${item.vote_average}&year=${releaseYear || ''}`;
 
   const movieDetails = {
@@ -97,12 +98,12 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
   };
 
   return (
-    <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200">
-      <CardContent className="p-0 flex w-full">
+    <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200 flex flex-col h-full">
+      <div className="flex w-full flex-grow">
         <Link href={href} className="block flex-shrink-0">
-          <div className="relative w-28 h-40 md:w-32 md:h-48 bg-muted">
+          <div className="relative w-28 h-full min-h-40 md:w-32 bg-muted">
             <Image
-              src={`https://image.tmdb.org/t/p/w200${item.poster_path}`}
+              src={posterUrl}
               alt={title}
               fill
               className="object-cover"
@@ -166,7 +167,7 @@ export function MovieResultCard({ item }: { item: SearchResult }) {
             </div>
           </div>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }
