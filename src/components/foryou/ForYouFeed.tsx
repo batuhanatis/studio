@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Film } from 'lucide-react';
 import { MovieResultCard } from '@/components/search/MovieResultCard';
@@ -21,12 +21,18 @@ interface Movie {
   popularity: number;
   release_date?: string;
   first_air_date?: string;
+  genre_ids: number[];
 }
 
 interface UserMovieData {
   movieId: string;
   mediaType: 'movie' | 'tv';
 }
+
+interface UserRatingData extends UserMovieData {
+  rating: number;
+}
+
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -48,15 +54,21 @@ export function ForYouFeed() {
   });
 
   const [watched, setWatched] = useState<UserMovieData[]>([]);
+  const [preferredGenreIds, setPreferredGenreIds] = useState<string>('');
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
-  const fetchDiscoverData = useCallback(async (currentFilters: Filters) => {
+  const fetchDiscoverData = useCallback(async (currentFilters: Filters, genrePrefs: string) => {
     setLoading(true);
     try {
+        const genreQuery = currentFilters.genres.length > 0 
+            ? currentFilters.genres.join(',')
+            : genrePrefs;
+
         let allMovies: Movie[] = [];
-        const moviePage1 = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1&watch_region=TR&with_genres=${currentFilters.genres.join(',')}&with_watch_providers=${currentFilters.platforms.join(',')}&primary_release_date.gte=${currentFilters.year[0]}-01-01&primary_release_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
-        const tvPage1 = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1&watch_region=TR&with_genres=${currentFilters.genres.join(',')}&with_watch_providers=${currentFilters.platforms.join(',')}&first_air_date.gte=${currentFilters.year[0]}-01-01&first_air_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
-        const moviePage2 = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=2&watch_region=TR&with_genres=${currentFilters.genres.join(',')}&with_watch_providers=${currentFilters.platforms.join(',')}&primary_release_date.gte=${currentFilters.year[0]}-01-01&primary_release_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
-        const tvPage2 = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=2&watch_region=TR&with_genres=${currentFilters.genres.join(',')}&with_watch_providers=${currentFilters.platforms.join(',')}&first_air_date.gte=${currentFilters.year[0]}-01-01&first_air_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
+        const moviePage1 = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&primary_release_date.gte=${currentFilters.year[0]}-01-01&primary_release_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
+        const tvPage1 = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&first_air_date.gte=${currentFilters.year[0]}-01-01&first_air_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
+        const moviePage2 = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=2&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&primary_release_date.gte=${currentFilters.year[0]}-01-01&primary_release_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
+        const tvPage2 = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=2&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&first_air_date.gte=${currentFilters.year[0]}-01-01&first_air_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
 
         const [movieData, tvData, movieData2, tvData2] = await Promise.all([moviePage1, tvPage1, moviePage2, tvPage2]);
 
@@ -85,8 +97,10 @@ export function ForYouFeed() {
 
 
   useEffect(() => {
-    debouncedFetch(filters);
-  }, [filters, debouncedFetch]);
+    if (!loadingProfile) {
+        debouncedFetch(filters, preferredGenreIds);
+    }
+  }, [filters, debouncedFetch, loadingProfile, preferredGenreIds]);
 
   // Fetch genres and platforms for filter controls
   useEffect(() => {
@@ -112,13 +126,42 @@ export function ForYouFeed() {
     fetchFilterOptions();
   }, [toast]);
 
-  // Fetch user's watched list
+  // Fetch user profile data to personalize the feed
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+        setLoadingProfile(false);
+        return;
+    }
     const userDocRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-            setWatched(doc.data().watchedMovies || []);
+    const unsubscribe = onSnapshot(userDocRef, async (doc) => {
+        setLoadingProfile(true);
+        try {
+            if (doc.exists()) {
+                const data = doc.data();
+                setWatched(data.watchedMovies || []);
+
+                const ratings: UserRatingData[] = data.ratedMovies || [];
+                const highlyRated = ratings.filter(r => r.rating >= 4)
+                                         .sort((a, b) => b.rating - a.rating)
+                                         .slice(0, 5);
+                
+                if (highlyRated.length > 0) {
+                     const genreDetailsPromises = highlyRated.map(m => 
+                        fetch(`https://api.themoviedb.org/3/${m.mediaType}/${m.movieId}?api_key=${API_KEY}`)
+                            .then(res => res.ok ? res.json() : Promise.resolve({ genre_ids: [] }))
+                            .then(details => details.genres?.map((g: Genre) => g.id) || [])
+                     );
+                     const genreIdArrays = await Promise.all(genreDetailsPromises);
+                     const uniqueGenreIds = [...new Set(genreIdArrays.flat())];
+                     setPreferredGenreIds(uniqueGenreIds.join('|'));
+                } else {
+                     setPreferredGenreIds('');
+                }
+            }
+        } catch (error) {
+            console.error("Error processing user profile:", error);
+        } finally {
+            setLoadingProfile(false);
         }
     });
     return () => unsubscribe();
@@ -169,10 +212,10 @@ export function ForYouFeed() {
         allPlatforms={allPlatforms}
         filters={filters}
         onFilterChange={setFilters}
-        loading={loading}
+        loading={loading || loadingProfile}
       />
       
-      {loading && filteredMovies.length === 0 ? (
+      {(loading || loadingProfile) ? (
         <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p>Loading recommendations...</p>
