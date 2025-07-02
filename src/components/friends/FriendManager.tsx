@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -49,6 +50,8 @@ const addFriendSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email.' }),
 });
 
+type AddFriendFormValues = z.infer<typeof addFriendSchema>;
+
 export function FriendManager() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -57,7 +60,7 @@ export function FriendManager() {
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState({ requests: true, friends: true, action: false });
 
-  const form = useForm<z.infer<typeof addFriendSchema>>({
+  const form = useForm<AddFriendFormValues>({
     resolver: zodResolver(addFriendSchema),
     defaultValues: { email: '' },
   });
@@ -132,7 +135,7 @@ export function FriendManager() {
   }, [user]);
 
 
-  const handleAddFriend = async (values: z.infer<typeof addFriendSchema>>) => {
+  const handleAddFriend = async (values: AddFriendFormValues) => {
     if (!user || !user.email || values.email === user.email) {
       toast({ variant: 'destructive', title: 'Error', description: "You can't add yourself as a friend." });
       return;
@@ -306,3 +309,5 @@ export function FriendManager() {
     </div>
   );
 }
+
+    
