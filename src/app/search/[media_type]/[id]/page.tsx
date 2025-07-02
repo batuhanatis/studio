@@ -182,14 +182,7 @@ export default function DetailPage() {
       });
       toast({ title: 'Rating saved!', description: `You rated "${decodedTitle}" ${rating} stars.` });
     } catch (error: any) {
-       console.error("Transaction failed: ", error);
-       console.log("Rating Error Code:", error.code);
-       console.log("Rating Error Name:", error.name);
-       let description = error.message || 'Could not save your rating.';
-       if (error.code === 'permission-denied' || error.code === 'unauthenticated') {
-         description = "Could not save rating due to database permissions. Please check your Firestore security rules.";
-       }
-       toast({ variant: 'destructive', title: 'Error Saving Rating', description });
+       toast({ variant: 'destructive', title: 'Error Saving Rating', description: error.message || 'Could not save your rating.' });
     }
   };
   
