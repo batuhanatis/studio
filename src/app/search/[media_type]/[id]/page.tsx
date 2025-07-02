@@ -56,6 +56,8 @@ export default function DetailPage() {
   const [userRating, setUserRating] = useState(0);
   const [isWatched, setIsWatched] = useState(false);
   const [loadingUserData, setLoadingUserData] = useState(true);
+  
+  const decodedTitle = decodeURIComponent(title);
 
   useEffect(() => {
     async function getWatchProviders(id: string, type: 'movie' | 'tv') {
@@ -148,29 +150,40 @@ export default function DetailPage() {
   }, [user, id, media_type, toast]);
 
   const handleRateMovie = async (rating: number) => {
-    if (!user) return;
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to rate movies.' });
+      return;
+    }
     const userDocRef = doc(db, 'users', user.uid);
 
     try {
       await runTransaction(db, async (transaction) => {
         const userDoc = await transaction.get(userDocRef);
         if (!userDoc.exists()) {
-          throw new Error("User document does not exist!");
+          throw new Error("User profile not found. Please try again.");
         }
         
-        const currentRatings = userDoc.data().ratedMovies || [];
-        const movieIdentifier = { movieId: id, mediaType: media_type };
-        const newRatings = [
-            ...currentRatings.filter((r: any) => r.movieId !== id || r.mediaType !== media_type), 
-            {...movieIdentifier, rating}
-        ];
+        const data = userDoc.data();
+        const currentRatings: any[] = data.ratedMovies ? [...data.ratedMovies] : [];
         
-        transaction.update(userDocRef, { ratedMovies: newRatings });
+        const ratingIndex = currentRatings.findIndex(r => r.movieId === id && r.mediaType === media_type);
+
+        if (ratingIndex > -1) {
+          // Update existing rating if it has changed
+          if(currentRatings[ratingIndex].rating !== rating) {
+            currentRatings[ratingIndex].rating = rating;
+          }
+        } else {
+          // Add new rating
+          currentRatings.push({ movieId: id, mediaType: media_type, rating: rating });
+        }
+        
+        transaction.update(userDocRef, { ratedMovies: currentRatings });
       });
-      toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
-    } catch (error) {
+      toast({ title: 'Rating saved!', description: `You rated "${decodedTitle}" ${rating} stars.` });
+    } catch (error: any) {
        console.error("Transaction failed: ", error);
-       toast({ variant: 'destructive', title: 'Error', description: 'Could not save rating.' });
+       toast({ variant: 'destructive', title: 'Error Saving Rating', description: error.message || 'Could not save your rating.' });
     }
   };
   
@@ -195,8 +208,6 @@ export default function DetailPage() {
   const posterUrl = poster && poster !== 'null'
     ? `https://image.tmdb.org/t/p/w500${poster}`
     : 'https://placehold.co/500x750.png';
-
-  const decodedTitle = decodeURIComponent(title);
 
   const movieDetails = {
     id: Number(id),

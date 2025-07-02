@@ -147,50 +147,62 @@ export function DiscoverFeed() {
   }, [user, toast]);
 
   const handleRateMovie = async (movieId: number, mediaType: 'movie' | 'tv', rating: number) => {
-    if (!user) return;
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to rate movies.' });
+        return;
+    }
     const userDocRef = doc(db, 'users', user.uid);
+    const movieIdStr = String(movieId);
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userDocRef);
-        if (!userDoc.exists()) {
-          throw new Error("User document does not exist!");
-        }
-        
-        const currentRatings = userDoc.data().ratedMovies || [];
-        const newRatings = [
-            ...currentRatings.filter((r: any) => r.movieId !== String(movieId) || r.mediaType !== mediaType), 
-            { movieId: String(movieId), mediaType, rating }
-        ];
-        
-        transaction.update(userDocRef, { ratedMovies: newRatings });
-      });
-
-      toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
-      
-      if (rating >= 4) {
-        const res = await fetch(`https://api.themoviedb.org/3/${mediaType}/${movieId}/recommendations?api_key=${API_KEY}&language=en-US`);
-        if (res.ok) {
-            const data = await res.json();
-            const seenMovieIds = new Set([
-                ...userRatings.map(m => m.movieId), 
-                ...userWatched.map(m => m.movieId),
-                ...movies.map(m => String(m.id)),
-                String(movieId)
-            ]);
-            const newRecs = (data.results || [])
-                .map((m: any) => ({...m, media_type: m.media_type || mediaType}))
-                .filter((m: Movie) => m.poster_path && m.overview && !seenMovieIds.has(String(m.id)));
+        await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userDocRef);
+            if (!userDoc.exists()) {
+                throw new Error("User profile not found. Please try again.");
+            }
             
-            if (newRecs.length > 0) {
-                setMovies(prev => [...prev, ...newRecs.sort(() => 0.5 - Math.random())]);
-                toast({ title: "We've found more for you!", description: "New recommendations added to your queue."});
+            const data = userDoc.data();
+            const currentRatings: any[] = data.ratedMovies ? [...data.ratedMovies] : [];
+            
+            const ratingIndex = currentRatings.findIndex(r => r.movieId === movieIdStr && r.mediaType === mediaType);
+
+            if (ratingIndex > -1) {
+                // Update existing rating if it changed
+                if (currentRatings[ratingIndex].rating === rating) return; // No change needed
+                currentRatings[ratingIndex].rating = rating;
+            } else {
+                // Add new rating
+                currentRatings.push({ movieId: movieIdStr, mediaType, rating });
+            }
+            
+            transaction.update(userDocRef, { ratedMovies: currentRatings });
+        });
+
+        toast({ title: 'Rating saved!', description: 'Your recommendations will be updated based on your new rating.' });
+      
+        if (rating >= 4) {
+            const res = await fetch(`https://api.themoviedb.org/3/${mediaType}/${movieId}/recommendations?api_key=${API_KEY}&language=en-US`);
+            if (res.ok) {
+                const data = await res.json();
+                const seenMovieIds = new Set([
+                    ...userRatings.map(m => m.movieId), 
+                    ...userWatched.map(m => m.movieId),
+                    ...movies.map(m => String(m.id)),
+                    String(movieId)
+                ]);
+                const newRecs = (data.results || [])
+                    .map((m: any) => ({...m, media_type: m.media_type || mediaType}))
+                    .filter((m: Movie) => m.poster_path && m.overview && !seenMovieIds.has(String(m.id)));
+                
+                if (newRecs.length > 0) {
+                    setMovies(prev => [...prev, ...newRecs.sort(() => 0.5 - Math.random())]);
+                    toast({ title: "We've found more for you!", description: "New recommendations added to your queue."});
+                }
             }
         }
-      }
-    } catch (error) {
+    } catch (error: any) {
        console.error("Failed to rate movie:", error);
-       toast({ variant: 'destructive', title: 'Error', description: 'Could not save rating.' });
+       toast({ variant: 'destructive', title: 'Error Saving Rating', description: error.message || 'Could not save your rating.' });
     }
   };
 
