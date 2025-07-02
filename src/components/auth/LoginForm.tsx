@@ -58,8 +58,9 @@ export function LoginForm() {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       router.push('/search');
     } catch (error: any) {
-      let description = 'An unexpected error occurred. Please try again.';
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      let description = `An unexpected error occurred: ${error.message}`;
+      // 'auth/invalid-credential' is the modern code for wrong email/password.
+      if (error.code === 'auth/invalid-credential') {
         description = 'Invalid email or password. Please try again.';
       }
       toast({

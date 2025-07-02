@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -60,6 +59,7 @@ export function RegisterForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
+      // After user is created in Auth, create their profile document in Firestore
       if (user) {
         await setDoc(doc(db, "users", user.uid), {
           uid: user.uid,
@@ -74,13 +74,37 @@ export function RegisterForm() {
 
       router.push('/search');
     } catch (error: any) {
+      let title = 'Registration Failed';
       let description = 'An unexpected error occurred. Please try again.';
-      if (error.code === 'auth/email-already-in-use') {
-        description = 'This email is already registered. Please login instead.';
+
+      // Check if it's a Firebase Auth error
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            description = 'This email is already registered. Please login instead.';
+            break;
+          case 'auth/invalid-email':
+            description = 'The email address is not valid. Please check and try again.';
+            break;
+          case 'auth/weak-password':
+            description = 'The password is too weak. It must be at least 6 characters long.';
+            break;
+          case 'auth/operation-not-allowed':
+            description = 'Email/password sign-up is not enabled. Please check your Firebase project settings.';
+            break;
+          default:
+            description = `An unexpected error occurred: ${error.message}`;
+            break;
+        }
+      } else {
+        // This is likely a Firestore error after user creation
+        title = 'Profile Setup Failed';
+        description = `Your account was created, but we couldn't set up your profile. This is often due to a database configuration or security rule issue. Please contact support.`;
       }
+      
       toast({
         variant: 'destructive',
-        title: 'Registration Failed',
+        title: title,
         description,
       });
     } finally {
