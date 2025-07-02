@@ -108,10 +108,18 @@ export function RegisterForm() {
     } catch (error: any) {
       // This block specifically handles errors from the Firestore operation
       const title = 'Profile Creation Failed';
-      const description = `Your account was created, but we couldn't set up your profile. This is likely a database permissions issue. Error: ${error.message}`;
+      let description = `Your account was created, but we couldn't set up your profile. Error: ${error.message}`;
       
       // Log the full error for debugging
       console.error("FIRESTORE ERROR during user profile creation:", error);
+      console.log("Error Code:", error.code);
+      console.log("Error Name:", error.name);
+
+      if (error.code === 'permission-denied' || error.code === 'unauthenticated') {
+        description = "Your account was created, but we couldn't set up your profile due to a database permissions issue. Please check your Firestore security rules and that the database was created correctly.";
+      } else {
+         description = `Your account was created, but we couldn't set up your profile. An unexpected database error occurred: ${error.message}`;
+      }
       
       toast({ 
         variant: 'destructive', 
