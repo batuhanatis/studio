@@ -1,11 +1,8 @@
 'use client';
 
-import { auth } from '@/lib/firebase';
-import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Film, LogOut, Users, Gift, Compass, Sparkles, List, Menu } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Film, Users, Gift, Compass, Sparkles, List, Menu, User } from 'lucide-react';
 import Link from 'next/link';
 import {
   Sheet,
@@ -16,20 +13,6 @@ import {
 
 export function Header() {
   const router = useRouter();
-  const { toast } = useToast();
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push('/login');
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Logout Failed',
-        description: 'Could not log you out. Please try again.',
-      });
-    }
-  };
 
   const navLinks = (
     <>
@@ -63,9 +46,11 @@ export function Header() {
           Friends
         </Link>
       </Button>
-      <Button variant="ghost" size="sm" onClick={handleLogout}>
-        <LogOut className="mr-2 h-4 w-4" />
-        Logout
+      <Button asChild variant="ghost" size="sm">
+        <Link href="/profile">
+          <User className="mr-2 h-4 w-4" />
+          Profilim
+        </Link>
       </Button>
     </>
   );
@@ -103,10 +88,10 @@ export function Header() {
             </Link>
         </SheetClose>
         <SheetClose asChild>
-            <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
-                <LogOut className="h-5 w-5" />
-                <span className="font-medium">Logout</span>
-            </button>
+            <Link href="/profile" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+                <User className="h-5 w-5" />
+                <span className="font-medium">Profilim</span>
+            </Link>
         </SheetClose>
     </nav>
   );
