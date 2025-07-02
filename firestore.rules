@@ -1,41 +1,45 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Users can read their own profile, and friends can read profiles.
+    
+    // Users Collection
+    // - A user can create their own profile upon signup.
+    // - A user can only read or update their own profile after creation.
+    // - Nobody can delete a user profile.
+    // - Nobody can see the full list of users.
     match /users/{userId} {
-      allow read: if request.auth != null && (
-        request.auth.uid == userId ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.friends.hasAny([userId]))
-      );
-      // A user can only be created if the UID in the path matches the authenticated user.
       allow create: if request.auth != null && request.auth.uid == userId;
-      
-      // Only the user can update their own profile.
-      allow update: if request.auth != null && request.auth.uid == userId;
-      
-      // Users cannot delete their profiles through the app.
+      allow read, update: if request.auth != null && request.auth.uid == userId;
       allow delete: if false;
     }
 
-    // A user can manage their own watchlists.
-    match /watchlists/{listId} {
-      allow read, create, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
-    }
-    
-    // The recipient of a friend request can read, update, or delete it.
-    // Any logged-in user can create a friend request.
+    // Friend Requests Collection
+    // - Logged-in users can create new friend requests.
+    // - Users can read requests sent to them or by them.
+    // - A user can update/delete a request sent to them (accept/decline).
+    // - A user can update a request they sent (if the status changes to 'accepted').
     match /friendRequests/{requestId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.toUserId;
       allow create: if request.auth != null;
+      allow read: if request.auth != null && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
+      allow update, delete: if request.auth != null && resource.data.toUserId == request.auth.uid;
+      allow update: if request.auth != null && resource.data.fromUserId == request.auth.uid && request.resource.data.status == 'accepted';
     }
 
-    // The recipient of a recommendation can read it.
-    // Any logged-in user can create a recommendation.
+    // Watchlists Collection
+    // - A user can create/read/update/delete their own watchlists.
+    // - Nobody can see other users' watchlists.
+    match /watchlists/{listId} {
+        allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    
+    // Recommendations Collection
+    // - Logged-in users can create new recommendations (send to a friend).
+    // - A user can only read recommendations sent to them.
+    // - Nobody can update or delete recommendations after they are sent.
     match /recommendations/{recommendationId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.toUserId;
-      allow create: if request.auth != null;
+        allow create: if request.auth != null;
+        allow read: if request.auth != null && resource.data.toUserId == request.auth.uid;
+        allow update, delete: if false;
     }
   }
 }

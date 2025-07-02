@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, type UserCredential } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -55,29 +55,15 @@ export function RegisterForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+    let userCredential: UserCredential | null = null;
+
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      const user = userCredential.user;
-
-      // After user is created in Auth, create their profile document in Firestore
-      if (user) {
-        await setDoc(doc(db, "users", user.uid), {
-          uid: user.uid,
-          email: user.email,
-          friends: [],
-          friendRequestsSent: [],
-          friendRequestsReceived: [],
-          ratedMovies: [],
-          watchedMovies: [],
-        });
-      }
-
-      router.push('/search');
+      // Step 1: Create user in Firebase Authentication
+      userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
     } catch (error: any) {
+      // This block only handles Authentication errors
       let title = 'Registration Failed';
-      let description = 'An unexpected error occurred. Please try again.';
-
-      // Check if it's a Firebase Auth error
+      let description = 'An unexpected error occurred during account creation.';
       if (error.code) {
         switch (error.code) {
           case 'auth/email-already-in-use':
@@ -89,23 +75,49 @@ export function RegisterForm() {
           case 'auth/weak-password':
             description = 'The password is too weak. It must be at least 6 characters long.';
             break;
-          case 'auth/operation-not-allowed':
-            description = 'Email/password sign-up is not enabled. Please check your Firebase project settings.';
-            break;
           default:
-            description = `An unexpected error occurred: ${error.message}`;
+            description = `An unexpected Auth error occurred: ${error.message}`;
             break;
         }
-      } else {
-        // This is likely a Firestore error after user creation
-        title = 'Profile Setup Failed';
-        description = `Your account was created, but we couldn't set up your profile. This is often due to a database configuration or security rule issue. Please contact support.`;
+      }
+      console.error("AUTHENTICATION ERROR:", error);
+      toast({ variant: 'destructive', title, description });
+      setIsLoading(false);
+      return; // Stop execution if auth fails
+    }
+
+    const user = userCredential.user;
+
+    try {
+      // Step 2: Create user profile document in Firestore
+      if (user) {
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          email: user.email,
+          friends: [],
+          friendRequestsSent: [],
+          friendRequestsReceived: [],
+          ratedMovies: [],
+          watchedMovies: [],
+        });
       }
       
-      toast({
-        variant: 'destructive',
-        title: title,
+      // If successful, navigate to the search page
+      router.push('/search');
+
+    } catch (error: any) {
+      // This block specifically handles errors from the Firestore operation
+      const title = 'Profile Creation Failed';
+      const description = `Your account was created, but we couldn't set up your profile. This is likely a database permissions issue. Error: ${error.message}`;
+      
+      // Log the full error for debugging
+      console.error("FIRESTORE ERROR during user profile creation:", error);
+      
+      toast({ 
+        variant: 'destructive', 
+        title, 
         description,
+        duration: 9000 // Give user more time to read
       });
     } finally {
       setIsLoading(false);
