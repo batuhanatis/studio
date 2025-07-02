@@ -1,11 +1,41 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: This is an insecure rule for debugging purposes ONLY.
-    // It allows any authenticated user to read and write any data.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // Users can read their own profile, and friends can read profiles.
+    match /users/{userId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.friends.hasAny([userId]))
+      );
+      // A user can only be created if the UID in the path matches the authenticated user.
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Only the user can update their own profile.
+      allow update: if request.auth != null && request.auth.uid == userId;
+      
+      // Users cannot delete their profiles through the app.
+      allow delete: if false;
+    }
+
+    // A user can manage their own watchlists.
+    match /watchlists/{listId} {
+      allow read, create, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    // The recipient of a friend request can read, update, or delete it.
+    // Any logged-in user can create a friend request.
+    match /friendRequests/{requestId} {
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.toUserId;
+      allow create: if request.auth != null;
+    }
+
+    // The recipient of a recommendation can read it.
+    // Any logged-in user can create a recommendation.
+    match /recommendations/{recommendationId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.toUserId;
+      allow create: if request.auth != null;
     }
   }
 }
