@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import {
@@ -8,13 +8,15 @@ import {
   getDoc,
   updateDoc,
   arrayUnion,
-  arrayRemove,
   query,
   collection,
   where,
   getDocs,
   onSnapshot,
   writeBatch,
+  addDoc,
+  serverTimestamp,
+  deleteDoc,
 } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,6 +34,15 @@ import { Avatar, AvatarFallback } from '../ui/avatar';
 interface UserProfile {
   uid: string;
   email: string;
+  friends?: string[];
+}
+
+interface FriendRequest {
+  id: string;
+  fromUserId: string;
+  fromUserEmail: string;
+  toUserId: string;
+  status: 'pending' | 'accepted';
 }
 
 const addFriendSchema = z.object({
@@ -41,8 +52,9 @@ const addFriendSchema = z.object({
 export function FriendManager() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [requests, setRequests] = useState<UserProfile[]>([]);
+  const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<UserProfile[]>([]);
+  const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState({ requests: true, friends: true, action: false });
 
   const form = useForm<z.infer<typeof addFriendSchema>>({
@@ -50,104 +62,105 @@ export function FriendManager() {
     defaultValues: { email: '' },
   });
 
+  // Listener for incoming friend requests
   useEffect(() => {
     if (!user) return;
+    const q = query(
+      collection(db, 'friendRequests'),
+      where('toUserId', '==', user.uid),
+      where('status', '==', 'pending')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const requests = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FriendRequest));
+      setIncomingRequests(requests);
+      setLoading(p => ({ ...p, requests: false }));
+    });
+    return () => unsubscribe();
+  }, [user]);
+  
+  // Listener for sent requests (to auto-add friend on acceptance)
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'friendRequests'), where('fromUserId', '==', user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const requests = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FriendRequest));
+      setSentRequests(requests);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
+  // Process accepted requests
+  useEffect(() => {
+    if (!user) return;
+    const accepted = sentRequests.find(r => r.status === 'accepted');
+    if (accepted) {
+      const userDocRef = doc(db, 'users', user.uid);
+      updateDoc(userDocRef, { friends: arrayUnion(accepted.toUserId) })
+        .then(() => deleteDoc(doc(db, 'friendRequests', accepted.id)))
+        .catch(e => console.error("Error finalizing friendship:", e));
+    }
+  }, [sentRequests, user]);
+  
+  // Listener for user's profile to get friends list
+  useEffect(() => {
+    if (!user) return;
     const userDocRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userDocRef, async (snapshot) => {
-      const userData = snapshot.data();
-
-      if (!userData) {
-        setRequests([]);
-        setFriends([]);
-        setLoading({ requests: false, friends: false, action: false });
-        return;
-      }
-
-      // Fetch friend requests
-      setLoading(prev => ({ ...prev, requests: true }));
-      try {
-        if (userData.friendRequestsReceived?.length > 0) {
-          const requestUids: string[] = userData.friendRequestsReceived;
-          const requestProfiles = await Promise.all(
-            requestUids.map(async (uid) => {
-              const userDoc = await getDoc(doc(db, 'users', uid));
-              return userDoc.exists() ? (userDoc.data() as UserProfile) : null;
-            })
-          );
-          setRequests(requestProfiles.filter(Boolean) as UserProfile[]);
-        } else {
-          setRequests([]);
-        }
-      } catch (error) {
-        console.error("Error fetching friend requests:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load friend requests.' });
-        setRequests([]);
-      } finally {
-        setLoading(prev => ({ ...prev, requests: false }));
-      }
-
-      // Fetch friends
-      setLoading(prev => ({ ...prev, friends: true }));
+      const userData = snapshot.data() as UserProfile | undefined;
+      setLoading(p => ({ ...p, friends: true }));
       try {
         let finalFriends: UserProfile[] = [];
-        if (userData.friends?.length > 0) {
-          const friendUids: string[] = userData.friends;
+        if (userData?.friends && userData.friends.length > 0) {
           const friendProfiles = await Promise.all(
-            friendUids.map(async (uid) => {
+            userData.friends.map(async (uid) => {
               const userDoc = await getDoc(doc(db, 'users', uid));
               return userDoc.exists() ? (userDoc.data() as UserProfile) : null;
             })
           );
           finalFriends = friendProfiles.filter(Boolean) as UserProfile[];
         }
-        
-        // Add a test user for demonstration
         finalFriends.push({ uid: 'test-friend-for-blend', email: 'test.friend@example.com' });
-
-        // Ensure uniqueness
         const uniqueFriends = Array.from(new Map(finalFriends.map(f => [f.uid, f])).values());
         setFriends(uniqueFriends);
-
       } catch (error) {
         console.error("Error fetching friends list:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load friends list.' });
-        setFriends([]);
       } finally {
-        setLoading(prev => ({ ...prev, friends: false }));
+        setLoading(p => ({ ...p, friends: false }));
       }
     });
-
     return () => unsubscribe();
-  }, [user, toast]);
+  }, [user]);
 
-  const handleAddFriend = async (values: z.infer<typeof addFriendSchema>) => {
-    if (!user || values.email === user.email) {
+
+  const handleAddFriend = async (values: z.infer<typeof addFriendSchema>>) => {
+    if (!user || !user.email || values.email === user.email) {
       toast({ variant: 'destructive', title: 'Error', description: "You can't add yourself as a friend." });
       return;
     }
-
     setLoading(prev => ({...prev, action: true}));
+
     try {
       const q = query(collection(db, 'users'), where('email', '==', values.email));
       const querySnapshot = await getDocs(q);
 
-      if (querySnapshot.empty) {
-        throw new Error('User not found.');
-      }
-
-      const targetUser = querySnapshot.docs[0].data();
+      if (querySnapshot.empty) throw new Error('User not found.');
+      const targetUser = querySnapshot.docs[0].data() as UserProfile;
       const targetUserId = targetUser.uid;
 
-      if (friends.some(f => f.uid === targetUserId)) {
-          throw new Error("You are already friends with this user.");
-      }
+      if (friends.some(f => f.uid === targetUserId)) throw new Error("You are already friends with this user.");
+      
+      const existingReqQuery = query(collection(db, 'friendRequests'), where('fromUserId', '==', user.uid), where('toUserId', '==', targetUserId));
+      const existingReqSnapshot = await getDocs(existingReqQuery);
+      if (!existingReqSnapshot.empty) throw new Error("You've already sent a request to this user.");
 
-      const currentUserDocRef = doc(db, 'users', user.uid);
-      const targetUserDocRef = doc(db, 'users', targetUserId);
-
-      await updateDoc(currentUserDocRef, { friendRequestsSent: arrayUnion(targetUserId) });
-      await updateDoc(targetUserDocRef, { friendRequestsReceived: arrayUnion(user.uid) });
+      await addDoc(collection(db, 'friendRequests'), {
+        fromUserId: user.uid,
+        fromUserEmail: user.email,
+        toUserId: targetUserId,
+        toUserEmail: targetUser.email,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
 
       toast({ title: 'Success', description: 'Friend request sent!' });
       form.reset();
@@ -158,25 +171,27 @@ export function FriendManager() {
     }
   };
 
-  const handleRequest = async (targetId: string, accept: boolean) => {
+  const handleRequest = async (request: FriendRequest, accept: boolean) => {
     if (!user) return;
     setLoading(prev => ({...prev, action: true}));
 
+    const requestDocRef = doc(db, 'friendRequests', request.id);
+
     try {
-      const batch = writeBatch(db);
-      const currentUserDocRef = doc(db, 'users', user.uid);
-      const targetUserDocRef = doc(db, 'users', targetId);
-
-      batch.update(currentUserDocRef, { friendRequestsReceived: arrayRemove(targetId) });
-      batch.update(targetUserDocRef, { friendRequestsSent: arrayRemove(user.uid) });
-
       if (accept) {
-        batch.update(currentUserDocRef, { friends: arrayUnion(targetId) });
-        batch.update(targetUserDocRef, { friends: arrayUnion(user.uid) });
+         const batch = writeBatch(db);
+         // Add sender to current user's friend list
+         const currentUserDocRef = doc(db, 'users', user.uid);
+         batch.update(currentUserDocRef, { friends: arrayUnion(request.fromUserId) });
+         // Update request status so sender's client can complete the friendship
+         batch.update(requestDocRef, { status: 'accepted' });
+         await batch.commit();
+         toast({ title: 'Success', description: `Friend request accepted.` });
+      } else {
+        // Just delete the request
+        await deleteDoc(requestDocRef);
+        toast({ title: 'Success', description: 'Friend request declined.' });
       }
-
-      await batch.commit();
-      toast({ title: 'Success', description: `Friend request ${accept ? 'accepted' : 'declined'}.` });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to process request.' });
     } finally {
@@ -225,21 +240,21 @@ export function FriendManager() {
           <CardContent>
             {loading.requests ? (
               <div className="flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
-            ) : requests.length > 0 ? (
+            ) : incomingRequests.length > 0 ? (
               <ul className="space-y-3">
-                {requests.map((req) => (
-                  <li key={req.uid} className="flex items-center justify-between rounded-lg bg-secondary p-3">
+                {incomingRequests.map((req) => (
+                  <li key={req.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarFallback>{getInitials(req.email)}</AvatarFallback>
+                        <AvatarFallback>{getInitials(req.fromUserEmail)}</AvatarFallback>
                       </Avatar>
-                      <span className="font-medium">{req.email}</span>
+                      <span className="font-medium">{req.fromUserEmail}</span>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => handleRequest(req.uid, true)} disabled={loading.action}>
+                      <Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => handleRequest(req, true)} disabled={loading.action}>
                         <Check className="h-4 w-4" />
                       </Button>
-                      <Button size="icon" variant="outline" className="h-8 w-8 bg-red-500/10 text-red-600 hover:bg-red-500/20" onClick={() => handleRequest(req.uid, false)} disabled={loading.action}>
+                      <Button size="icon" variant="outline" className="h-8 w-8 bg-red-500/10 text-red-600 hover:bg-red-500/20" onClick={() => handleRequest(req, false)} disabled={loading.action}>
                         <X className="h-4 w-4" />
                       </Button>
                     </div>

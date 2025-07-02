@@ -2,23 +2,49 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can only create and update their own profile, but any logged-in user can read profiles.
     match /users/{userId} {
+      // Any authenticated user can read public profile data.
       allow read: if request.auth != null;
+
+      // Users can only create their own profile, and can only update their own profile.
       allow create, update: if request.auth.uid == userId;
+      
+      // No one can delete profiles from the client.
+      allow delete: if false;
+
+      // Allow querying to find users by email.
+      allow list: if request.auth != null;
     }
 
-    // A user can manage their own watchlists.
     match /watchlists/{listId} {
-      allow read, update, delete: if request.auth.uid == resource.data.userId;
-      allow create: if request.auth.uid == request.resource.data.userId;
+      // Users can create watchlists for themselves.
+      allow create: if request.auth.uid != null && request.resource.data.userId == request.auth.uid;
+      // Users can read, update, delete their own watchlists.
+      allow read, update, delete: if request.auth.uid != null && resource.data.userId == request.auth.uid;
     }
     
-    // A user can create recommendations for others.
-    // A user can only read recommendations sent to them.
-    match /recommendations/{recId} {
-      allow read: if request.auth.uid == resource.data.toUserId;
-      allow create: if request.auth.uid == request.resource.data.fromUserId;
+    match /recommendations/{recommendationId} {
+      // Users can send recommendations.
+      allow create: if request.auth.uid != null && request.resource.data.fromUserId == request.auth.uid;
+      // Only the recipient can read a recommendation.
+      allow read: if request.auth.uid != null && resource.data.toUserId == request.auth.uid;
+      // Not updateable or deletable.
+      allow update, delete: if false;
+    }
+
+    match /friendRequests/{requestId} {
+      // A user can create a request if they are the sender.
+      allow create: if request.auth.uid != null && request.resource.data.fromUserId == request.auth.uid;
+
+      // The sender or receiver can read the request.
+      allow read: if request.auth.uid != null && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+
+      // Only the receiver can update the status (to accept/decline).
+      // Note: We are deleting accepted requests on the client after processing, so update is minimal.
+      allow update: if request.auth.uid != null && resource.data.toUserId == request.auth.uid;
+
+      // The sender or receiver can delete the request (e.g. decline, cancel, or cleanup).
+      allow delete: if request.auth.uid != null && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
     }
   }
 }
