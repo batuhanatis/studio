@@ -59,32 +59,59 @@ export function ForYouFeed() {
 
   const fetchDiscoverData = useCallback(async (currentFilters: Filters, genrePrefs: string) => {
     setLoading(true);
+    setMovies([]); // Clear previous results to show loading state correctly
     try {
         const genreQuery = currentFilters.genres.length > 0 
             ? currentFilters.genres.join(',')
             : genrePrefs;
 
-        let allMovies: Movie[] = [];
-        const moviePage1 = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&primary_release_date.gte=${currentFilters.year[0]}-01-01&primary_release_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
-        const tvPage1 = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&first_air_date.gte=${currentFilters.year[0]}-01-01&first_air_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
-        const moviePage2 = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=2&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&primary_release_date.gte=${currentFilters.year[0]}-01-01&primary_release_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
-        const tvPage2 = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=2&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&first_air_date.gte=${currentFilters.year[0]}-01-01&first_air_date.lte=${currentFilters.year[1]}-12-31`).then(res => res.json());
+        const urls = [
+            `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&primary_release_date.gte=${currentFilters.year[0]}-01-01&primary_release_date.lte=${currentFilters.year[1]}-12-31`,
+            `https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&first_air_date.gte=${currentFilters.year[0]}-01-01&first_air_date.lte=${currentFilters.year[1]}-12-31`,
+            `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=2&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&primary_release_date.gte=${currentFilters.year[0]}-01-01&primary_release_date.lte=${currentFilters.year[1]}-12-31`,
+            `https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=2&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&first_air_date.gte=${currentFilters.year[0]}-01-01&first_air_date.lte=${currentFilters.year[1]}-12-31`,
+        ];
 
-        const [movieData, tvData, movieData2, tvData2] = await Promise.all([moviePage1, tvPage1, moviePage2, tvPage2]);
+        const media_types = ['movie', 'tv', 'movie', 'tv'];
 
-        const movies = [
-            ...(movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' })),
-            ...(tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' })),
-            ...(movieData2.results || []).map((m: any) => ({ ...m, media_type: 'movie' })),
-            ...(tvData2.results || []).map((t: any) => ({ ...t, media_type: 'tv' })),
-        ].filter(item => item.poster_path);
+        // This keeps track of seen IDs to avoid duplicates in the UI
+        const seenMovieIds = new Set<number>();
+
+        const fetchPromises = urls.map((url, index) => 
+            fetch(url)
+                .then(res => {
+                    if (!res.ok) throw new Error(`TMDB API request failed with status ${res.status}`);
+                    return res.json();
+                })
+                .then(data => {
+                    const newMovies = (data.results || [])
+                        .map((m: any) => ({ ...m, media_type: media_types[index] as 'movie' | 'tv' }))
+                        .filter((item: Movie) => item.poster_path);
+                    
+                    // Filter out duplicates before adding
+                    const uniqueNewMovies = newMovies.filter((m: Movie) => {
+                        if (seenMovieIds.has(m.id)) {
+                            return false;
+                        }
+                        seenMovieIds.add(m.id);
+                        return true;
+                    });
+
+                    if (uniqueNewMovies.length > 0) {
+                        setMovies(prevMovies => [...prevMovies, ...uniqueNewMovies].sort((a, b) => b.popularity - a.popularity));
+                    }
+                })
+                .catch(error => {
+                    // Don't show a toast for every failed page, just log it.
+                    console.error("Error fetching a page of recommendations:", error);
+                })
+        );
         
-        const uniqueMovies = Array.from(new Map(movies.map(m => [m.id, m])).values());
-        allMovies = uniqueMovies.sort((a, b) => b.popularity - a.popularity);
+        // Wait for all fetches to complete to turn off the main loading spinner
+        await Promise.all(fetchPromises);
 
-      setMovies(allMovies);
     } catch (error) {
-      console.error("Error fetching discover feed:", error);
+      console.error("Error setting up discover feed fetch:", error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not load movies.' });
       setMovies([]);
     } finally {
@@ -133,11 +160,11 @@ export function ForYouFeed() {
         return;
     }
     const userDocRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userDocRef, async (doc) => {
+    const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
         setLoadingProfile(true);
         try {
-            if (doc.exists()) {
-                const data = doc.data();
+            if (docSnap.exists()) {
+                const data = docSnap.data();
                 setWatched(data.watchedMovies || []);
 
                 const ratings: UserRatingData[] = data.ratedMovies || [];
@@ -148,7 +175,7 @@ export function ForYouFeed() {
                 if (highlyRated.length > 0) {
                      const genreDetailsPromises = highlyRated.map(m => 
                         fetch(`https://api.themoviedb.org/3/${m.mediaType}/${m.movieId}?api_key=${API_KEY}`)
-                            .then(res => res.ok ? res.json() : Promise.resolve({ genre_ids: [] }))
+                            .then(res => res.ok ? res.json() : Promise.resolve({ genres: [] }))
                             .then(details => details.genres?.map((g: Genre) => g.id) || [])
                      );
                      const genreIdArrays = await Promise.all(genreDetailsPromises);
@@ -220,28 +247,44 @@ export function ForYouFeed() {
         loading={loading || loadingProfile}
       />
       
-      {(loading || loadingProfile) ? (
+      {/* Initial loading spinner, shown only when no movies are loaded yet */}
+      {(loading || loadingProfile) && filteredMovies.length === 0 && (
         <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p>Loading recommendations...</p>
         </div>
-      ) : !loading && filteredMovies.length === 0 ? (
+      )}
+
+      {/* No results message */}
+      {!(loading || loadingProfile) && filteredMovies.length === 0 && (
         <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
             <Film className="h-16 w-16" />
             <p className="text-lg">No Results Found</p>
             <p className="text-sm">Try adjusting your filters to find more titles.</p>
         </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {filteredMovies.map((item) => (
-            <MovieResultCard
-              key={item.id}
-              item={item}
-              isWatched={watchedIds.has(String(item.id))}
-              onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
-            />
-          ))}
-        </div>
+      )}
+
+      {/* Movie grid, shown as soon as there's at least one movie */}
+      {filteredMovies.length > 0 && (
+        <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {filteredMovies.map((item) => (
+                <MovieResultCard
+                key={item.id}
+                item={item}
+                isWatched={watchedIds.has(String(item.id))}
+                onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
+                />
+            ))}
+            </div>
+            {/* "Loading more" spinner shown at the bottom while still fetching */}
+            {(loading || loadingProfile) && (
+                <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p>Loading more...</p>
+                </div>
+            )}
+        </>
       )}
     </div>
   );

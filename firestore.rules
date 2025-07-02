@@ -1,38 +1,13 @@
 rules_version = '2';
 
 service cloud.firestore {
+
   match /databases/{database}/documents {
-    
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
 
-    // Users can read any profile (needed for friend search/blend).
-    // They can only create or update their OWN profile.
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow update: if isOwner(userId);
-      allow create: if request.auth.uid != null && request.resource.id == request.auth.uid;
-    }
+    match /{document=**} {
 
-    // Users can create, read, update, and delete their own watchlists.
-    match /watchlists/{listId} {
-      allow read, update, delete: if isOwner(resource.data.userId);
-      allow create: if isOwner(request.resource.data.userId);
-    }
-    
-    // Users can create recommendations for others.
-    // A user can only read or delete recommendations sent to them.
-    match /recommendations/{recommendationId} {
-      allow read, delete: if isOwner(resource.data.toUserId);
-      allow create: if isOwner(request.resource.data.fromUserId);
-    }
+      allow read, write: if true;
 
-    // Users can create friend requests.
-    // Users can read, update, or delete requests sent to or from them.
-    match /friendRequests/{requestId} {
-      allow read, update, delete: if isOwner(resource.data.fromUserId) || isOwner(resource.data.toUserId);
-      allow create: if isOwner(request.resource.data.fromUserId);
     }
   }
 }
