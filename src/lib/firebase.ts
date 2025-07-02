@@ -10,7 +10,7 @@ const firebaseConfig = {
   projectId: "movie-finder-kqqse",
   storageBucket: "movie-finder-kqqse.firebasestorage.app",
   messagingSenderId: "226527022824",
-  appId: "1:226527022824:web:2e48cac5116ea1cf6e435d"
+  appId: "1:226527022824:web:78c6557a8005dec26e435d"
 };
 
 // Initialize Firebase
