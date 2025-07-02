@@ -1,8 +1,24 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // Users can only create and update their own profile, but any logged-in user can read profiles.
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth.uid == userId;
+    }
+
+    // A user can manage their own watchlists.
+    match /watchlists/{listId} {
+      allow read, update, delete: if request.auth.uid == resource.data.userId;
+      allow create: if request.auth.uid == request.resource.data.userId;
+    }
+    
+    // A user can create recommendations for others.
+    // A user can only read recommendations sent to them.
+    match /recommendations/{recId} {
+      allow read: if request.auth.uid == resource.data.toUserId;
+      allow create: if request.auth.uid == request.resource.data.fromUserId;
     }
   }
 }
