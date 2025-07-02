@@ -5,13 +5,12 @@ import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 // IMPORTANT: Replace the following with your app's Firebase project configuration.
 // See: https://firebase.google.com/docs/web/setup#available-libraries
 const firebaseConfig = {
-  apiKey: "AIzaSyA86GPu4bus3pcVf0ryIc-2ebsUYNVZW5U",
-  authDomain: "watchme-apps.firebaseapp.com",
-  projectId: "watchme-apps",
-  storageBucket: "watchme-apps.firebasestorage.app",
-  messagingSenderId: "1076703186319",
-  appId: "1:1076703186319:web:78f9255429938f976b4ffa",
-  measurementId: "G-77JR4JZ88X"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 // Initialize Firebase
