@@ -1,39 +1,65 @@
 
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper function to check if a user is signed in.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the requesting user is the owner of the document.
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Helper function to check if the user being accessed is in the requester's friends list.
+    function isFriend(friendId) {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return friendId in userDoc.data.friends;
+    }
     
+    // Rules for the 'users' collection.
     match /users/{userId} {
-      // A user can create their own document.
-      allow create: if request.auth != null && request.auth.uid == userId;
-      
-      // A user can read their own document.
-      // They can also read another user's document if that user is in their friends list.
-      allow read: if request.auth != null && (request.auth.uid == userId || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.friends));
-
-      // A user can only update or delete their own document.
-      allow update, delete: if request.auth != null && request.auth.uid == userId;
+      // A user can read their own profile, or the profile of a friend.
+      allow read: if isSignedIn() && (isOwner(userId) || isFriend(userId));
+      // A user can create their own profile document.
+      allow create: if isSignedIn() && isOwner(userId);
+      // A user can only update their own profile document.
+      allow update: if isSignedIn() && isOwner(userId);
+      // Nobody can delete a user profile from the app.
+      allow delete: if false;
     }
 
+    // Rules for the 'watchlists' collection.
     match /watchlists/{listId} {
-      // A user can read/write a watchlist if they are the owner.
-      // This rule covers create, read, update, and delete by checking the userId on the document.
-      allow read, write: if request.auth != null && ((request.resource.data.userId == request.auth.uid) || (resource.data.userId == request.auth.uid));
+      // A user can read, update, or delete a watchlist only if they own it.
+      allow read, update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // A user can create a watchlist for themselves.
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
-    
+
+    // Rules for the 'recommendations' collection.
     match /recommendations/{recommendationId} {
-      // A user must be authenticated to create a recommendation.
-      allow create: if request.auth != null;
       // A user can only read recommendations sent to them.
-      allow read: if request.auth != null && resource.data.toUserId == request.auth.uid;
-      allow delete: if false; 
+      allow read: if isSignedIn() && resource.data.toUserId == request.auth.uid;
+      // A user can send a recommendation.
+      allow create: if isSignedIn() && request.resource.data.fromUserId == request.auth.uid;
+      // Recommendations cannot be changed or deleted.
+      allow update, delete: if false;
     }
     
+    // Rules for the 'friendRequests' collection.
     match /friendRequests/{requestId} {
-      // A user can read or delete a request if they are the sender or receiver.
-      allow read, delete: if request.auth != null && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
-      // A user must be authenticated to create or update a request.
-      allow create, update: if request.auth != null;
+      // A user can read requests sent to them or by them.
+      allow read: if isSignedIn() && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
+      // A user can create a request.
+      allow create: if isSignedIn() && request.resource.data.fromUserId == request.auth.uid;
+      // The recipient can update a request (to accept it).
+      allow update: if isSignedIn() && resource.data.toUserId == request.auth.uid;
+      // Either the sender or receiver can delete a request.
+      allow delete: if isSignedIn() && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
     }
   }
 }
