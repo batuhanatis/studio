@@ -103,7 +103,12 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     }
 
     try {
-      await updateDoc(listDocRef, { movies: arrayUnion(movie) });
+      // Create a new object, only including properties that are not undefined.
+      const movieToAdd = Object.fromEntries(
+        Object.entries(movie).filter(([, value]) => value !== undefined)
+      );
+      
+      await updateDoc(listDocRef, { movies: arrayUnion(movieToAdd) });
       toast({ title: 'Success!', description: `Added "${movie.title}" to "${listName}".` });
       setIsOpen(false);
     } catch (error: any) {
@@ -118,10 +123,15 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     if (!user || !newListName.trim()) return;
     setIsCreating(true);
     
+    // Create a new object, only including properties that are not undefined.
+    const movieToAdd = Object.fromEntries(
+      Object.entries(movie).filter(([, value]) => value !== undefined)
+    );
+
     const newList = {
         userId: user.uid,
         name: newListName.trim(),
-        movies: [movie],
+        movies: [movieToAdd],
         createdAt: serverTimestamp(),
     };
 
