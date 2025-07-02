@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { getWatchlistRecommendations } from '@/ai/flows/watchlist-recommendations';
 import { MovieResultCard } from '@/components/search/MovieResultCard';
@@ -130,27 +130,17 @@ export function WatchlistDetail({ listId }: { listId: string }) {
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!user) return;
+    const userDocRef = doc(db, 'users', user.uid);
     const movieIdentifier = { movieId: String(movieId), mediaType };
     
     try {
-        const userDocRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
-        const currentWatched: UserMovieData[] = docSnap.data()?.watchedMovies || [];
-        
-        let updatedWatched: UserMovieData[];
-        const movieExists = currentWatched.some(m => m.movieId === String(movieId) && m.mediaType === mediaType);
-
         if (isWatched) {
-            if (!movieExists) {
-                updatedWatched = [...currentWatched, movieIdentifier];
-            } else {
-                updatedWatched = currentWatched;
-            }
+            await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
         } else {
-            updatedWatched = currentWatched.filter(m => !(m.movieId === String(movieId) && m.mediaType === mediaType));
+            await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
         }
-        await updateDoc(userDocRef, { watchedMovies: updatedWatched });
     } catch (e) {
+        console.error("Toggle watched failed: ", e);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };

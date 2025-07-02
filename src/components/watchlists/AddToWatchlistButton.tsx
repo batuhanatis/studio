@@ -91,34 +91,20 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     setAddingToList(listId);
     
     const listDocRef = doc(db, 'watchlists', listId);
-    let listName = 'this list';
+    const list = watchlists.find(l => l.id === listId);
+    const listName = list?.name || 'this list';
+
+    const movieExistsInState = list?.movies.some(m => m.id === movie.id && m.media_type === movie.media_type);
+    if (movieExistsInState) {
+        toast({ title: 'Already Added', description: `"${movie.title}" is already in "${listName}".` });
+        setIsOpen(false);
+        setAddingToList(null);
+        return;
+    }
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const listDoc = await transaction.get(listDocRef);
-        if (!listDoc.exists()) throw new Error("Watchlist not found.");
-
-        const listData = listDoc.data() as Watchlist;
-        listName = listData.name;
-        const movieExists = listData.movies.some(m => m.id === movie.id && m.media_type === movie.media_type);
-
-        if (movieExists) {
-          // No need to throw an error, just inform the user.
-          return;
-        }
-        
-        transaction.update(listDocRef, { movies: arrayUnion(movie) });
-      });
-
-      const list = watchlists.find(l => l.id === listId);
-      const movieExistsInState = list?.movies.some(m => m.id === movie.id && m.media_type === movie.media_type);
-
-      if (movieExistsInState) {
-        toast({ title: 'Already Added', description: `"${movie.title}" is already in "${listName}".` });
-      } else {
-        toast({ title: 'Success!', description: `Added "${movie.title}" to "${listName}".` });
-      }
-
+      await updateDoc(listDocRef, { movies: arrayUnion(movie) });
+      toast({ title: 'Success!', description: `Added "${movie.title}" to "${listName}".` });
       setIsOpen(false);
     } catch (error: any) {
       console.error("Add to list failed: ", error);

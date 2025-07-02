@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, runTransaction, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Film } from 'lucide-react';
 import useEmblaCarousel from 'embla-carousel-react';
@@ -148,15 +148,24 @@ export function DiscoverFeed() {
 
   const handleRateMovie = async (movieId: number, mediaType: 'movie' | 'tv', rating: number) => {
     if (!user) return;
-    const movieIdentifier = { movieId: String(movieId), mediaType };
-    
+    const userDocRef = doc(db, 'users', user.uid);
+
     try {
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
-      const currentRatings = userDoc.data()?.ratedMovies || [];
-      const newRatings = [...currentRatings.filter((r: any) => r.movieId !== String(movieId) || r.mediaType !== mediaType), {...movieIdentifier, rating}];
-      
-      await setDoc(userDocRef, { ratedMovies: newRatings }, { merge: true });
+      await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userDocRef);
+        if (!userDoc.exists()) {
+          throw new Error("User document does not exist!");
+        }
+        
+        const currentRatings = userDoc.data().ratedMovies || [];
+        const newRatings = [
+            ...currentRatings.filter((r: any) => r.movieId !== String(movieId) || r.mediaType !== mediaType), 
+            { movieId: String(movieId), mediaType, rating }
+        ];
+        
+        transaction.update(userDocRef, { ratedMovies: newRatings });
+      });
+
       toast({ title: 'Rating saved!', description: 'Your recommendations will be updated.' });
       
       if (rating >= 4) {
@@ -164,9 +173,10 @@ export function DiscoverFeed() {
         if (res.ok) {
             const data = await res.json();
             const seenMovieIds = new Set([
-                ...newRatings.map(m => m.movieId), 
+                ...userRatings.map(m => m.movieId), 
                 ...userWatched.map(m => m.movieId),
-                ...movies.map(m => String(m.id))
+                ...movies.map(m => String(m.id)),
+                String(movieId)
             ]);
             const newRecs = (data.results || [])
                 .map((m: any) => ({...m, media_type: m.media_type || mediaType}))
@@ -179,35 +189,24 @@ export function DiscoverFeed() {
         }
       }
     } catch (error) {
+       console.error("Failed to rate movie:", error);
        toast({ variant: 'destructive', title: 'Error', description: 'Could not save rating.' });
     }
   };
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!user) return;
+    const userDocRef = doc(db, 'users', user.uid);
     const movieIdentifier = { movieId: String(movieId), mediaType };
-    
-    try {
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
-      const currentWatched = userDoc.data()?.watchedMovies || [];
-      
-      let updatedWatched;
-      const movieExists = currentWatched.some((m: any) => m.movieId === String(movieId) && m.mediaType === mediaType);
-      
-      if (isWatched) {
-          if (!movieExists) {
-              updatedWatched = [...currentWatched, movieIdentifier];
-          } else {
-              updatedWatched = currentWatched;
-          }
-      } else {
-          updatedWatched = currentWatched.filter((m: any) => m.movieId !== String(movieId) || m.mediaType !== mediaType);
-      }
-      
-      await setDoc(userDocRef, { watchedMovies: updatedWatched }, { merge: true });
 
+    try {
+      if (isWatched) {
+        await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
+      } else {
+        await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
+      }
     } catch (error) {
+      console.error("Toggle watched failed: ", error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };
