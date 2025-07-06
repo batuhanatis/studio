@@ -106,10 +106,30 @@ export function RegisterForm() {
         await signInWithPopup(auth, googleProvider);
         router.push('/search');
     } catch (error: any) {
+        console.error("Google Sign-In Error:", error);
+        let description = 'Google ile giriş yapılamadı. Lütfen tekrar deneyin.';
+        
+        switch (error.code) {
+            case 'auth/popup-closed-by-user':
+                description = 'Giriş penceresi tamamlanmadan kapatıldı. Lütfen tekrar deneyin.';
+                break;
+            case 'auth/cancelled-popup-request':
+                return;
+            case 'auth/popup-blocked':
+                description = 'Giriş penceresi tarayıcınız tarafından engellendi. Lütfen bu site için açılır pencerelere izin verin.';
+                break;
+            case 'auth/operation-not-allowed':
+                description = 'Google ile Giriş bu uygulama için etkinleştirilmemiş. Lütfen Firebase konsolunu kontrol edin.';
+                break;
+            case 'auth/unauthorized-domain':
+                 description = 'Bu alan adı Google ile Giriş için yetkilendirilmemiş. Lütfen Firebase konsol ayarlarını kontrol edin.'
+                 break;
+        }
+
         toast({
             variant: 'destructive',
-            title: 'Google Sign-In Failed',
-            description: 'Could not sign in with Google. Please try again.',
+            title: 'Google ile Giriş Başarısız',
+            description,
         });
     } finally {
         setIsGoogleLoading(false);
