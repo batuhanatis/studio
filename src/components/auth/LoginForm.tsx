@@ -90,7 +90,7 @@ export function LoginForm() {
         await signInWithPopup(auth, googleProvider);
         router.push('/search');
     } catch (error: any) {
-        console.error("Google Sign-In Error:", error);
+        console.error("Google Sign-In Error (Full Object):", error);
         let description = 'Google ile giriş yapılamadı. Lütfen tekrar deneyin.';
         
         switch (error.code) {
@@ -106,7 +106,7 @@ export function LoginForm() {
                 description = 'Google ile Giriş bu uygulama için etkinleştirilmemiş. Lütfen Firebase konsolunu kontrol edin.';
                 break;
             case 'auth/unauthorized-domain':
-                 description = 'Bu alan adı Google ile Giriş için yetkilendirilmemiş. Lütfen Firebase konsol ayarlarını kontrol edin.'
+                 description = 'Bu alan adı Google ile Giriş için yetkilendirilmemiş. Lütfen Firebase ve Google Cloud konsol ayarlarını kontrol edin.'
                  break;
         }
 

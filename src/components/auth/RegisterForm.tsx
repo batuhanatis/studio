@@ -83,6 +83,10 @@ export function RegisterForm() {
           case 'auth/weak-password':
             description = 'The password is too weak. It must be at least 6 characters long.';
             break;
+          case 'permission-denied':
+          case 'auth/permission-denied':
+             description = 'Your account was created, but your profile could not be. Please check your database rules.';
+             break;
           default:
             description = `An unexpected error occurred: ${error.message}`;
             break;
@@ -106,7 +110,7 @@ export function RegisterForm() {
         await signInWithPopup(auth, googleProvider);
         router.push('/search');
     } catch (error: any) {
-        console.error("Google Sign-In Error:", error);
+        console.error("Google Sign-In Error (Full Object):", error);
         let description = 'Google ile giriş yapılamadı. Lütfen tekrar deneyin.';
         
         switch (error.code) {
@@ -122,7 +126,7 @@ export function RegisterForm() {
                 description = 'Google ile Giriş bu uygulama için etkinleştirilmemiş. Lütfen Firebase konsolunu kontrol edin.';
                 break;
             case 'auth/unauthorized-domain':
-                 description = 'Bu alan adı Google ile Giriş için yetkilendirilmemiş. Lütfen Firebase konsol ayarlarını kontrol edin.'
+                 description = 'Bu alan adı Google ile Giriş için yetkilendirilmemiş. Lütfen Firebase ve Google Cloud konsol ayarlarını kontrol edin.'
                  break;
         }
 
