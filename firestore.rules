@@ -2,32 +2,34 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Users can be discovered by others (for friend requests), but can only modify their own profile.
+  
+    // Users can create their own profile upon registration,
+    // and can only read/update their own data afterwards.
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth.uid == userId;
-      allow update, delete: if request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read, update: if request.auth != null && request.auth.uid == userId;
     }
-
-    // Watchlists can only be accessed by their owner.
-    match /watchlists/{listId} {
-      allow read, update, delete: if request.auth.uid == resource.data.userId;
-      allow create: if request.auth.uid == request.resource.data.userId;
-    }
-
-    // Friend requests can be created by any logged-in user.
-    // They can only be read, updated, or deleted by the sender or receiver.
+    
+    // Users can only create friend requests from their own account.
+    // Only the involved users can see the request.
+    // Only the recipient can update (accept) or delete (decline) the request.
     match /friendRequests/{requestId} {
-      allow read, update, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+      allow read: if request.auth != null && (request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId);
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.toUserId;
     }
 
-    // Recommendations can be created by any logged-in user.
-    // They can only be read or deleted by the person who received them.
-    match /recommendations/{recommendationId} {
-      allow read, delete: if request.auth.uid == resource.data.toUserId;
-      allow create: if request.auth != null;
+    // Users can only manage their own watchlists.
+    match /watchlists/{listId} {
+      allow read, write: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/watchlists/$(listId)).data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+
+    // Users can only send recommendations from their own account.
+    // Only the recipient can read the recommendation.
+    match /recommendations/{recId} {
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+      allow read: if request.auth != null && request.auth.uid == resource.data.toUserId;
     }
   }
 }
