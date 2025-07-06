@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { signInWithEmailAndPassword, signInWithRedirect } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -87,18 +87,32 @@ export function LoginForm() {
   async function handleGoogleSignIn() {
     setIsGoogleLoading(true);
     try {
-        await signInWithRedirect(auth, googleProvider);
+        await signInWithPopup(auth, googleProvider);
+        // The onAuthStateChanged listener in AuthProvider will handle profile creation.
+        // Once signed in, we can redirect.
+        toast({
+            title: 'Welcome!',
+            description: 'You have been successfully signed in.',
+        });
+        router.push('/search');
     } catch (error: any) {
-        console.error("Google Sign-In Redirect Start Error:", error);
-        let description = error.message || 'Lütfen bağlantınızı kontrol edip tekrar deneyin.';
-        if (error.code === 'auth/unauthorized-domain') {
+        let description = 'An unexpected error occurred. Please try again.';
+        if (error.code === 'auth/popup-closed-by-user') {
+            // This is not a real error, so we just stop loading and don't show a toast.
+            setIsGoogleLoading(false);
+            return;
+        } else if (error.code === 'auth/account-exists-with-different-credential') {
+            description = 'An account already exists with the same email address but different sign-in credentials. Please sign in using the original method.';
+        } else if (error.code === 'auth/unauthorized-domain') {
             description = "Bu alan adı google ile giriş için yetkilendirilmemiş. Lütfen Firebase projenizin Authentication -> Settings -> Authorized domains listesine bu alan adını ekleyin.";
         }
+        
         toast({
             variant: 'destructive',
-            title: 'Google ile Giriş Başlatılamadı',
-            description: description,
+            title: 'Google Sign-In Failed',
+            description,
         });
+    } finally {
         setIsGoogleLoading(false);
     }
   }
