@@ -122,9 +122,7 @@ export function FriendManager() {
           );
           finalFriends = friendProfiles.filter(Boolean) as UserProfile[];
         }
-        finalFriends.push({ uid: 'test-friend-for-blend', email: 'test.friend@example.com' });
-        const uniqueFriends = Array.from(new Map(finalFriends.map(f => [f.uid, f])).values());
-        setFriends(uniqueFriends);
+        setFriends(finalFriends);
       } catch (error) {
         console.error("Error fetching friends list:", error);
       } finally {
