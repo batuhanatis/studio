@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword, type UserCredential } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -55,17 +55,33 @@ export function RegisterForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    let userCredential: UserCredential | null = null;
-
     try {
       // Step 1: Create user in Firebase Authentication
-      userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+
+      // Step 2: Create user profile document in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: user.email,
+        friends: [],
+        friendRequestsSent: [],
+        friendRequestsReceived: [],
+        ratedMovies: [],
+        watchedMovies: [],
+      });
+
+      // Step 3: If both are successful, navigate to the search page
+      router.push('/search');
+
     } catch (error: any) {
-      // This block only handles Authentication errors
+      // Centralized error handling
       let title = 'Registration Failed';
-      let description = 'An unexpected error occurred during account creation.';
+      let description = 'An unexpected error occurred. Please try again.';
+
       if (error.code) {
         switch (error.code) {
+          // Auth errors
           case 'auth/email-already-in-use':
             description = 'This email is already registered. Please login instead.';
             break;
@@ -75,42 +91,15 @@ export function RegisterForm() {
           case 'auth/weak-password':
             description = 'The password is too weak. It must be at least 6 characters long.';
             break;
+          // Firestore errors
+          case 'permission-denied':
+          case 'unauthenticated':
+             description = "Your account was created, but we couldn't set up your profile due to a database permissions issue. Please check your Firestore security rules.";
+             break;
           default:
-            description = `An unexpected Auth error occurred: ${error.message}`;
+            description = `An unexpected error occurred: ${error.message}`;
             break;
         }
-      }
-      toast({ variant: 'destructive', title, description });
-      setIsLoading(false);
-      return; // Stop execution if auth fails
-    }
-
-    const user = userCredential.user;
-
-    try {
-      // Step 2: Create user profile document in Firestore
-      if (user) {
-        await setDoc(doc(db, "users", user.uid), {
-          uid: user.uid,
-          email: user.email,
-          friends: [],
-          friendRequestsSent: [],
-          friendRequestsReceived: [],
-          ratedMovies: [],
-          watchedMovies: [],
-        });
-      }
-      
-      // If successful, navigate to the search page
-      router.push('/search');
-
-    } catch (error: any) {
-      // This block specifically handles errors from the Firestore operation
-      const title = 'Profile Creation Failed';
-      let description = `Your account was created, but we couldn't set up your profile. Error: ${error.message}`;
-      
-      if (error.code === 'permission-denied' || error.code === 'unauthenticated') {
-        description = "Your account was created, but we couldn't set up your profile due to a database permissions issue. Please check your Firestore security rules and that the database was created correctly.";
       }
       
       toast({ 
@@ -119,7 +108,9 @@ export function RegisterForm() {
         description,
         duration: 9000 // Give user more time to read
       });
+
     } finally {
+      // This will always run, ensuring the loading state is reset.
       setIsLoading(false);
     }
   }
