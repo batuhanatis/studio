@@ -1,34 +1,45 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Varsayılan olarak tüm okuma ve yazma işlemlerini reddet.
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
-    // Users can only create their own profile, can read any profile,
-    // and can only update their own profile. No one can delete user profiles.
+    // --- USERS ---
+    // Herhangi bir kimliği doğrulanmış kullanıcının profilleri okumasına izin ver (arkadaş bulma vb. için).
+    // Ancak bir kullanıcının yalnızca kendi belgesine yazmasına izin ver.
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId;
-      allow delete: if false; 
+      allow write: if request.auth.uid == userId;
     }
 
-    // Users can create/read/update/delete their own watchlists.
+    // --- WATCHLISTS ---
+    // Bir kullanıcı, belgedeki userId kendi kimliğiyle eşleşiyorsa bir izleme listesi oluşturabilir.
+    // Yalnızca kendilerine ait olan listeleri okuyabilir, güncelleyebilir veya silebilirler.
     match /watchlists/{listId} {
-      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow create: if request.auth.uid == request.resource.data.userId;
+      allow read, update, delete: if request.auth.uid == resource.data.userId;
     }
-
-    // Users can send recommendations to others.
-    // Users can read and delete recommendations sent to them.
-    match /recommendations/{recId} {
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
-      allow read, delete: if request.auth != null && request.auth.uid == resource.data.toUserId;
+    
+    // --- RECOMMENDATIONS ---
+    // Bir kullanıcı, fromUserId kendi kimliğiyle eşleşiyorsa bir tavsiye oluşturabilir.
+    // Yalnızca alıcı (toUserId), tavsiyelerini okuyabilir veya silebilir.
+    match /recommendations/{recommendationId} {
+      allow create: if request.auth.uid == request.resource.data.fromUserId;
+      allow read, delete: if request.auth.uid == resource.data.toUserId;
     }
-
-    // Users can send friend requests.
-    // Users can accept/decline (update/delete) requests sent to them.
-    match /friendRequests/{reqId} {
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
-      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.toUserId;
+    
+    // --- FRIEND REQUESTS ---
+    // Bir kullanıcı, fromUserId kendi kimliğiyle eşleşiyorsa bir istek oluşturabilir.
+    // Bir kullanıcı, kendisine veya kendisinden gönderilen istekleri okuyabilir.
+    // Alıcı, isteği güncelleyebilir (kabul edebilir) veya silebilir (reddedebilir).
+    // Gönderen, isteği silebilir (iptal edebilir).
+    match /friendRequests/{requestId} {
+       allow create: if request.auth.uid == request.resource.data.fromUserId;
+       allow read, delete: if request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId;
+       allow update: if request.auth.uid == resource.data.toUserId;
     }
   }
 }
