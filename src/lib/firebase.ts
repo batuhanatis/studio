@@ -6,6 +6,7 @@ import { getFirestore } from "firebase/firestore";
 const firebaseConfig = {
   apiKey: "AIzaSyAyPvD9_qqD8R3ljCAjF5oCAOJJnU320Xk",
   authDomain: "movie-finder-kqqse.firebaseapp.com",
+  databaseURL: "https://movie-finder-kqqse-default-rtdb.firebaseio.com",
   projectId: "movie-finder-kqqse",
   storageBucket: "movie-finder-kqqse.firebasestorage.app",
   messagingSenderId: "226527022824",
