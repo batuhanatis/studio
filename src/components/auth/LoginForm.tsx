@@ -90,10 +90,14 @@ export function LoginForm() {
         await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
         console.error("Google Sign-In Redirect Start Error:", error);
+        let description = error.message || 'Lütfen bağlantınızı kontrol edip tekrar deneyin.';
+        if (error.code === 'auth/unauthorized-domain') {
+            description = "Bu alan adı google ile giriş için yetkilendirilmemiş. Lütfen Firebase projenizin Authentication -> Settings -> Authorized domains listesine bu alan adını ekleyin.";
+        }
         toast({
             variant: 'destructive',
             title: 'Google ile Giriş Başlatılamadı',
-            description: error.message || 'Lütfen bağlantınızı kontrol edip tekrar deneyin.',
+            description: description,
         });
         setIsGoogleLoading(false);
     }

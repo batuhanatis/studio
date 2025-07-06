@@ -32,10 +32,13 @@ export default function SignInGooglePage() {
       } catch (error: any) {
         console.error('Google sign-in redirect error:', error);
         let description = 'An unexpected error occurred. Please try again from the login page.';
-        // Provide more specific feedback if possible
+        
         if (error.code === 'auth/account-exists-with-different-credential') {
             description = 'An account already exists with the same email address but different sign-in credentials. Please sign in using the original method.';
+        } else if (error.code === 'auth/unauthorized-domain') {
+            description = "Bu alan adı google ile giriş için yetkilendirilmemiş. Lütfen Firebase projenizin Authentication -> Settings -> Authorized domains listesine bu alan adını ekleyin.";
         }
+        
         toast({
           variant: 'destructive',
           title: 'Google Sign-In Failed',
