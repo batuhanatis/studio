@@ -4,8 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -56,32 +55,22 @@ export function RegisterForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      // Step 1: Create user in Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      const user = userCredential.user;
+      // Step 1: Create user in Firebase Authentication.
+      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      
+      // Step 2: The AuthProvider will now handle creating the user document in Firestore.
+      // This solves the race condition.
 
-      // Step 2: Create user profile document in Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        email: user.email,
-        friends: [],
-        friendRequestsSent: [],
-        friendRequestsReceived: [],
-        ratedMovies: [],
-        watchedMovies: [],
-      });
-
-      // Step 3: If both are successful, navigate to the search page
+      // Step 3: If auth creation is successful, navigate to the search page.
       router.push('/search');
 
     } catch (error: any) {
-      // Centralized error handling
+      // Centralized error handling for authentication errors
       let title = 'Registration Failed';
       let description = 'An unexpected error occurred. Please try again.';
 
       if (error.code) {
         switch (error.code) {
-          // Auth errors
           case 'auth/email-already-in-use':
             description = 'This email is already registered. Please login instead.';
             break;
@@ -91,11 +80,6 @@ export function RegisterForm() {
           case 'auth/weak-password':
             description = 'The password is too weak. It must be at least 6 characters long.';
             break;
-          // Firestore errors
-          case 'permission-denied':
-          case 'unauthenticated':
-             description = "Your account was created, but we couldn't set up your profile due to a database permissions issue. Please check your Firestore security rules.";
-             break;
           default:
             description = `An unexpected error occurred: ${error.message}`;
             break;
@@ -106,11 +90,9 @@ export function RegisterForm() {
         variant: 'destructive', 
         title, 
         description,
-        duration: 9000 // Give user more time to read
       });
 
     } finally {
-      // This will always run, ensuring the loading state is reset.
       setIsLoading(false);
     }
   }
