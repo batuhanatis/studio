@@ -3,14 +3,14 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
-// IMPORTANT: Please replace these values with the ones from your Firebase project settings
 const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY_HERE",
-  authDomain: "PASTE_YOUR_AUTH_DOMAIN_HERE",
-  projectId: "PASTE_YOUR_PROJECT_ID_HERE",
-  storageBucket: "PASTE_YOUR_STORAGE_BUCKET_HERE",
-  messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID_HERE",
-  appId: "PASTE_YOUR_APP_ID_HERE"
+  apiKey: "AIzaSyAyPvD9_qqD8R3ljCAjF5oCAOJJnU320Xk",
+  authDomain: "movie-finder-kqqse.firebaseapp.com",
+  databaseURL: "https://movie-finder-kqqse-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "movie-finder-kqqse",
+  storageBucket: "movie-finder-kqqse.firebasestorage.app",
+  messagingSenderId: "226527022824",
+  appId: "1:226527022824:web:78c6557a8005dec26e435d"
 };
 
 // Initialize Firebase
