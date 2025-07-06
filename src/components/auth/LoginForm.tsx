@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithRedirect } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -87,35 +87,14 @@ export function LoginForm() {
   async function handleGoogleSignIn() {
     setIsGoogleLoading(true);
     try {
-        await signInWithPopup(auth, googleProvider);
-        router.push('/search');
+        await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
-        console.error("Google Sign-In Error (Full Object):", error);
-        let description = 'Google ile giriş yapılamadı. Lütfen tekrar deneyin.';
-        
-        switch (error.code) {
-            case 'auth/popup-closed-by-user':
-                description = 'Giriş penceresi tamamlanmadan kapatıldı. Lütfen tekrar deneyin.';
-                break;
-            case 'auth/cancelled-popup-request':
-                return;
-            case 'auth/popup-blocked':
-                description = 'Giriş penceresi tarayıcınız tarafından engellendi. Lütfen bu site için açılır pencerelere izin verin.';
-                break;
-            case 'auth/operation-not-allowed':
-                description = 'Google ile Giriş bu uygulama için etkinleştirilmemiş. Lütfen Firebase konsolunu kontrol edin.';
-                break;
-            case 'auth/unauthorized-domain':
-                 description = 'Bu alan adı Google ile Giriş için yetkilendirilmemiş. Lütfen Firebase ve Google Cloud konsol ayarlarını kontrol edin.'
-                 break;
-        }
-
+        console.error("Google Sign-In Redirect Start Error:", error);
         toast({
             variant: 'destructive',
-            title: 'Google ile Giriş Başarısız',
-            description,
+            title: 'Google ile Giriş Başlatılamadı',
+            description: error.message || 'Lütfen bağlantınızı kontrol edip tekrar deneyin.',
         });
-    } finally {
         setIsGoogleLoading(false);
     }
   }
