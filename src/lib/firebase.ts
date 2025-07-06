@@ -1,10 +1,10 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAyPvD9_qqD8R3ljCAjF5oCAOJJnU320Xk",
+  apiKey: "AIzaSyAyPvD9_qqD9_qqD8R3ljCAjF5oCAOJJnU320Xk",
   authDomain: "movie-finder-kqqse.firebaseapp.com",
   databaseURL: "https://movie-finder-kqqse-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "movie-finder-kqqse",
@@ -14,7 +14,7 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
