@@ -106,25 +106,25 @@ export function RegisterForm() {
 
   async function handleGoogleSignIn() {
     setIsGoogleLoading(true);
+    console.log('Attempting Google Sign-In from origin:', window.location.origin);
     try {
         await signInWithPopup(auth, googleProvider);
-        // The onAuthStateChanged listener in AuthProvider will handle profile creation.
-        // Once signed in, we can redirect.
         toast({
             title: 'Welcome!',
             description: 'You have been successfully signed in.',
         });
         router.push('/search');
     } catch (error: any) {
+        console.error("Full Google Sign-In Error:", error);
+        
         let description = 'An unexpected error occurred. Please try again.';
         if (error.code === 'auth/popup-closed-by-user') {
-            // This is not a real error, so we just stop loading and don't show a toast.
             setIsGoogleLoading(false);
             return;
         } else if (error.code === 'auth/account-exists-with-different-credential') {
             description = 'An account already exists with the same email address but different sign-in credentials. Please sign in using the original method.';
         } else if (error.code === 'auth/unauthorized-domain') {
-            description = "Bu alan adı google ile giriş için yetkilendirilmemiş. Lütfen Firebase projenizin Authentication -> Settings -> Authorized domains listesine bu alan adını ekleyin.";
+            description = "This app's domain is not authorized for Google Sign-In. Please contact the site administrator.";
         }
         
         toast({
