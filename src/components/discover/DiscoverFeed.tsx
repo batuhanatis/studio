@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, type RefObject } from 'react';
@@ -67,7 +66,7 @@ export function DiscoverFeed() {
 
   const fetchAndSetMovies = useCallback(async () => {
     setLoading(true);
-    setMovies([]);
+    // Don't clear movies here to prevent flickering. New content will replace old.
     
     try {
       let seenMovieIds = new Set<string>();
@@ -87,20 +86,30 @@ export function DiscoverFeed() {
         }
       }
       
-      const movieRes = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
-      const tvRes = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
-      
-      if (!movieRes.ok || !tvRes.ok) throw new Error("Failed to fetch from TMDB API");
-      
-      const movieData = await movieRes.json();
-      const tvData = await tvRes.json();
+      // Fetch multiple pages to get a larger pool of movies
+      const movieRes1 = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
+      const tvRes1 = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
+      const movieRes2 = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=2`);
+      const tvRes2 = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=2`);
 
-      const popularMovies = (movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' as const }));
-      const popularTv = (tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' as const }));
-      
-      const allPopular = [...popularMovies, ...popularTv];
+      const responses = await Promise.all([movieRes1, tvRes1, movieRes2, tvRes2]);
 
-      const filtered = allPopular.filter(item => 
+      for (const res of responses) {
+        if (!res.ok) throw new Error("Failed to fetch from TMDB API");
+      }
+
+      const [movieData1, tvData1, movieData2, tvData2] = await Promise.all(responses.map(res => res.json()));
+      
+      const popularMovies1 = (movieData1.results || []).map((m: any) => ({ ...m, media_type: 'movie' as const }));
+      const popularTv1 = (tvData1.results || []).map((t: any) => ({ ...t, media_type: 'tv' as const }));
+      const popularMovies2 = (movieData2.results || []).map((m: any) => ({ ...m, media_type: 'movie' as const }));
+      const popularTv2 = (tvData2.results || []).map((t: any) => ({ ...t, media_type: 'tv' as const }));
+      
+      const allPopular = [...popularMovies1, ...popularTv1, ...popularMovies2, ...popularTv2];
+      
+      // Filter out seen movies and duplicates
+      const uniqueItems = Array.from(new Map(allPopular.map(item => [item.id, item])).values());
+      const filtered = uniqueItems.filter(item => 
         item.poster_path && 
         item.overview && 
         !seenMovieIds.has(String(item.id))
@@ -114,7 +123,7 @@ export function DiscoverFeed() {
     } catch (error) {
         console.error("Error fetching discover feed:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load movies.' });
-        setMovies([]);
+        setMovies([]); // Clear movies on error
     } finally {
         setLoading(false);
     }
