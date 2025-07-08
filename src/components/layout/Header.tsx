@@ -28,7 +28,7 @@ export function Header() {
     <Button asChild variant="ghost" size="sm">
       <Link href="/profile">
         <User className="mr-2 h-4 w-4" />
-        Profilim
+        Profile
       </Link>
     </Button>
   );
@@ -44,7 +44,7 @@ export function Header() {
     <SheetClose asChild>
       <Link href="/profile" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
         <User className="h-5 w-5" />
-        <span className="font-medium">Profilim</span>
+        <span className="font-medium">Profile</span>
       </Link>
     </SheetClose>
   );

@@ -107,7 +107,7 @@ export function LoginForm() {
         } else if (error.code === 'auth/account-exists-with-different-credential') {
             description = 'An account already exists with the same email address but different sign-in credentials. Please sign in using the original method.';
         } else if (error.code === 'auth/unauthorized-domain') {
-            description = `Bu uygulamanın alan adı (${window.location.hostname}) Google ile Giriş için yetkilendirilmemiş. Lütfen bu adresi Firebase Authentication ayarlarınızdaki 'Yetkilendirilen alan adları' listesine ekleyin.`;
+            description = `This app's domain (${window.location.hostname}) is not authorized for Google Sign-In. Please add this domain to the 'Authorized domains' list in your Firebase Authentication settings.`;
         }
         
         toast({
@@ -187,7 +187,7 @@ export function LoginForm() {
                 Google
             </Button>
             <Button variant="link" asChild className="text-muted-foreground">
-                <Link href="/search">Misafir olarak devam et</Link>
+                <Link href="/search">Continue as Guest</Link>
             </Button>
         </div>
       </CardContent>

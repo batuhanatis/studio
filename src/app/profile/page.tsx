@@ -109,8 +109,8 @@ export default function ProfilePage() {
                     </AvatarFallback>
                 </Avatar>
                 <div className="grid gap-1">
-                    <CardTitle className="text-2xl">Profilim</CardTitle>
-                    <CardDescription>Hesap bilgilerinizi burada görüntüleyin.</CardDescription>
+                    <CardTitle className="text-2xl">Profile</CardTitle>
+                    <CardDescription>View your account information here.</CardDescription>
                 </div>
              </div>
           </CardHeader>
@@ -122,7 +122,7 @@ export default function ProfilePage() {
             
             <Button variant="outline" onClick={handleLogout} className="w-full sm:w-auto">
               <LogOut className="mr-2 h-4 w-4" />
-              Çıkış Yap
+              Logout
             </Button>
           </CardContent>
         </Card>
