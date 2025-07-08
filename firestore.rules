@@ -1,50 +1,12 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId} {
-      // Allow user to create their own document when signing up.
-      // request.auth.uid must match the userId in the path.
-      allow create: if request.auth != null && request.auth.uid == userId;
-
-      // Allow a user to read, update, or delete their own profile.
-      // The userId in the path must match the authenticated user's uid.
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    match /watchlists/{watchlistId} {
-      // A user can create a watchlist, but the document's 'userId' field
-      // must match their own uid. This prevents creating lists for others.
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-
-      // A user can only read, update, or delete a watchlist if its
-      // 'userId' field matches their own uid.
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
-    }
-
-    match /friendRequests/{requestId} {
-      // A user can create a friend request if they are the sender.
-      allow create: if request.auth.uid == request.resource.data.fromUserId;
-
-      // The recipient can read the request to accept/decline.
-      // The sender can read the request to see its status.
-      allow read: if request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId;
-
-      // The recipient can update the status (e.g., to 'accepted').
-      // The sender could also update (e.g., to 'cancelled'), so we allow both.
-      allow update: if request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId;
-
-      // The recipient can delete (decline) the request.
-      // The sender can delete (cancel) the request.
-      allow delete: if request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId;
-    }
-
-    match /recommendations/{recommendationId} {
-      // A user can create (send) a recommendation.
-      allow create: if request.auth.uid == request.resource.data.fromUserId;
-
-      // Only the recipient can read or delete the recommendation.
-      allow read, delete: if request.auth.uid == resource.data.toUserId;
+    // WARNING: INSECURE - For debugging only.
+    // Allows any authenticated user to read/write to any document.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
