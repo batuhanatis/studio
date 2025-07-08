@@ -1,9 +1,9 @@
 
 'use client';
 
-import { auth, db } from '@/lib/firebase';
+import { auth, db, signInAnonymously } from '@/lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { createContext, useEffect, useState, type ReactNode } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,21 +20,31 @@ const createUserProfileDocument = async (firebaseUser: User) => {
   const snapshot = await getDoc(userDocRef);
 
   if (!snapshot.exists()) {
-    const { email, uid } = firebaseUser;
+    const { email, uid, isAnonymous } = firebaseUser;
     const createdAt = serverTimestamp();
     
     try {
         await setDoc(userDocRef, {
             uid,
             email,
+            isAnonymous,
             createdAt,
             friends: [],
             ratedMovies: [],
             watchedMovies: [],
         });
     } catch (error) {
-        // Re-throw the error to be caught by the onAuthStateChanged listener
         throw error;
+    }
+  } else {
+    // If user exists, ensure isAnonymous flag is up to date.
+    // This happens when an anonymous user is upgraded.
+    const data = snapshot.data();
+    if (data.isAnonymous && !firebaseUser.isAnonymous) {
+        await updateDoc(userDocRef, { 
+            isAnonymous: false,
+            email: firebaseUser.email 
+        });
     }
   }
 };
@@ -47,23 +57,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (newFirebaseUser) => {
-      try {
-        if (newFirebaseUser) {
+      if (newFirebaseUser) {
+        // User is signed in (either permanently or anonymously)
+        try {
           await createUserProfileDocument(newFirebaseUser);
-        }
-        setFirebaseUser(newFirebaseUser);
-      } catch (error: any) {
-          console.error("Error during authentication state change, possibly due to Firestore permissions:", error);
+          setFirebaseUser(newFirebaseUser);
+        } catch (error: any) {
+          console.error("Error during profile creation/update:", error);
           toast({
             variant: 'destructive',
-            title: 'Profile Creation Failed',
-            description: 'Login was successful, but creating your user profile failed. Please check your Firestore security rules and try again.',
+            title: 'Profile Sync Failed',
+            description: 'Could not sync your profile with the database. Some features might not work correctly.',
             duration: 9000,
           });
-          // This allows login even if profile creation fails, to avoid a login loop.
+          // Still set the user to allow app access, but with a warning.
           setFirebaseUser(newFirebaseUser);
-      } finally {
-        setLoading(false);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // User is not signed in, so sign them in anonymously.
+        setLoading(true); // Keep loading while we sign in anonymously
+        try {
+          await signInAnonymously(auth);
+          // onAuthStateChanged will fire again with the new anonymous user.
+        } catch (error) {
+          console.error("Anonymous sign-in failed:", error);
+          toast({
+            variant: 'destructive',
+            title: 'Authentication Failed',
+            description: 'Could not start an anonymous session. Please refresh the page to try again.',
+          });
+          setFirebaseUser(null);
+          setLoading(false);
+        }
       }
     });
 

@@ -9,6 +9,7 @@ import { auth, googleProvider } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -31,6 +32,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Clapperboard, Loader2 } from 'lucide-react';
 import { Separator } from '../ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const formSchema = z.object({
   email: z.string().email({
@@ -54,6 +56,7 @@ const GoogleIcon = () => (
 export function LoginForm() {
   const router = useRouter();
   const { toast } = useToast();
+  const { firebaseUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -64,6 +67,8 @@ export function LoginForm() {
       password: '',
     },
   });
+  
+  const isAnonymous = firebaseUser?.isAnonymous;
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
@@ -87,7 +92,6 @@ export function LoginForm() {
 
   async function handleGoogleSignIn() {
     setIsGoogleLoading(true);
-    console.log('Attempting Google Sign-In from origin:', window.location.origin);
     try {
         await signInWithPopup(auth, googleProvider);
         toast({
@@ -96,8 +100,6 @@ export function LoginForm() {
         });
         router.push('/search');
     } catch (error: any) {
-        console.error("Full Google Sign-In Error:", error);
-
         let description = 'An unexpected error occurred. Please try again.';
         if (error.code === 'auth/popup-closed-by-user') {
             setIsGoogleLoading(false);
@@ -125,9 +127,17 @@ export function LoginForm() {
           <Clapperboard className="h-10 w-10" />
         </div>
         <CardTitle className="text-2xl font-headline">Welcome Back!</CardTitle>
-        <CardDescription>Sign in to find your next movie.</CardDescription>
+        <CardDescription>Sign in to your existing account.</CardDescription>
       </CardHeader>
       <CardContent>
+        {isAnonymous && (
+          <Alert variant="destructive" className="mb-4 text-left">
+             <AlertTitle>Important Note</AlertTitle>
+             <AlertDescription>
+                Logging in will end your current guest session. Any ratings or lists you've made as a guest will not be transferred. To save your current progress, create a new account instead.
+             </AlertDescription>
+          </Alert>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -180,7 +190,7 @@ export function LoginForm() {
         <p className="text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
           <Link href="/register" className="font-semibold text-primary hover:underline">
-            Register
+            Create one
           </Link>
         </p>
       </CardFooter>

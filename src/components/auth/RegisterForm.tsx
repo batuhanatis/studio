@@ -4,8 +4,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from '@/lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { auth, googleProvider, db, linkWithCredential, linkWithPopup, EmailAuthProvider } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -66,44 +66,33 @@ export function RegisterForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+    if (!auth.currentUser) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No active guest session found to upgrade.' });
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-      await sendEmailVerification(userCredential.user);
+      const credential = EmailAuthProvider.credential(values.email, values.password);
+      await linkWithCredential(auth.currentUser, credential);
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      await updateDoc(userDocRef, { email: values.email, isAnonymous: false });
       toast({
-        title: 'Verification Email Sent',
-        description: 'Please check your inbox to verify your account.',
+        title: 'Account Created!',
+        description: 'Your progress is now saved to your new account.',
       });
-      router.push('/verify-email');
+      router.push('/profile');
     } catch (error: any) {
       let title = 'Registration Failed';
       let description = 'An unexpected error occurred. Please try again.';
 
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/email-already-in-use':
-            description = 'This email is already registered. Please login instead.';
-            break;
-          case 'auth/invalid-email':
-            description = 'The email address is not valid. Please check and try again.';
-            break;
-          case 'auth/weak-password':
-            description = 'The password is too weak. It must be at least 6 characters long.';
-            break;
-          case 'permission-denied':
-          case 'auth/permission-denied':
-             description = 'Hesabınız oluşturuldu, ancak profiliniz kurulamadı. Lütfen veritabanı kurallarınızı kontrol edin.';
-             break;
-          default:
-            description = `An unexpected error occurred: ${error.message}`;
-            break;
-        }
+      if (error.code === 'auth/email-already-in-use') {
+        description = 'This email is already in use by another account. Please try logging in instead.';
+      } else if (error.code === 'auth/weak-password') {
+        description = 'The password is too weak. It must be at least 6 characters long.';
       }
       
-      toast({ 
-        variant: 'destructive', 
-        title, 
-        description,
-      });
+      toast({ variant: 'destructive', title, description });
 
     } finally {
       setIsLoading(false);
@@ -112,30 +101,30 @@ export function RegisterForm() {
 
   async function handleGoogleSignIn() {
     setIsGoogleLoading(true);
-    console.log('Attempting Google Sign-In from origin:', window.location.origin);
+    if (!auth.currentUser) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No active guest session found to upgrade.' });
+      setIsGoogleLoading(false);
+      return;
+    }
+
     try {
-        await signInWithPopup(auth, googleProvider);
-        toast({
-            title: 'Welcome!',
-            description: 'You have been successfully signed in.',
-        });
-        router.push('/search');
+        const result = await linkWithPopup(auth.currentUser, googleProvider);
+        const userDocRef = doc(db, 'users', result.user.uid);
+        await updateDoc(userDocRef, { email: result.user.email, isAnonymous: false });
+        toast({ title: 'Account Created!', description: 'Your progress is now saved to your Google account.' });
+        router.push('/profile');
     } catch (error: any) {
-        console.error("Full Google Sign-In Error:", error);
-        
         let description = 'An unexpected error occurred. Please try again.';
         if (error.code === 'auth/popup-closed-by-user') {
             setIsGoogleLoading(false);
             return;
-        } else if (error.code === 'auth/account-exists-with-different-credential') {
-            description = 'An account already exists with the same email address but different sign-in credentials. Please sign in using the original method.';
-        } else if (error.code === 'auth/unauthorized-domain') {
-            description = `Bu uygulamanın alan adı (${window.location.hostname}) Google ile Giriş için yetkilendirilmemiş. Lütfen bu adresi Firebase Authentication ayarlarınızdaki 'Yetkilendirilen alan adları' listesine ekleyin.`;
+        } else if (error.code === 'auth/credential-already-in-use') {
+            description = 'This Google account is already linked to another user. Please log in with Google instead.';
         }
         
         toast({
             variant: 'destructive',
-            title: 'Google Sign-In Failed',
+            title: 'Failed to Link Google Account',
             description,
         });
     } finally {
@@ -149,8 +138,8 @@ export function RegisterForm() {
         <div className="mb-4 rounded-full bg-primary/10 p-4 text-primary">
           <Clapperboard className="h-10 w-10" />
         </div>
-        <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
-        <CardDescription>Join Movie Finder to discover where to watch movies.</CardDescription>
+        <CardTitle className="text-2xl font-headline">Save Your Progress</CardTitle>
+        <CardDescription>Create a permanent account to save your watchlists and ratings.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -182,7 +171,7 @@ export function RegisterForm() {
               )}
             />
             <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Register'}
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
             </Button>
           </form>
         </Form>
@@ -192,7 +181,7 @@ export function RegisterForm() {
           </div>
           <div className="relative flex justify-center text-xs uppercase">
             <span className="bg-background px-2 text-muted-foreground">
-              Or continue with
+              Or with
             </span>
           </div>
         </div>

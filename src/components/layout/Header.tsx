@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Film, Users, Gift, Compass, Sparkles, List, Menu, User } from 'lucide-react';
+import { Film, Users, Gift, Compass, Sparkles, List, Menu, User, LogIn } from 'lucide-react';
 import Link from 'next/link';
 import {
   Sheet,
@@ -10,9 +10,44 @@ import {
   SheetTrigger,
   SheetClose,
 } from '@/components/ui/sheet';
+import { useAuth } from '@/hooks/useAuth';
 
 export function Header() {
   const router = useRouter();
+  const { firebaseUser } = useAuth();
+  const isAnonymous = firebaseUser?.isAnonymous;
+
+  const authNav = isAnonymous ? (
+    <Button asChild variant="ghost" size="sm">
+      <Link href="/login">
+        <LogIn className="mr-2 h-4 w-4" />
+        Login / Sign Up
+      </Link>
+    </Button>
+  ) : (
+    <Button asChild variant="ghost" size="sm">
+      <Link href="/profile">
+        <User className="mr-2 h-4 w-4" />
+        Profilim
+      </Link>
+    </Button>
+  );
+
+  const mobileAuthNav = isAnonymous ? (
+    <SheetClose asChild>
+      <Link href="/login" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+        <LogIn className="h-5 w-5" />
+        <span className="font-medium">Login / Sign Up</span>
+      </Link>
+    </SheetClose>
+  ) : (
+    <SheetClose asChild>
+      <Link href="/profile" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+        <User className="h-5 w-5" />
+        <span className="font-medium">Profilim</span>
+      </Link>
+    </SheetClose>
+  );
 
   const navLinks = (
     <>
@@ -46,12 +81,7 @@ export function Header() {
           Friends
         </Link>
       </Button>
-      <Button asChild variant="ghost" size="sm">
-        <Link href="/profile">
-          <User className="mr-2 h-4 w-4" />
-          Profilim
-        </Link>
-      </Button>
+      {authNav}
     </>
   );
 
@@ -87,12 +117,7 @@ export function Header() {
                 <span className="font-medium">Friends</span>
             </Link>
         </SheetClose>
-        <SheetClose asChild>
-            <Link href="/profile" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
-                <User className="h-5 w-5" />
-                <span className="font-medium">Profilim</span>
-            </Link>
-        </SheetClose>
+        {mobileAuthNav}
     </nav>
   );
 

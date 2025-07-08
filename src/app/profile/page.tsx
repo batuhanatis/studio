@@ -3,7 +3,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { Loader2, Mail, LogOut } from 'lucide-react';
+import { Loader2, Mail, LogOut, User } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function ProfilePage() {
   const { firebaseUser, loading } = useAuth();
@@ -20,13 +21,15 @@ export default function ProfilePage() {
   useEffect(() => {
     if (loading) return;
     if (!firebaseUser) {
+      // This case should not be hit due to anonymous auth, but as a fallback
       router.push('/login');
       return;
     }
     const isEmailPasswordUser = firebaseUser.providerData.some(
       (provider) => provider.providerId === 'password'
     );
-    if (isEmailPasswordUser && !firebaseUser.emailVerified) {
+    // Do not redirect anonymous users from their profile page.
+    if (!firebaseUser.isAnonymous && isEmailPasswordUser && !firebaseUser.emailVerified) {
       router.push('/verify-email');
     }
   }, [firebaseUser, loading, router]);
@@ -34,7 +37,9 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      router.push('/login');
+      // After logout, AuthProvider will automatically create a new anonymous session
+      // and redirect to /search.
+      router.push('/search');
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -45,7 +50,7 @@ export default function ProfilePage() {
   };
   
   const getInitials = (email: string | null | undefined) => {
-    if (!email) return 'P';
+    if (!email) return 'G'; // Guest
     return email.substring(0, 2).toUpperCase();
   }
   
@@ -53,7 +58,7 @@ export default function ProfilePage() {
     (provider) => provider.providerId === 'password'
   );
 
-  if (loading || !firebaseUser || (isEmailPasswordUser && !firebaseUser.emailVerified)) {
+  if (loading || !firebaseUser) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -63,7 +68,34 @@ export default function ProfilePage() {
       </div>
     );
   }
+  
+  if (firebaseUser.isAnonymous) {
+      return (
+        <div className="min-h-screen w-full bg-background">
+          <Header />
+          <main className="container mx-auto max-w-2xl px-4 py-8">
+            <Card className="text-center">
+                <CardHeader>
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
+                        <User className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle className="text-2xl">You are browsing anonymously</CardTitle>
+                    <CardDescription>
+                        Create a free account to permanently save your watchlists, ratings, and recommendations.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button asChild size="lg">
+                        <Link href="/register">Create Account</Link>
+                    </Button>
+                </CardContent>
+            </Card>
+          </main>
+        </div>
+      );
+  }
 
+  // View for permanent users
   return (
     <div className="min-h-screen w-full bg-background">
       <Header />

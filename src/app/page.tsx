@@ -11,22 +11,14 @@ export default function Home() {
 
   useEffect(() => {
     if (loading) {
-      return;
+      return; // Wait until auth state is resolved
     }
 
     if (firebaseUser) {
-      const isEmailPasswordUser = firebaseUser.providerData.some(
-        (provider) => provider.providerId === 'password'
-      );
-
-      if (isEmailPasswordUser && !firebaseUser.emailVerified) {
-        router.push('/verify-email');
-      } else {
-        router.push('/search');
-      }
-    } else {
-      router.push('/login');
+      // User is either permanent or anonymous, send them to the app.
+      router.push('/search');
     }
+    // There is no "else" because AuthProvider handles signing in non-logged-in users.
   }, [firebaseUser, loading, router]);
 
   return (
