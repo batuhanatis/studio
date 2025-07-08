@@ -1,14 +1,15 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type RefObject } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, runTransaction, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Film } from 'lucide-react';
-import useEmblaCarousel from 'embla-carousel-react';
+import { Film, Heart, X as XIcon } from 'lucide-react';
+import TinderCard from 'react-tinder-card';
 import { DiscoverCard } from './DiscoverCard';
+import { Button } from '@/components/ui/button';
 
 interface Movie {
   id: number;
@@ -36,15 +37,33 @@ const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 export function DiscoverFeed() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
-
+  
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0);
-
+  
   const [userRatings, setUserRatings] = useState<UserRatingData[]>([]);
   const [userWatched, setUserWatched] = useState<UserMovieData[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
+  
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const childRefs = useMemo(
+    () =>
+      Array(movies.length)
+        .fill(0)
+        .map(() => React.createRef<{ swipe: (dir: 'left' | 'right') => Promise<void> }>()),
+    [movies.length]
+  );
+  
+  const canSwipe = currentIndex >= 0;
+
+  const swipe = async (dir: 'left' | 'right') => {
+    if (canSwipe && currentIndex < movies.length) {
+      if (childRefs[currentIndex]?.current) {
+        await childRefs[currentIndex].current!.swipe(dir);
+      }
+    }
+  }
 
   const fetchAndSetMovies = useCallback(async () => {
     setLoading(true);
@@ -64,7 +83,6 @@ export function DiscoverFeed() {
           }
         } catch (dbError) {
           console.warn("Could not fetch user ratings, falling back to popular titles.", dbError);
-          // Gracefully continue without user data, popular titles will be fetched.
         }
       }
       
@@ -86,32 +104,22 @@ export function DiscoverFeed() {
         const movieRes = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
         const tvRes = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
         
-        if (!movieRes.ok || !tvRes.ok) {
-            throw new Error("Failed to fetch from TMDB API");
-        }
+        if (!movieRes.ok || !tvRes.ok) throw new Error("Failed to fetch from TMDB API");
         
         const movieData = await movieRes.json();
         const tvData = await tvRes.json();
-
         const popular = [
             ...(movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' })),
             ...(tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' })),
         ].filter(item => item.poster_path && item.overview && !seenMovieIds.has(String(item.id)));
-        
         const existingIds = new Set(initialMovies.map(r => r.id));
         const uniquePopular = popular.filter(p => !existingIds.has(p.id));
-
         initialMovies.push(...uniquePopular);
       }
-      
-      if (initialMovies.length === 0 && seenMovieIds.size > 0) {
-         // This is the correct case for the "no new movies" message.
-      } else if (initialMovies.length === 0) {
-        // If we still have no movies, it means the TMDB API calls likely failed.
-        throw new Error("Failed to fetch any movies from the API.");
-      }
 
-      setMovies(initialMovies.sort(() => 0.5 - Math.random()));
+      const shuffledMovies = initialMovies.sort(() => 0.5 - Math.random());
+      setMovies(shuffledMovies);
+      setCurrentIndex(shuffledMovies.length - 1);
     } catch (error) {
         console.error("Error fetching discover feed:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load movies.' });
@@ -131,9 +139,9 @@ export function DiscoverFeed() {
       return;
     }
     const userDocRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-            const data = doc.data();
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
             setUserRatings(data.ratedMovies || []);
             setUserWatched(data.watchedMovies || []);
         }
@@ -147,65 +155,35 @@ export function DiscoverFeed() {
   }, [user, toast]);
 
   const handleRateMovie = async (movieId: number, mediaType: 'movie' | 'tv', rating: number) => {
-    if (!user) {
-        toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to rate movies.' });
-        return;
-    }
+    if (!user) return;
     const userDocRef = doc(db, 'users', user.uid);
     const movieIdStr = String(movieId);
-
     try {
         await runTransaction(db, async (transaction) => {
             const userDoc = await transaction.get(userDocRef);
-            if (!userDoc.exists()) {
-                throw new Error("User profile not found. Please try again.");
-            }
+            if (!userDoc.exists()) throw new Error("User profile not found.");
             
             const data = userDoc.data();
             const currentRatings: any[] = data.ratedMovies ? [...data.ratedMovies] : [];
-            
             const ratingIndex = currentRatings.findIndex(r => r.movieId === movieIdStr && r.mediaType === mediaType);
 
             if (ratingIndex > -1) {
-                // Update existing rating if it changed
-                if (currentRatings[ratingIndex].rating === rating) return; // No change needed
+                if (currentRatings[ratingIndex].rating === rating) return;
                 currentRatings[ratingIndex].rating = rating;
             } else {
-                // Add new rating
                 currentRatings.push({ movieId: movieIdStr, mediaType, rating });
             }
-            
             transaction.update(userDocRef, { ratedMovies: currentRatings });
         });
-
-        toast({ title: 'Rating saved!', description: 'Your recommendations will be updated based on your new rating.' });
-      
-        if (rating >= 4) {
-            const res = await fetch(`https://api.themoviedb.org/3/${mediaType}/${movieId}/recommendations?api_key=${API_KEY}&language=en-US`);
-            if (res.ok) {
-                const data = await res.json();
-                const seenMovieIds = new Set([
-                    ...userRatings.map(m => m.movieId), 
-                    ...userWatched.map(m => m.movieId),
-                    ...movies.map(m => String(m.id)),
-                    String(movieId)
-                ]);
-                const newRecs = (data.results || [])
-                    .map((m: any) => ({...m, media_type: m.media_type || mediaType}))
-                    .filter((m: Movie) => m.poster_path && m.overview && !seenMovieIds.has(String(m.id)));
-                
-                if (newRecs.length > 0) {
-                    setMovies(prev => [...prev, ...newRecs.sort(() => 0.5 - Math.random())]);
-                    toast({ title: "We've found more for you!", description: "New recommendations added to your queue."});
-                }
-            }
+        if (rating === 5) {
+          toast({ title: 'Liked!', description: 'Added to your profile.' });
         }
     } catch (error: any) {
        console.error("Failed to rate movie:", error);
        toast({ variant: 'destructive', title: 'Error Saving Rating', description: error.message || 'Could not save your rating.' });
     }
   };
-
+  
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!user) return;
     const userDocRef = doc(db, 'users', user.uid);
@@ -223,57 +201,66 @@ export function DiscoverFeed() {
     }
   };
 
-  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
-  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
-
-  useEffect(() => {
-    if (!emblaApi) return;
-    const onSelect = () => setCurrentIndex(emblaApi.selectedScrollSnap());
-    emblaApi.on('select', onSelect);
-    return () => { emblaApi.off('select', onSelect) };
-  }, [emblaApi]);
-
+  const swiped = (direction: 'left' | 'right', movie: Movie, index: number) => {
+    setCurrentIndex(index - 1);
+    if (direction === 'right') {
+        handleRateMovie(movie.id, movie.media_type, 5);
+    }
+  };
 
   return (
-    <div className="w-full">
-       <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
-                Discover New Titles
-            </h1>
-            <p className="mt-2 text-lg text-muted-foreground">
-                Rate movies and shows to get better recommendations.
-            </p>
-        </div>
-        
-        { (loading || loadingUserData) && movies.length === 0 ? (
-            <DiscoverCard />
-        ) : !loading && movies.length === 0 ? (
-             <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-                <Film className="h-16 w-16" />
-                <p className="text-lg">No New Movies to Discover</p>
-                <p className="text-sm">You've rated all available movies, or we couldn't find any. Try again later!</p>
+    <div className="flex flex-col items-center w-full h-full">
+      <div className="text-center mb-4">
+        <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
+            Discover New Titles
+        </h1>
+        <p className="mt-2 text-lg text-muted-foreground">
+            Swipe right to like, left to skip.
+        </p>
+      </div>
+
+      <div className="relative flex-grow w-full flex items-center justify-center">
+          {(loading || loadingUserData) && movies.length === 0 ? (
+            <DiscoverCard onRate={()=>{}} onToggleWatched={()=>{}}/>
+          ) : !loading && movies.length === 0 ? (
+            <div className="text-center text-muted-foreground flex flex-col items-center gap-4">
+              <Film className="h-16 w-16" />
+              <p className="text-lg">All Caught Up!</p>
+              <p className="text-sm">You've seen all available recommendations. Check back later!</p>
             </div>
-        ) : (
-            <div className="overflow-hidden" ref={emblaRef}>
-                <div className="flex">
+          ) : (
+             <div className="relative w-full max-w-sm h-[75vh]">
                 {movies.map((movie, index) => (
-                    <div className="relative flex-[0_0_100%]" key={`${movie.id}-${index}`}>
+                    <TinderCard
+                        ref={childRefs[index]}
+                        className="absolute"
+                        key={movie.id}
+                        onSwipe={(dir) => swiped(dir as 'left' | 'right', movie, index)}
+                        preventSwipe={['up', 'down']}
+                    >
                         <DiscoverCard
                             movie={movie}
                             rating={userRatings.find(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type)?.rating || 0}
                             isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
                             onRate={(rating) => handleRateMovie(movie.id, movie.media_type, rating)}
                             onToggleWatched={(watched) => handleToggleWatched(movie.id, movie.media_type, watched)}
-                            onPrev={scrollPrev}
-                            onNext={scrollNext}
-                            isFirst={index === 0}
-                            isLast={index === movies.length - 1}
                         />
-                    </div>
+                    </TinderCard>
                 ))}
-                </div>
-            </div>
-        )}
+             </div>
+          )}
+      </div>
+
+      {!loading && movies.length > 0 && (
+        <div className="flex items-center gap-6 mt-4 z-10">
+            <Button variant="outline" size="icon" className="w-16 h-16 rounded-full border-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => swipe('left')}>
+                <XIcon className="h-8 w-8" />
+            </Button>
+            <Button variant="outline" size="icon" className="w-16 h-16 rounded-full border-2 border-primary text-primary hover:bg-primary/10" onClick={() => swipe('right')}>
+                <Heart className="h-8 w-8" />
+            </Button>
+        </div>
+      )}
     </div>
   );
 }

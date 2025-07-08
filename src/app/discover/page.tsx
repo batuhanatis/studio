@@ -30,9 +30,9 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-background">
+    <div className="flex flex-col h-screen w-full bg-background overflow-hidden">
       <Header />
-      <main className="container mx-auto max-w-4xl px-4 py-8">
+      <main className="container mx-auto max-w-4xl px-4 py-4 flex-grow flex flex-col">
         <DiscoverFeed />
       </main>
     </div>
