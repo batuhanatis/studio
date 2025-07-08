@@ -1,3 +1,4 @@
+
 'use client';
 
 import { auth, db } from '@/lib/firebase';
@@ -36,28 +37,29 @@ const createUserProfileDocument = async (firebaseUser: User) => {
 
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (newFirebaseUser) => {
       try {
-        if (firebaseUser) {
-          // When user logs in or signs up, ensure their profile exists.
-          // This might fail if Firestore rules are not set correctly.
-          await createUserProfileDocument(firebaseUser);
-          setUser(firebaseUser);
+        if (newFirebaseUser) {
+          // When user logs in or signs up, AWAIT the profile creation/check
+          // before we proceed. This is crucial to prevent race conditions.
+          await createUserProfileDocument(newFirebaseUser);
+          setFirebaseUser(newFirebaseUser);
         } else {
-          setUser(null);
+          setFirebaseUser(null);
         }
       } catch (error) {
           console.error("Error during authentication state change, possibly due to Firestore permissions:", error);
           // We still set the user so the app knows someone is authenticated,
           // but features requiring a DB profile might fail.
           // This prevents the entire app from getting stuck on a loading screen.
-          setUser(firebaseUser); 
+          setFirebaseUser(newFirebaseUser); 
       } finally {
         // This is crucial to ensure the app is never stuck in a loading state.
+        // It now runs only AFTER the profile document check is complete.
         setLoading(false);
       }
     });
@@ -66,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = {
-    firebaseUser: user,
+    firebaseUser,
     loading,
   };
 
