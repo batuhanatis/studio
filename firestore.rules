@@ -1,10 +1,31 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // UYARI: Bu kurallar hata ayıklama amaçlıdır ve production için güvenli değildir.
-    // Giriş yapmış herhangi bir kullanıcının tüm verileri okumasına ve yazmasına izin verir.
-    match /{document=**} {
-      allow read, write: if true;
+  
+    // Users can only read and write to their own user document.
+    match /users/{userId} {
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
+    }
+
+    // Users can manage their own watchlists.
+    match /watchlists/{listId} {
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Users can send friend requests and manage requests sent to them.
+    match /friendRequests/{requestId} {
+      allow read: if request.auth != null && (request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId);
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+      allow update, delete: if request.auth != null && (request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId);
+    }
+    
+    // Users can send recommendations and read recommendations sent to them.
+    match /recommendations/{recommendationId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.toUserId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+      // No update/delete needed for recommendations for now
     }
   }
 }
