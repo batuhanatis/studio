@@ -119,7 +119,6 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
                       className="object-cover"
                       sizes="(max-width: 640px) 100vw, 384px"
                       data-ai-hint="movie poster"
-                      priority
                     />
                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
                 </div>

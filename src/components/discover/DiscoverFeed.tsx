@@ -67,10 +67,10 @@ export function DiscoverFeed() {
 
   const fetchAndSetMovies = useCallback(async () => {
     setLoading(true);
+    setMovies([]);
+    
     try {
-      let initialMovies: Movie[] = [];
-      let ratedMovies: UserRatingData[] = [];
-      let watchedMovies: UserMovieData[] = [];
+      let seenMovieIds = new Set<string>();
 
       if (user) {
         try {
@@ -78,48 +78,39 @@ export function DiscoverFeed() {
           const userDoc = await getDoc(userDocRef);
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            ratedMovies = userData.ratedMovies || [];
-            watchedMovies = userData.watchedMovies || [];
+            const ratedMovies: UserRatingData[] = userData.ratedMovies || [];
+            const watchedMovies: UserMovieData[] = userData.watchedMovies || [];
+            seenMovieIds = new Set([...ratedMovies.map(m => m.movieId), ...watchedMovies.map(m => m.movieId)]);
           }
         } catch (dbError) {
-          console.warn("Could not fetch user ratings, falling back to popular titles.", dbError);
+          console.warn("Could not fetch user data, showing generic popular titles.", dbError);
         }
       }
       
-      const seenMovieIds = new Set([...ratedMovies.map(m => m.movieId), ...watchedMovies.map(m => m.movieId)]);
-      const highlyRated = ratedMovies.filter(r => r.rating >= 4);
+      const movieRes = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
+      const tvRes = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
+      
+      if (!movieRes.ok || !tvRes.ok) throw new Error("Failed to fetch from TMDB API");
+      
+      const movieData = await movieRes.json();
+      const tvData = await tvRes.json();
 
-      if (highlyRated.length > 0) {
-        const seedMovie = highlyRated[Math.floor(Math.random() * highlyRated.length)];
-        const res = await fetch(`https://api.themoviedb.org/3/${seedMovie.mediaType}/${seedMovie.movieId}/recommendations?api_key=${API_KEY}&language=en-US`);
-        if (res.ok) {
-            const data = await res.json();
-            initialMovies = (data.results || [])
-                .map((m: any) => ({...m, media_type: m.media_type || seedMovie.mediaType}))
-                .filter((m: Movie) => m.poster_path && m.overview && !seenMovieIds.has(String(m.id)));
-        }
-      }
+      const popularMovies = (movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' as const }));
+      const popularTv = (tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' as const }));
+      
+      const allPopular = [...popularMovies, ...popularTv];
 
-      if (initialMovies.length < 20) {
-        const movieRes = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
-        const tvRes = await fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
-        
-        if (!movieRes.ok || !tvRes.ok) throw new Error("Failed to fetch from TMDB API");
-        
-        const movieData = await movieRes.json();
-        const tvData = await tvRes.json();
-        const popular = [
-            ...(movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' })),
-            ...(tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' })),
-        ].filter(item => item.poster_path && item.overview && !seenMovieIds.has(String(item.id)));
-        const existingIds = new Set(initialMovies.map(r => r.id));
-        const uniquePopular = popular.filter(p => !existingIds.has(p.id));
-        initialMovies.push(...uniquePopular);
-      }
+      const filtered = allPopular.filter(item => 
+        item.poster_path && 
+        item.overview && 
+        !seenMovieIds.has(String(item.id))
+      );
 
-      const shuffledMovies = initialMovies.sort(() => 0.5 - Math.random());
+      const shuffledMovies = filtered.sort(() => 0.5 - Math.random());
+      
       setMovies(shuffledMovies);
       setCurrentIndex(shuffledMovies.length - 1);
+
     } catch (error) {
         console.error("Error fetching discover feed:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load movies.' });
