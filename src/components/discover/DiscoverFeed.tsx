@@ -171,7 +171,11 @@ export function DiscoverFeed() {
         }
     } catch (error: any) {
        console.error("Failed to rate movie:", error);
-       toast({ variant: 'destructive', title: 'Error Saving Rating', description: error.message || 'Could not save your rating.' });
+       let description = error.message || 'Could not save your rating.';
+       if (error.code === 'permission-denied') {
+           description = "Your rating could not be saved due to a permissions issue. Please check your Firestore rules.";
+       }
+       toast({ variant: 'destructive', title: 'Error Saving Rating', description });
     }
   };
   
