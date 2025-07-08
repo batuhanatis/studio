@@ -1,39 +1,10 @@
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Users can read any user's profile data (for finding friends by email).
-    // They can only create or update their own user document.
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId; // Covers create, update, delete
-    }
-    
-    // Users can only create, read, or write to their own watchlists.
-    // This rule works for queries that filter by userId, which the app does.
-    match /watchlists/{listId} {
-      allow create: if request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if resource.data.userId == request.auth.uid;
-    }
-    
-    // Users can create recommendations for others.
-    // The recipient is the only one who can read or delete the recommendation.
-    match /recommendations/{recommendationId} {
-      allow create: if request.resource.data.fromUserId == request.auth.uid;
-      allow read, delete: if resource.data.toUserId == request.auth.uid;
-    }
-    
-    // Friend requests can be created by the sender.
-    // They can be read by either party.
-    // They can be updated (accepted) by the recipient.
-    // They can be deleted (declined/cancelled) by either party.
-    match /friendRequests/{requestId} {
-      allow create: if request.resource.data.fromUserId == request.auth.uid;
-      allow read: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
-      allow update: if request.auth.uid == resource.data.toUserId;
-      allow delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
+    // UYARI: Bu kurallar hata ayıklama amaçlıdır ve production için güvenli değildir.
+    // Giriş yapmış herhangi bir kullanıcının tüm verileri okumasına ve yazmasına izin verir.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
