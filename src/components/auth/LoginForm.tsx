@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -104,7 +105,7 @@ export function LoginForm() {
         } else if (error.code === 'auth/account-exists-with-different-credential') {
             description = 'An account already exists with the same email address but different sign-in credentials. Please sign in using the original method.';
         } else if (error.code === 'auth/unauthorized-domain') {
-            description = "This app's domain is not authorized for Google Sign-In. Please contact the site administrator.";
+            description = `Bu uygulamanın alan adı (${window.location.hostname}) Google ile Giriş için yetkilendirilmemiş. Lütfen bu adresi Firebase Authentication ayarlarınızdaki 'Yetkilendirilen alan adları' listesine ekleyin.`;
         }
         
         toast({
