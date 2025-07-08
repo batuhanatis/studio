@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification, signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -66,8 +66,13 @@ export function RegisterForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
-      router.push('/search');
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      await sendEmailVerification(userCredential.user);
+      toast({
+        title: 'Verification Email Sent',
+        description: 'Please check your inbox to verify your account.',
+      });
+      router.push('/verify-email');
     } catch (error: any) {
       let title = 'Registration Failed';
       let description = 'An unexpected error occurred. Please try again.';

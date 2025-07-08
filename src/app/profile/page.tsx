@@ -18,8 +18,16 @@ export default function ProfilePage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading) return;
+    if (!user) {
       router.push('/login');
+      return;
+    }
+    const isEmailPasswordUser = user.providerData.some(
+      (provider) => provider.providerId === 'password'
+    );
+    if (isEmailPasswordUser && !user.emailVerified) {
+      router.push('/verify-email');
     }
   }, [user, loading, router]);
 
@@ -40,8 +48,12 @@ export default function ProfilePage() {
     if (!email) return 'P';
     return email.substring(0, 2).toUpperCase();
   }
+  
+  const isEmailPasswordUser = user?.providerData.some(
+    (provider) => provider.providerId === 'password'
+  );
 
-  if (loading || !user) {
+  if (loading || !user || (isEmailPasswordUser && !user.emailVerified)) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">

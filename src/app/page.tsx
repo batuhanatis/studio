@@ -10,12 +10,22 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (user) {
-        router.push('/search');
+    if (loading) {
+      return;
+    }
+
+    if (user) {
+      const isEmailPasswordUser = user.providerData.some(
+        (provider) => provider.providerId === 'password'
+      );
+
+      if (isEmailPasswordUser && !user.emailVerified) {
+        router.push('/verify-email');
       } else {
-        router.push('/login');
+        router.push('/search');
       }
+    } else {
+      router.push('/login');
     }
   }, [user, loading, router]);
 
