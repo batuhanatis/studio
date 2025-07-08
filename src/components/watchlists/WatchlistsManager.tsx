@@ -43,7 +43,7 @@ interface Watchlist {
 }
 
 export function WatchlistsManager() {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,12 +57,12 @@ export function WatchlistsManager() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    if (!user) {
+    if (!firebaseUser) {
         setLoading(false);
         return;
     };
     setLoading(true);
-    const q = query(collection(db, 'watchlists'), where('userId', '==', user.uid));
+    const q = query(collection(db, 'watchlists'), where('userId', '==', firebaseUser.uid));
     
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const lists = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Watchlist));
@@ -75,16 +75,16 @@ export function WatchlistsManager() {
     });
 
     return () => unsubscribe();
-  }, [user, toast]);
+  }, [firebaseUser, toast]);
 
   const handleCreateList = async () => {
-    if (!user || !newListName.trim()) return;
+    if (!firebaseUser || !newListName.trim()) return;
     setIsCreating(true);
 
     const newList = { 
         name: newListName.trim(), 
         movies: [],
-        userId: user.uid,
+        userId: firebaseUser.uid,
         createdAt: serverTimestamp(),
     };
 
@@ -102,7 +102,7 @@ export function WatchlistsManager() {
   };
 
   const handleUpdateName = async () => {
-    if (!user || !editingList || !editedName.trim()) return;
+    if (!firebaseUser || !editingList || !editedName.trim()) return;
     setIsUpdating(true);
     const listDocRef = doc(db, 'watchlists', editingList.id);
     try {
@@ -118,7 +118,7 @@ export function WatchlistsManager() {
   };
   
   const handleDeleteList = async () => {
-    if (!user || !deletingList) return;
+    if (!firebaseUser || !deletingList) return;
     setIsDeleting(true);
     const listDocRef = doc(db, 'watchlists', deletingList.id);
     try {

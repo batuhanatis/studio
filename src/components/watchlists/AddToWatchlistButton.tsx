@@ -55,7 +55,7 @@ interface AddToWatchlistButtonProps {
 }
 
 export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchlistButtonProps) {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
@@ -66,9 +66,9 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
 
   useEffect(() => {
     let unsubscribe: Unsubscribe | undefined;
-    if (user && isOpen) {
+    if (firebaseUser && isOpen) {
         setLoading(true);
-        const q = query(collection(db, 'watchlists'), where('userId', '==', user.uid));
+        const q = query(collection(db, 'watchlists'), where('userId', '==', firebaseUser.uid));
         
         unsubscribe = onSnapshot(q, (querySnapshot) => {
             const lists = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Watchlist));
@@ -84,10 +84,10 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
             unsubscribe();
         }
     };
-  }, [isOpen, user, toast]);
+  }, [isOpen, firebaseUser, toast]);
 
   const handleAddToList = async (listId: string) => {
-    if (!user) return;
+    if (!firebaseUser) return;
     setAddingToList(listId);
     
     const listDocRef = doc(db, 'watchlists', listId);
@@ -120,7 +120,7 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
   };
 
   const handleCreateAndAdd = async () => {
-    if (!user || !newListName.trim()) return;
+    if (!firebaseUser || !newListName.trim()) return;
     setIsCreating(true);
     
     // Create a new object, only including properties that are not undefined.
@@ -129,7 +129,7 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     );
 
     const newList = {
-        userId: user.uid,
+        userId: firebaseUser.uid,
         name: newListName.trim(),
         movies: [movieToAdd],
         createdAt: serverTimestamp(),

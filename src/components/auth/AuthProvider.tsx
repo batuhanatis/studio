@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { createContext, useEffect, useState, type ReactNode } from 'react';
 
 interface AuthContextType {
-  user: User | null;
+  firebaseUser: User | null;
   loading: boolean;
 }
 
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = {
-    user,
+    firebaseUser: user,
     loading,
   };
 

@@ -35,7 +35,7 @@ interface UserMovieData {
 }
 
 export function BlendFeed({ friendId }: { friendId: string }) {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
 
   const [friendProfile, setFriendProfile] = useState<UserProfile | null>(null);
@@ -48,15 +48,15 @@ export function BlendFeed({ friendId }: { friendId: string }) {
 
   // Fetch current user's watched list
   useEffect(() => {
-    if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
             setWatched(doc.data().watchedMovies || []);
         }
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [firebaseUser]);
 
   const fetchMovieDetails = useCallback(async (movieId: string, mediaType: 'movie' | 'tv'): Promise<string | null> => {
     try {
@@ -83,7 +83,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
 
 
   const createBlend = useCallback(async () => {
-    if (!user) return;
+    if (!firebaseUser) return;
     setLoading(true);
 
     try {
@@ -95,7 +95,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
       setFriendProfile(friendData);
 
       setLoadingMessage('Analyzing your movie tastes...');
-      const currentUserDoc = await getDoc(doc(db, 'users', user.uid));
+      const currentUserDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (!currentUserDoc.exists()) throw new Error("Could not find your profile.");
       const currentUserData = currentUserDoc.data() as UserProfile;
 
@@ -139,7 +139,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [user, friendId, toast, fetchMovieDetails, searchMovieByTitle]);
+  }, [firebaseUser, friendId, toast, fetchMovieDetails, searchMovieByTitle]);
   
   useEffect(() => {
     createBlend();

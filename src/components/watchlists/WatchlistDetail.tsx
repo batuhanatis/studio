@@ -46,7 +46,7 @@ interface MovieApiResult extends MovieDetails {
 }
 
 export function WatchlistDetail({ listId }: { listId: string }) {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
   const [watchlist, setWatchlist] = useState<Watchlist | null>(null);
   const [recommendations, setRecommendations] = useState<MovieApiResult[]>([]);
@@ -56,26 +56,26 @@ export function WatchlistDetail({ listId }: { listId: string }) {
 
   // Fetch watched list for card states
   useEffect(() => {
-    if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
             setWatched(docSnap.data().watchedMovies || []);
         }
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [firebaseUser]);
 
   // Fetch watchlist details
   useEffect(() => {
-    if (!user) return;
+    if (!firebaseUser) return;
     setLoading(prev => ({...prev, list: true}));
     const listDocRef = doc(db, 'watchlists', listId);
     
     const unsubscribe = onSnapshot(listDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const listData = docSnap.data();
-        if (listData.userId === user.uid) {
+        if (listData.userId === firebaseUser.uid) {
           setWatchlist({ ...listData, id: docSnap.id } as Watchlist);
         } else {
           setError("You don't have permission to view this list.");
@@ -90,7 +90,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
     });
 
     return () => unsubscribe();
-  }, [user, listId]);
+  }, [firebaseUser, listId]);
   
   const searchMovieByTitle = useCallback(async (title: string): Promise<MovieApiResult | null> => {
      try {
@@ -129,8 +129,8 @@ export function WatchlistDetail({ listId }: { listId: string }) {
   }, [watchlist, toast, searchMovieByTitle]);
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
-    if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const movieIdentifier = { movieId: String(movieId), mediaType };
     
     try {

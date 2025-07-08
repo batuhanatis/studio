@@ -35,20 +35,20 @@ interface Recommendation {
 }
 
 export function RecommendationList() {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
+    if (!firebaseUser) {
       setLoading(false);
       return;
     }
 
     const q = query(
       collection(db, 'recommendations'),
-      where('toUserId', '==', user.uid),
+      where('toUserId', '==', firebaseUser.uid),
       orderBy('createdAt', 'desc')
     );
 
@@ -97,7 +97,7 @@ export function RecommendationList() {
     );
 
     return () => unsubscribe();
-  }, [user, toast]);
+  }, [firebaseUser, toast]);
 
   const getInitials = (email: string) => email.substring(0, 2).toUpperCase();
 

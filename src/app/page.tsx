@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const { user, loading } = useAuth();
+  const { firebaseUser, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -14,12 +14,12 @@ export default function Home() {
       return;
     }
 
-    if (user) {
-      const isEmailPasswordUser = user.providerData.some(
+    if (firebaseUser) {
+      const isEmailPasswordUser = firebaseUser.providerData.some(
         (provider) => provider.providerId === 'password'
       );
 
-      if (isEmailPasswordUser && !user.emailVerified) {
+      if (isEmailPasswordUser && !firebaseUser.emailVerified) {
         router.push('/verify-email');
       } else {
         router.push('/search');
@@ -27,7 +27,7 @@ export default function Home() {
     } else {
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [firebaseUser, loading, router]);
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background">

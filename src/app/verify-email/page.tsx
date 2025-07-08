@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { MailCheck, LogOut, Loader2 } from 'lucide-react';
 
 export default function VerifyEmailPage() {
-  const { user, loading } = useAuth();
+  const { firebaseUser, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isSending, setIsSending] = useState(false);
@@ -20,14 +20,14 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     if (loading) return;
 
-    if (!user) {
+    if (!firebaseUser) {
       // If for some reason user is not logged in, send to login page.
       router.replace('/login');
       return;
     }
     
     // The user is logged in, now check for verification.
-    if (user.emailVerified) {
+    if (firebaseUser.emailVerified) {
       router.replace('/search');
       return;
     }
@@ -45,14 +45,14 @@ export default function VerifyEmailPage() {
     }, 3000); // Check every 3 seconds
 
     return () => clearInterval(interval);
-  }, [user, loading, router]);
+  }, [firebaseUser, loading, router]);
 
 
   const handleResendVerification = async () => {
-    if (!user) return;
+    if (!firebaseUser) return;
     setIsSending(true);
     try {
-      await sendEmailVerification(user);
+      await sendEmailVerification(firebaseUser);
       toast({
         title: 'Verification Email Sent',
         description: 'Please check your inbox (and spam folder).',
@@ -75,7 +75,7 @@ export default function VerifyEmailPage() {
   };
 
   // While loading or if user is not available yet, show a loading screen.
-  if (loading || !user || user.emailVerified) {
+  if (loading || !firebaseUser || firebaseUser.emailVerified) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -97,7 +97,7 @@ export default function VerifyEmailPage() {
           <CardTitle className="text-2xl">Verify Your Email</CardTitle>
           <CardDescription>
             A verification link has been sent to{' '}
-            <span className="font-semibold text-foreground">{user.email}</span>. Please
+            <span className="font-semibold text-foreground">{firebaseUser.email}</span>. Please
             check your inbox to complete your registration.
           </CardDescription>
         </CardHeader>

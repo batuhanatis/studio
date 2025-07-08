@@ -37,7 +37,7 @@ interface UserRatingData extends UserMovieData {
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
 export function ForYouFeed() {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
 
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -155,11 +155,11 @@ export function ForYouFeed() {
 
   // Fetch user profile data to personalize the feed
   useEffect(() => {
-    if (!user) {
+    if (!firebaseUser) {
         setLoadingProfile(false);
         return;
     }
-    const userDocRef = doc(db, 'users', user.uid);
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
         setLoadingProfile(true);
         try {
@@ -192,14 +192,14 @@ export function ForYouFeed() {
         }
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [firebaseUser]);
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
-    if (!user) return;
+    if (!firebaseUser) return;
     const movieIdentifier = { movieId: String(movieId), mediaType };
     
     try {
-      const userDocRef = doc(db, 'users', user.uid);
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
       const userDoc = await getDoc(userDocRef);
       const currentWatched = userDoc.data()?.watchedMovies || [];
       

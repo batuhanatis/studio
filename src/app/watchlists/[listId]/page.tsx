@@ -8,30 +8,30 @@ import { Header } from '@/components/layout/Header';
 import { WatchlistDetail } from '@/components/watchlists/WatchlistDetail';
 
 export default function WatchlistDetailPage() {
-  const { user, loading } = useAuth();
+  const { firebaseUser, loading } = useAuth();
   const router = useRouter();
   const params = useParams();
   const listId = params.listId as string;
 
   useEffect(() => {
     if (loading) return;
-    if (!user) {
+    if (!firebaseUser) {
       router.push('/login');
       return;
     }
-    const isEmailPasswordUser = user.providerData.some(
+    const isEmailPasswordUser = firebaseUser.providerData.some(
       (provider) => provider.providerId === 'password'
     );
-    if (isEmailPasswordUser && !user.emailVerified) {
+    if (isEmailPasswordUser && !firebaseUser.emailVerified) {
       router.push('/verify-email');
     }
-  }, [user, loading, router]);
+  }, [firebaseUser, loading, router]);
   
-  const isEmailPasswordUser = user?.providerData.some(
+  const isEmailPasswordUser = firebaseUser?.providerData.some(
     (provider) => provider.providerId === 'password'
   );
 
-  if (loading || !user || !listId || (isEmailPasswordUser && !user.emailVerified)) {
+  if (loading || !firebaseUser || !listId || (isEmailPasswordUser && !firebaseUser.emailVerified)) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">

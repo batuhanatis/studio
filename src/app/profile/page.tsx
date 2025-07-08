@@ -13,23 +13,23 @@ import { auth } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 
 export default function ProfilePage() {
-  const { user, loading } = useAuth();
+  const { firebaseUser, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
     if (loading) return;
-    if (!user) {
+    if (!firebaseUser) {
       router.push('/login');
       return;
     }
-    const isEmailPasswordUser = user.providerData.some(
+    const isEmailPasswordUser = firebaseUser.providerData.some(
       (provider) => provider.providerId === 'password'
     );
-    if (isEmailPasswordUser && !user.emailVerified) {
+    if (isEmailPasswordUser && !firebaseUser.emailVerified) {
       router.push('/verify-email');
     }
-  }, [user, loading, router]);
+  }, [firebaseUser, loading, router]);
 
   const handleLogout = async () => {
     try {
@@ -49,11 +49,11 @@ export default function ProfilePage() {
     return email.substring(0, 2).toUpperCase();
   }
   
-  const isEmailPasswordUser = user?.providerData.some(
+  const isEmailPasswordUser = firebaseUser?.providerData.some(
     (provider) => provider.providerId === 'password'
   );
 
-  if (loading || !user || (isEmailPasswordUser && !user.emailVerified)) {
+  if (loading || !firebaseUser || (isEmailPasswordUser && !firebaseUser.emailVerified)) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -73,7 +73,7 @@ export default function ProfilePage() {
              <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
                     <AvatarFallback className="text-3xl">
-                        {getInitials(user.email)}
+                        {getInitials(firebaseUser.email)}
                     </AvatarFallback>
                 </Avatar>
                 <div className="grid gap-1">
@@ -85,7 +85,7 @@ export default function ProfilePage() {
           <CardContent className="space-y-6">
             <div className="flex items-center gap-3 rounded-md border p-3">
                 <Mail className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm font-medium">{user.email}</span>
+                <span className="text-sm font-medium">{firebaseUser.email}</span>
             </div>
             
             <Button variant="outline" onClick={handleLogout} className="w-full sm:w-auto">

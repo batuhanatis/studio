@@ -45,17 +45,17 @@ export function MovieFinder() {
   const [loadingRecs, setLoadingRecs] = useState(true);
   
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
 
   const [watched, setWatched] = useState<UserMovieData[]>([]);
   const [loadingWatched, setLoadingWatched] = useState(true);
 
   useEffect(() => {
-    if (!user) {
+    if (!firebaseUser) {
         setLoadingWatched(false);
         return;
     }
-    const userDocRef = doc(db, 'users', user.uid);
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
             setWatched(doc.data().watchedMovies || []);
@@ -66,7 +66,7 @@ export function MovieFinder() {
         setLoadingWatched(false);
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [firebaseUser]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -74,13 +74,13 @@ export function MovieFinder() {
 
     const fetchRecommendations = async () => {
       setLoadingRecs(true);
-      if (!user) {
+      if (!firebaseUser) {
         setLoadingRecs(false);
         return;
       }
       
       try {
-        const userDocRef = doc(db, 'users', user.uid);
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
         if (signal.aborted) return;
 
@@ -132,7 +132,7 @@ export function MovieFinder() {
     }
 
     return () => controller.abort();
-  }, [query, hasSearched, user]);
+  }, [query, hasSearched, firebaseUser]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -208,8 +208,8 @@ export function MovieFinder() {
   }, [query, toast]);
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
-    if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const movieIdentifier = { movieId: String(movieId), mediaType };
 
     try {

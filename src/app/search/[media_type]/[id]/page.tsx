@@ -36,7 +36,7 @@ interface Genre {
 export default function DetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
 
   const id = params.id as string;
@@ -123,13 +123,13 @@ export default function DetailPage() {
   }, [id, media_type]);
   
   useEffect(() => {
-    if (!user || !id) {
+    if (!firebaseUser || !id) {
         setLoadingUserData(false);
         return;
     }
     
     setLoadingUserData(true);
-    const userDocRef = doc(db, 'users', user.uid);
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
 
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
@@ -147,14 +147,14 @@ export default function DetailPage() {
     });
 
     return () => unsubscribe();
-  }, [user, id, media_type, toast]);
+  }, [firebaseUser, id, media_type, toast]);
 
   const handleRateMovie = async (rating: number) => {
-    if (!user) {
+    if (!firebaseUser) {
       toast({ variant: 'destructive', title: 'Not signed in', description: 'You must be signed in to rate movies.' });
       return;
     }
-    const userDocRef = doc(db, 'users', user.uid);
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
 
     try {
       await runTransaction(db, async (transaction) => {
@@ -187,8 +187,8 @@ export default function DetailPage() {
   };
   
   const handleToggleWatched = async (watched: boolean) => {
-    if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const movieIdentifier = { movieId: id, mediaType: media_type };
 
     try {

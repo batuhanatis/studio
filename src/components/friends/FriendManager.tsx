@@ -53,7 +53,7 @@ const addFriendSchema = z.object({
 type AddFriendFormValues = z.infer<typeof addFriendSchema>;
 
 export function FriendManager() {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<UserProfile[]>([]);
@@ -67,10 +67,10 @@ export function FriendManager() {
 
   // Listener for incoming friend requests
   useEffect(() => {
-    if (!user) return;
+    if (!firebaseUser) return;
     const q = query(
       collection(db, 'friendRequests'),
-      where('toUserId', '==', user.uid),
+      where('toUserId', '==', firebaseUser.uid),
       where('status', '==', 'pending')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -79,35 +79,35 @@ export function FriendManager() {
       setLoading(p => ({ ...p, requests: false }));
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [firebaseUser]);
   
   // Listener for sent requests (to auto-add friend on acceptance)
   useEffect(() => {
-    if (!user) return;
-    const q = query(collection(db, 'friendRequests'), where('fromUserId', '==', user.uid));
+    if (!firebaseUser) return;
+    const q = query(collection(db, 'friendRequests'), where('fromUserId', '==', firebaseUser.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const requests = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FriendRequest));
       setSentRequests(requests);
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [firebaseUser]);
 
   // Process accepted requests
   useEffect(() => {
-    if (!user) return;
+    if (!firebaseUser) return;
     const accepted = sentRequests.find(r => r.status === 'accepted');
     if (accepted) {
-      const userDocRef = doc(db, 'users', user.uid);
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
       updateDoc(userDocRef, { friends: arrayUnion(accepted.toUserId) })
         .then(() => deleteDoc(doc(db, 'friendRequests', accepted.id)))
         .catch(e => console.error("Error finalizing friendship:", e));
     }
-  }, [sentRequests, user]);
+  }, [sentRequests, firebaseUser]);
   
   // Listener for user's profile to get friends list
   useEffect(() => {
-    if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, async (snapshot) => {
       const userData = snapshot.data() as UserProfile | undefined;
       setLoading(p => ({ ...p, friends: true }));
@@ -130,11 +130,11 @@ export function FriendManager() {
       }
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [firebaseUser]);
 
 
   const handleAddFriend = async (values: AddFriendFormValues) => {
-    if (!user || !user.email || values.email === user.email) {
+    if (!firebaseUser || !firebaseUser.email || values.email === firebaseUser.email) {
       toast({ variant: 'destructive', title: 'Error', description: "You can't add yourself as a friend." });
       return;
     }
@@ -150,13 +150,13 @@ export function FriendManager() {
 
       if (friends.some(f => f.uid === targetUserId)) throw new Error("You are already friends with this user.");
       
-      const existingReqQuery = query(collection(db, 'friendRequests'), where('fromUserId', '==', user.uid), where('toUserId', '==', targetUserId));
+      const existingReqQuery = query(collection(db, 'friendRequests'), where('fromUserId', '==', firebaseUser.uid), where('toUserId', '==', targetUserId));
       const existingReqSnapshot = await getDocs(existingReqQuery);
       if (!existingReqSnapshot.empty) throw new Error("You've already sent a request to this user.");
 
       await addDoc(collection(db, 'friendRequests'), {
-        fromUserId: user.uid,
-        fromUserEmail: user.email,
+        fromUserId: firebaseUser.uid,
+        fromUserEmail: firebaseUser.email,
         toUserId: targetUserId,
         toUserEmail: targetUser.email,
         status: 'pending',
@@ -173,7 +173,7 @@ export function FriendManager() {
   };
 
   const handleRequest = async (request: FriendRequest, accept: boolean) => {
-    if (!user) return;
+    if (!firebaseUser) return;
     setLoading(prev => ({...prev, action: true}));
 
     const requestDocRef = doc(db, 'friendRequests', request.id);
@@ -182,7 +182,7 @@ export function FriendManager() {
       if (accept) {
          const batch = writeBatch(db);
          // Add sender to current user's friend list
-         const currentUserDocRef = doc(db, 'users', user.uid);
+         const currentUserDocRef = doc(db, 'users', firebaseUser.uid);
          batch.update(currentUserDocRef, { friends: arrayUnion(request.fromUserId) });
          // Update request status so sender's client can complete the friendship
          batch.update(requestDocRef, { status: 'accepted' });

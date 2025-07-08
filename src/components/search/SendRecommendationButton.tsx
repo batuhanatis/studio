@@ -39,7 +39,7 @@ interface UserProfile {
 }
 
 export function SendRecommendationButton({ movie, isIconOnly = false }: { movie: MovieDetails, isIconOnly?: boolean }) {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [friends, setFriends] = useState<UserProfile[]>([]);
@@ -47,11 +47,11 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
   const [sending, setSending] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen && user) {
+    if (isOpen && firebaseUser) {
       const fetchFriends = async () => {
         setLoading(true);
         try {
-            const userDocRef = doc(db, 'users', user.uid);
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
             const userDoc = await getDoc(userDocRef);
             if (userDoc.exists()) {
               const userData = userDoc.data();
@@ -81,15 +81,15 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
       };
       fetchFriends();
     }
-  }, [isOpen, user, toast]);
+  }, [isOpen, firebaseUser, toast]);
 
   const handleSend = async (friendId: string) => {
-    if (!user) return;
+    if (!firebaseUser) return;
     setSending(friendId);
 
     try {
       await addDoc(collection(db, 'recommendations'), {
-        fromUserId: user.uid,
+        fromUserId: firebaseUser.uid,
         toUserId: friendId,
         movieId: movie.id,
         mediaType: movie.media_type,

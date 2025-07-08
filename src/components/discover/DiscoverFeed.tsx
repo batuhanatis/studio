@@ -35,7 +35,7 @@ interface UserRatingData extends UserMovieData {
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
 export function DiscoverFeed() {
-  const { user } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
   
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -68,9 +68,9 @@ export function DiscoverFeed() {
     setLoading(true);
     
     let seenMovieIds = new Set<string>();
-    if (user) {
+    if (firebaseUser) {
         try {
-            const userDocRef = doc(db, 'users', user.uid);
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
             const userDoc = await getDoc(userDocRef);
             if (userDoc.exists()) {
                 const userData = userDoc.data();
@@ -124,15 +124,15 @@ export function DiscoverFeed() {
     } finally {
         setLoading(false);
     }
-  }, [user, toast]);
+  }, [firebaseUser, toast]);
 
   useEffect(() => {
     fetchDiscoverMovies();
   }, [fetchDiscoverMovies]);
 
   useEffect(() => {
-    if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
@@ -143,11 +143,11 @@ export function DiscoverFeed() {
         console.error("Error fetching user data snapshot for cards:", error);
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [firebaseUser]);
 
   const handleRateMovie = async (movieId: number, mediaType: 'movie' | 'tv', rating: number) => {
-    if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const movieIdStr = String(movieId);
     try {
         await runTransaction(db, async (transaction) => {
@@ -180,8 +180,8 @@ export function DiscoverFeed() {
   };
   
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
-    if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
     const movieIdentifier = { movieId: String(movieId), mediaType };
 
     try {
