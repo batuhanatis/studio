@@ -5,6 +5,7 @@ import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { createContext, useEffect, useState, type ReactNode } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   firebaseUser: User | null;
@@ -13,8 +14,6 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// This function creates a user profile in Firestore if it doesn't exist.
-// It's designed to be called from onAuthStateChanged and will throw on failure.
 const createUserProfileDocument = async (firebaseUser: User) => {
   if (!firebaseUser) return;
   const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -24,14 +23,19 @@ const createUserProfileDocument = async (firebaseUser: User) => {
     const { email, uid } = firebaseUser;
     const createdAt = serverTimestamp();
     
-    await setDoc(userDocRef, {
-      uid,
-      email,
-      createdAt,
-      friends: [],
-      ratedMovies: [],
-      watchedMovies: [],
-    });
+    try {
+        await setDoc(userDocRef, {
+            uid,
+            email,
+            createdAt,
+            friends: [],
+            ratedMovies: [],
+            watchedMovies: [],
+        });
+    } catch (error) {
+        // Re-throw the error to be caught by the onAuthStateChanged listener
+        throw error;
+    }
   }
 };
 
@@ -39,33 +43,32 @@ const createUserProfileDocument = async (firebaseUser: User) => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (newFirebaseUser) => {
       try {
         if (newFirebaseUser) {
-          // When user logs in or signs up, AWAIT the profile creation/check
-          // before we proceed. This is crucial to prevent race conditions.
           await createUserProfileDocument(newFirebaseUser);
-          setFirebaseUser(newFirebaseUser);
-        } else {
-          setFirebaseUser(null);
         }
-      } catch (error) {
+        setFirebaseUser(newFirebaseUser);
+      } catch (error: any) {
           console.error("Error during authentication state change, possibly due to Firestore permissions:", error);
-          // If profile creation fails, we will still set the user to prevent a login loop.
-          // This means the user is authenticated, but their DB profile might not exist,
-          // which can cause other issues down the line.
+          toast({
+            variant: 'destructive',
+            title: 'Profile Creation Failed',
+            description: 'Login was successful, but creating your user profile failed. Please check your Firestore security rules and try again.',
+            duration: 9000,
+          });
+          // This allows login even if profile creation fails, to avoid a login loop.
           setFirebaseUser(newFirebaseUser);
       } finally {
-        // This is crucial to ensure the app is never stuck in a loading state.
-        // It now runs only AFTER the profile document check is complete (or has failed).
         setLoading(false);
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [toast]);
 
   const value = {
     firebaseUser,
