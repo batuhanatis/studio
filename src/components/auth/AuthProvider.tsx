@@ -14,13 +14,13 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // This function creates a user profile in Firestore if it doesn't exist.
 // It's designed to be called from onAuthStateChanged and will throw on failure.
-const createUserProfileDocument = async (user: User) => {
-  if (!user) return;
-  const userDocRef = doc(db, 'users', user.uid);
+const createUserProfileDocument = async (firebaseUser: User) => {
+  if (!firebaseUser) return;
+  const userDocRef = doc(db, 'users', firebaseUser.uid);
   const snapshot = await getDoc(userDocRef);
 
   if (!snapshot.exists()) {
-    const { email, uid } = user;
+    const { email, uid } = firebaseUser;
     const createdAt = serverTimestamp();
     
     await setDoc(userDocRef, {
