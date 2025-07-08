@@ -53,13 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
           console.error("Error during authentication state change, possibly due to Firestore permissions:", error);
-          // We still set the user so the app knows someone is authenticated,
-          // but features requiring a DB profile might fail.
-          // This prevents the entire app from getting stuck on a loading screen.
-          setFirebaseUser(newFirebaseUser); 
+          // If profile creation fails, we must NOT set the user.
+          // Setting to null ensures the app state remains consistent and will
+          // likely redirect to a safe page like /login.
+          setFirebaseUser(null);
       } finally {
         // This is crucial to ensure the app is never stuck in a loading state.
-        // It now runs only AFTER the profile document check is complete.
+        // It now runs only AFTER the profile document check is complete (or has failed).
         setLoading(false);
       }
     });
