@@ -37,7 +37,7 @@ interface UserRatingData extends UserMovieData {
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
 export function ForYouFeed() {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -124,10 +124,10 @@ export function ForYouFeed() {
 
 
   useEffect(() => {
-    if (!loadingProfile) {
-        debouncedFetch(filters, preferredGenreIds);
-    }
-  }, [filters, debouncedFetch, loadingProfile, preferredGenreIds]);
+    if (authLoading || loadingProfile) return;
+    debouncedFetch(filters, preferredGenreIds);
+    
+  }, [filters, debouncedFetch, authLoading, loadingProfile, preferredGenreIds]);
 
   // Fetch genres and platforms for filter controls
   useEffect(() => {
@@ -155,6 +155,7 @@ export function ForYouFeed() {
 
   // Fetch user profile data to personalize the feed
   useEffect(() => {
+    if (authLoading) return;
     if (!firebaseUser) {
         setLoadingProfile(false);
         return;
@@ -192,7 +193,7 @@ export function ForYouFeed() {
         }
     });
     return () => unsubscribe();
-  }, [firebaseUser]);
+  }, [firebaseUser, authLoading]);
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!firebaseUser) return;
@@ -244,11 +245,11 @@ export function ForYouFeed() {
         allPlatforms={allPlatforms}
         filters={filters}
         onFilterChange={setFilters}
-        loading={loading || loadingProfile}
+        loading={loading || loadingProfile || authLoading}
       />
       
       {/* Initial loading spinner, shown only when no movies are loaded yet */}
-      {(loading || loadingProfile) && filteredMovies.length === 0 && (
+      {(loading || loadingProfile || authLoading) && filteredMovies.length === 0 && (
         <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p>Loading recommendations...</p>
@@ -256,7 +257,7 @@ export function ForYouFeed() {
       )}
 
       {/* No results message */}
-      {!(loading || loadingProfile) && filteredMovies.length === 0 && (
+      {!(loading || loadingProfile || authLoading) && filteredMovies.length === 0 && (
         <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
             <Film className="h-16 w-16" />
             <p className="text-lg">No Results Found</p>
@@ -278,7 +279,7 @@ export function ForYouFeed() {
             ))}
             </div>
             {/* "Loading more" spinner shown at the bottom while still fetching */}
-            {(loading || loadingProfile) && (
+            {(loading || loadingProfile || authLoading) && (
                 <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     <p>Loading more...</p>

@@ -53,21 +53,16 @@ const addFriendSchema = z.object({
 type AddFriendFormValues = z.infer<typeof addFriendSchema>;
 
 export function FriendManager() {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<UserProfile[]>([]);
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState({ requests: true, friends: true, action: false });
 
-  const form = useForm<AddFriendFormValues>({
-    resolver: zodResolver(addFriendSchema),
-    defaultValues: { email: '' },
-  });
-
   // Listener for incoming friend requests
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (authLoading || !firebaseUser) return;
     const q = query(
       collection(db, 'friendRequests'),
       where('toUserId', '==', firebaseUser.uid),
@@ -79,22 +74,22 @@ export function FriendManager() {
       setLoading(p => ({ ...p, requests: false }));
     });
     return () => unsubscribe();
-  }, [firebaseUser]);
+  }, [firebaseUser, authLoading]);
   
   // Listener for sent requests (to auto-add friend on acceptance)
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (authLoading || !firebaseUser) return;
     const q = query(collection(db, 'friendRequests'), where('fromUserId', '==', firebaseUser.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const requests = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FriendRequest));
       setSentRequests(requests);
     });
     return () => unsubscribe();
-  }, [firebaseUser]);
+  }, [firebaseUser, authLoading]);
 
   // Process accepted requests
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (authLoading || !firebaseUser) return;
     const accepted = sentRequests.find(r => r.status === 'accepted');
     if (accepted) {
       const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -102,17 +97,17 @@ export function FriendManager() {
         .then(() => deleteDoc(doc(db, 'friendRequests', accepted.id)))
         .catch(e => console.error("Error finalizing friendship:", e));
     }
-  }, [sentRequests, firebaseUser]);
+  }, [sentRequests, firebaseUser, authLoading]);
   
   // Listener for user's profile to get friends list
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (authLoading || !firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, async (snapshot) => {
-      const userData = snapshot.data() as UserProfile | undefined;
       setLoading(p => ({ ...p, friends: true }));
       try {
         let finalFriends: UserProfile[] = [];
+        const userData = snapshot.data() as UserProfile | undefined;
         if (userData?.friends && userData.friends.length > 0) {
           const friendProfiles = await Promise.all(
             userData.friends.map(async (uid) => {
@@ -130,7 +125,7 @@ export function FriendManager() {
       }
     });
     return () => unsubscribe();
-  }, [firebaseUser]);
+  }, [firebaseUser, authLoading]);
 
 
   const handleAddFriend = async (values: AddFriendFormValues) => {
@@ -224,8 +219,8 @@ export function FriendManager() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={loading.action}>
-                {loading.action ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Send Request
+              <Button type="submit" disabled={loading.action || authLoading}>
+                {(loading.action || authLoading) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Send Request
               </Button>
             </form>
           </Form>
@@ -239,7 +234,7 @@ export function FriendManager() {
             <CardDescription>People who want to be your friend.</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading.requests ? (
+            {loading.requests || authLoading ? (
               <div className="flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
             ) : incomingRequests.length > 0 ? (
               <ul className="space-y-3">
@@ -274,7 +269,7 @@ export function FriendManager() {
             <CardDescription>Your current list of friends.</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading.friends ? (
+            {loading.friends || authLoading ? (
               <div className="flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
             ) : friends.length > 0 ? (
               <ul className="space-y-3">
@@ -307,5 +302,3 @@ export function FriendManager() {
     </div>
   );
 }
-
-    

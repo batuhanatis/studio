@@ -35,12 +35,13 @@ interface Recommendation {
 }
 
 export function RecommendationList() {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!firebaseUser) {
       setLoading(false);
       return;
@@ -97,7 +98,7 @@ export function RecommendationList() {
     );
 
     return () => unsubscribe();
-  }, [firebaseUser, toast]);
+  }, [firebaseUser, toast, authLoading]);
 
   const getInitials = (email: string) => email.substring(0, 2).toUpperCase();
 
@@ -107,22 +108,18 @@ export function RecommendationList() {
         From Your Friends
       </h1>
 
-      {loading && (
+      {loading || authLoading ? (
         <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p>Loading recommendations...</p>
         </div>
-      )}
-
-      {!loading && recommendations.length === 0 && (
+      ) : recommendations.length === 0 ? (
         <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
           <Inbox className="h-16 w-16" />
           <p className="text-lg">Your inbox is empty.</p>
           <p className="text-sm">Recommendations from friends will appear here.</p>
         </div>
-      )}
-
-      {recommendations.length > 0 && (
+      ) : (
         <div className="w-full max-w-4xl space-y-4">
           {recommendations.map((item) => {
             const title = item.movieTitle;

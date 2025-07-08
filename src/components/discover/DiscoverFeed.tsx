@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, runTransaction, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Film, Heart, X as XIcon } from 'lucide-react';
+import { Film, Heart, X as XIcon, Loader2 } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { DiscoverCard } from './DiscoverCard';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ interface UserRatingData extends UserMovieData {
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
 export function DiscoverFeed() {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -65,6 +65,7 @@ export function DiscoverFeed() {
   }
 
   const fetchDiscoverMovies = useCallback(async () => {
+    if (authLoading) return;
     setLoading(true);
     
     let seenMovieIds = new Set<string>();
@@ -124,14 +125,14 @@ export function DiscoverFeed() {
     } finally {
         setLoading(false);
     }
-  }, [firebaseUser, toast]);
+  }, [firebaseUser, toast, authLoading]);
 
   useEffect(() => {
     fetchDiscoverMovies();
   }, [fetchDiscoverMovies]);
 
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (authLoading || !firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
@@ -143,7 +144,7 @@ export function DiscoverFeed() {
         console.error("Error fetching user data snapshot for cards:", error);
     });
     return () => unsubscribe();
-  }, [firebaseUser]);
+  }, [firebaseUser, authLoading]);
 
   const handleRateMovie = async (movieId: number, mediaType: 'movie' | 'tv', rating: number) => {
     if (!firebaseUser) return;
@@ -204,7 +205,7 @@ export function DiscoverFeed() {
   };
 
   const renderContent = () => {
-      if (loading) {
+      if (loading || authLoading) {
         return <DiscoverCard onRate={()=>{}} onToggleWatched={()=>{}}/>;
       }
     
@@ -256,7 +257,7 @@ export function DiscoverFeed() {
         {renderContent()}
       </div>
 
-      {!loading && movies.length > 0 && (
+      {!loading && !authLoading && movies.length > 0 && (
         <div className="flex items-center gap-6 mt-4 z-10">
             <Button variant="outline" size="icon" className="w-16 h-16 rounded-full border-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => swipe('left')} disabled={!canSwipe}>
                 <XIcon className="h-8 w-8" />

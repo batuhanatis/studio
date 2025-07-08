@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { SendRecommendationButton } from '@/components/search/SendRecommendationButton';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -36,7 +37,7 @@ interface Genre {
 export default function DetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const id = params.id as string;
@@ -123,6 +124,8 @@ export default function DetailPage() {
   }, [id, media_type]);
   
   useEffect(() => {
+    if (authLoading) return; // Wait for auth state to resolve
+
     if (!firebaseUser || !id) {
         setLoadingUserData(false);
         return;
@@ -147,7 +150,7 @@ export default function DetailPage() {
     });
 
     return () => unsubscribe();
-  }, [firebaseUser, id, media_type, toast]);
+  }, [firebaseUser, id, media_type, toast, authLoading]);
 
   const handleRateMovie = async (rating: number) => {
     if (!firebaseUser) {
@@ -175,7 +178,7 @@ export default function DetailPage() {
           }
         } else {
           // Add new rating
-          currentRatings.push({ movieId: id, mediaType: media_type, rating: rating });
+          currentRatings.push({ movieId: id, mediaType: media_type, rating: rating, title: decodedTitle });
         }
         
         transaction.update(userDocRef, { ratedMovies: currentRatings });
@@ -189,7 +192,7 @@ export default function DetailPage() {
   const handleToggleWatched = async (watched: boolean) => {
     if (!firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier = { movieId: id, mediaType: media_type };
+    const movieIdentifier = { movieId: id, mediaType: media_type, title: decodedTitle };
 
     try {
       if (watched) {
@@ -284,11 +287,14 @@ export default function DetailPage() {
             )}
             
             <div className="mt-6 space-y-4">
-              <AddToWatchlistButton movie={movieDetails} />
+              <div className="flex gap-2">
+                <AddToWatchlistButton movie={movieDetails} />
+                <SendRecommendationButton movie={{...movieDetails, id: String(id)}} />
+              </div>
 
               <Card>
                 <CardContent className="space-y-4 p-4">
-                  {loadingUserData ? (
+                  {authLoading || loadingUserData ? (
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Skeleton className="h-4 w-20" />

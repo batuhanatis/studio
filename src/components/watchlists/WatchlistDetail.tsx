@@ -46,7 +46,7 @@ interface MovieApiResult extends MovieDetails {
 }
 
 export function WatchlistDetail({ listId }: { listId: string }) {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [watchlist, setWatchlist] = useState<Watchlist | null>(null);
   const [recommendations, setRecommendations] = useState<MovieApiResult[]>([]);
@@ -56,7 +56,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
 
   // Fetch watched list for card states
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (authLoading || !firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
@@ -64,11 +64,11 @@ export function WatchlistDetail({ listId }: { listId: string }) {
         }
     });
     return () => unsubscribe();
-  }, [firebaseUser]);
+  }, [firebaseUser, authLoading]);
 
   // Fetch watchlist details
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (authLoading || !firebaseUser) return;
     setLoading(prev => ({...prev, list: true}));
     const listDocRef = doc(db, 'watchlists', listId);
     
@@ -90,7 +90,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
     });
 
     return () => unsubscribe();
-  }, [firebaseUser, listId]);
+  }, [firebaseUser, listId, authLoading]);
   
   const searchMovieByTitle = useCallback(async (title: string): Promise<MovieApiResult | null> => {
      try {
@@ -147,7 +147,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
 
   const watchedIds = new Set(watched.map(item => String(item.movieId)));
   
-  if (loading.list) {
+  if (loading.list || authLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
   

@@ -35,7 +35,7 @@ interface UserMovieData {
 }
 
 export function BlendFeed({ friendId }: { friendId: string }) {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const [friendProfile, setFriendProfile] = useState<UserProfile | null>(null);
@@ -48,7 +48,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
 
   // Fetch current user's watched list
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (authLoading || !firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
@@ -56,7 +56,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
         }
     });
     return () => unsubscribe();
-  }, [firebaseUser]);
+  }, [firebaseUser, authLoading]);
 
   const fetchMovieDetails = useCallback(async (movieId: string, mediaType: 'movie' | 'tv'): Promise<string | null> => {
     try {
@@ -83,7 +83,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
 
 
   const createBlend = useCallback(async () => {
-    if (!firebaseUser) return;
+    if (authLoading || !firebaseUser) return;
     setLoading(true);
 
     try {
@@ -139,7 +139,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [firebaseUser, friendId, toast, fetchMovieDetails, searchMovieByTitle]);
+  }, [firebaseUser, friendId, toast, fetchMovieDetails, searchMovieByTitle, authLoading]);
   
   useEffect(() => {
     createBlend();
@@ -147,7 +147,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
   
   const watchedIds = new Set(watched.map(item => String(item.movieId)));
   
-  if (loading) {
+  if (loading || authLoading) {
      return (
         <div className="flex flex-col items-center gap-4 pt-8 text-muted-foreground">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />

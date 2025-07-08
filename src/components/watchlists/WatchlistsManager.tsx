@@ -43,7 +43,7 @@ interface Watchlist {
 }
 
 export function WatchlistsManager() {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +57,7 @@ export function WatchlistsManager() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!firebaseUser) {
         setLoading(false);
         return;
@@ -75,7 +76,7 @@ export function WatchlistsManager() {
     });
 
     return () => unsubscribe();
-  }, [firebaseUser, toast]);
+  }, [firebaseUser, toast, authLoading]);
 
   const handleCreateList = async () => {
     if (!firebaseUser || !newListName.trim()) return;
@@ -134,7 +135,7 @@ export function WatchlistsManager() {
   };
 
 
-  if (loading) {
+  if (loading || authLoading) {
     return <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 

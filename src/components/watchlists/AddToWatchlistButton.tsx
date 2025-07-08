@@ -55,7 +55,7 @@ interface AddToWatchlistButtonProps {
 }
 
 export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchlistButtonProps) {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
@@ -66,6 +66,7 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
 
   useEffect(() => {
     let unsubscribe: Unsubscribe | undefined;
+    if (authLoading) return;
     if (firebaseUser && isOpen) {
         setLoading(true);
         const q = query(collection(db, 'watchlists'), where('userId', '==', firebaseUser.uid));
@@ -84,7 +85,7 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
             unsubscribe();
         }
     };
-  }, [isOpen, firebaseUser, toast]);
+  }, [isOpen, firebaseUser, toast, authLoading]);
 
   const handleAddToList = async (listId: string) => {
     if (!firebaseUser) return;
@@ -162,11 +163,11 @@ export function AddToWatchlistButton({ movie, isIconOnly = false }: AddToWatchli
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         {isIconOnly ? (
-          <Button variant="outline" size="icon" aria-label="Add to Watchlist">
+          <Button variant="outline" size="icon" aria-label="Add to Watchlist" disabled={authLoading}>
             {buttonContent}
           </Button>
         ) : (
-          <Button variant="outline">
+          <Button variant="outline" disabled={authLoading}>
             {buttonContent}
           </Button>
         )}

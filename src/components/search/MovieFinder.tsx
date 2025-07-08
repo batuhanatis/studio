@@ -45,12 +45,13 @@ export function MovieFinder() {
   const [loadingRecs, setLoadingRecs] = useState(true);
   
   const { toast } = useToast();
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, loading: authLoading } = useAuth();
 
   const [watched, setWatched] = useState<UserMovieData[]>([]);
   const [loadingWatched, setLoadingWatched] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!firebaseUser) {
         setLoadingWatched(false);
         return;
@@ -66,13 +67,14 @@ export function MovieFinder() {
         setLoadingWatched(false);
     });
     return () => unsubscribe();
-  }, [firebaseUser]);
+  }, [firebaseUser, authLoading]);
 
   useEffect(() => {
     const controller = new AbortController();
     const { signal } = controller;
 
     const fetchRecommendations = async () => {
+      if (authLoading) return;
       setLoadingRecs(true);
       if (!firebaseUser) {
         setLoadingRecs(false);
@@ -132,7 +134,7 @@ export function MovieFinder() {
     }
 
     return () => controller.abort();
-  }, [query, hasSearched, firebaseUser]);
+  }, [query, hasSearched, firebaseUser, authLoading]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -229,7 +231,7 @@ export function MovieFinder() {
   const renderRecommendations = () => {
     if (query.trim().length > 0 || hasSearched) return null;
 
-    if (loadingRecs || loadingWatched) {
+    if (loadingRecs || loadingWatched || authLoading) {
       return (
         <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
