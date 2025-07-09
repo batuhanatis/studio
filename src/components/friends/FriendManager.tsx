@@ -60,6 +60,13 @@ export function FriendManager() {
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState({ requests: true, friends: true, action: false });
 
+  const form = useForm<AddFriendFormValues>({
+    resolver: zodResolver(addFriendSchema),
+    defaultValues: {
+      email: '',
+    },
+  });
+
   // Listener for incoming friend requests
   useEffect(() => {
     if (authLoading || !firebaseUser) return;
