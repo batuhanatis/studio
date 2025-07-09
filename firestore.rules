@@ -1,12 +1,40 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: INSECURE - For debugging only.
-    // Allows any authenticated user to read/write to any document.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    
+    // Rule: Users can only manage their own profile.
+    // They can read and update it if they are the owner.
+    // They can create it if the new document's ID matches their own user ID.
+    match /users/{userId} {
+      allow read, update: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+    }
+    
+    // Rule: Users can manage their own watchlists.
+    // They can perform all actions on a watchlist if the document's `userId` field matches their user ID.
+    // They can create a new watchlist if they are logged in and the new list is for themselves.
+    match /watchlists/{listId} {
+      allow read, update, delete: if request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Rule: Users can manage friend requests they are involved in.
+    // They can read or delete a request if they are the sender or the receiver.
+    // Only the receiver can update the request (e.g., to change status to 'accepted').
+    // Any logged-in user can create a request, as long as they are the sender.
+    match /friendRequests/{requestId} {
+      allow read, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
+      allow update: if request.auth.uid == resource.data.toUserId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+    }
+    
+    // Rule: Users can send recommendations and read recommendations sent to them.
+    // They can read a recommendation only if they are the recipient.
+    // Any logged-in user can create a recommendation for another user.
+    match /recommendations/{recommendationId} {
+      allow read: if request.auth.uid == resource.data.toUserId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
     }
   }
 }
