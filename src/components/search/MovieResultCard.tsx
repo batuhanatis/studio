@@ -99,75 +99,77 @@ export function MovieResultCard({ item, isWatched, onToggleWatched }: MovieResul
 
 
   return (
-    <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200 flex flex-col h-full bg-card">
-      <Link href={href} className="block">
-        <div className="relative w-full aspect-[2/3] bg-muted">
-          <Image
-            src={posterUrl}
-            alt={title}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
-            data-ai-hint="movie poster"
-          />
-        </div>
-      </Link>
-      <CardContent className="p-3 flex flex-col flex-grow">
-        <Link href={href} className="flex-grow">
-          <h3 className="text-base font-bold font-headline line-clamp-2 hover:underline">{title}</h3>
+    <div className="h-full">
+        <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200 flex flex-col h-full bg-card">
+        <Link href={href} className="block">
+            <div className="relative w-full aspect-[2/3] bg-muted">
+            <Image
+                src={posterUrl}
+                alt={title}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
+                data-ai-hint="movie poster"
+            />
+            </div>
         </Link>
-        <div className="mt-auto pt-2">
-            <div className="h-8 mt-1 mb-2 flex items-center gap-1.5 flex-wrap">
-              {loadingProviders ? (
-                  <div className="flex gap-1.5">
-                    <Skeleton className="h-6 w-6 rounded-md" />
-                    <Skeleton className="h-6 w-6 rounded-md" />
-                  </div>
-              ) : (
-                platforms && platforms.length > 0 &&
-                    platforms.slice(0, 3).map((p) => (
-                        <div key={p.provider_id} className="relative h-6 w-6 overflow-hidden rounded-md bg-white/90 shadow-sm" title={p.provider_name}>
-                            <Image
-                                src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
-                                alt={`${p.provider_name} logo`}
-                                fill
-                                className="object-contain p-0.5"
-                                sizes="24px"
-                            />
-                        </div>
-                    ))
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                {item.media_type === 'movie' ? <Film className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
-                <span>{item.media_type === 'movie' ? 'Movie' : 'TV Show'}</span>
-                {releaseYear && <span className="text-xs">·</span>}
-                {releaseYear && <span>{releaseYear}</span>}
-            </div>
-            <div className="flex items-center gap-1 text-sm text-foreground">
-                <Star className="h-4 w-4 text-amber-500" />
-                <span className="font-semibold">{item.vote_average > 0 ? `${item.vote_average.toFixed(1)}` : 'N/A'}</span>
-                <span className="text-muted-foreground text-xs">/ 10</span>
-            </div>
-            <div className="flex items-center justify-between mt-2 border-t border-border pt-2">
-                <div className="flex items-center gap-2">
-                    <Checkbox
-                        id={`watched-card-${item.id}`}
-                        checked={isWatched}
-                        onCheckedChange={onToggleWatched}
-                        aria-label="Mark as watched"
-                    />
-                    <label
-                        htmlFor={`watched-card-${item.id}`}
-                        className="text-xs text-muted-foreground cursor-pointer"
-                    >
-                        Watched
-                    </label>
+        <CardContent className="p-3 flex flex-col flex-grow">
+            <Link href={href} className="flex-grow">
+            <h3 className="text-base font-bold font-headline line-clamp-2 hover:underline">{title}</h3>
+            </Link>
+            <div className="mt-auto pt-2">
+                <div className="h-8 mt-1 mb-2 flex items-center gap-1.5 flex-wrap">
+                {loadingProviders ? (
+                    <div className="flex gap-1.5">
+                        <Skeleton className="h-6 w-6 rounded-md" />
+                        <Skeleton className="h-6 w-6 rounded-md" />
+                    </div>
+                ) : (
+                    platforms && platforms.length > 0 &&
+                        platforms.slice(0, 3).map((p) => (
+                            <div key={p.provider_id} className="relative h-6 w-6 overflow-hidden rounded-md bg-white/90 shadow-sm" title={p.provider_name}>
+                                <Image
+                                    src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                                    alt={`${p.provider_name} logo`}
+                                    fill
+                                    className="object-contain p-0.5"
+                                    sizes="24px"
+                                />
+                            </div>
+                        ))
+                )}
                 </div>
-                <AddToWatchlistButton movie={movieDetails} isIconOnly={true} />
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                    {item.media_type === 'movie' ? <Film className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
+                    <span>{item.media_type === 'movie' ? 'Movie' : 'TV Show'}</span>
+                    {releaseYear && <span className="text-xs">·</span>}
+                    {releaseYear && <span>{releaseYear}</span>}
+                </div>
+                <div className="flex items-center gap-1 text-sm text-foreground">
+                    <Star className="h-4 w-4 text-amber-500" />
+                    <span className="font-semibold">{item.vote_average > 0 ? `${item.vote_average.toFixed(1)}` : 'N/A'}</span>
+                    <span className="text-muted-foreground text-xs">/ 10</span>
+                </div>
+                <div className="flex items-center justify-between mt-2 border-t border-border pt-2">
+                    <div className="flex items-center gap-2">
+                        <Checkbox
+                            id={`watched-card-${item.id}`}
+                            checked={isWatched}
+                            onCheckedChange={onToggleWatched}
+                            aria-label="Mark as watched"
+                        />
+                        <label
+                            htmlFor={`watched-card-${item.id}`}
+                            className="text-xs text-muted-foreground cursor-pointer"
+                        >
+                            Watched
+                        </label>
+                    </div>
+                    <AddToWatchlistButton movie={movieDetails} isIconOnly={true} />
+                </div>
             </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+        </Card>
+    </div>
   );
 }
