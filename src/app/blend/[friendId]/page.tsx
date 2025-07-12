@@ -17,21 +17,10 @@ export default function BlendPage() {
     if (loading) return;
     if (!firebaseUser) {
       router.push('/login');
-      return;
-    }
-    const isEmailPasswordUser = firebaseUser.providerData.some(
-      (provider) => provider.providerId === 'password'
-    );
-    if (isEmailPasswordUser && !firebaseUser.emailVerified) {
-      router.push('/verify-email');
     }
   }, [firebaseUser, loading, router]);
   
-  const isEmailPasswordUser = firebaseUser?.providerData.some(
-    (provider) => provider.providerId === 'password'
-  );
-
-  if (loading || !firebaseUser || (isEmailPasswordUser && !firebaseUser.emailVerified)) {
+  if (loading || !firebaseUser) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">

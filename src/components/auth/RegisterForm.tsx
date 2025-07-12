@@ -9,6 +9,7 @@ import { auth, googleProvider, db, linkWithCredential, linkWithPopup, EmailAuthP
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
+import { sendEmailVerification } from 'firebase/auth';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -77,11 +78,13 @@ export function RegisterForm() {
       await linkWithCredential(auth.currentUser, credential);
       const userDocRef = doc(db, 'users', auth.currentUser.uid);
       await updateDoc(userDocRef, { email: values.email, isAnonymous: false });
+      
+      // We don't need to ask for verification anymore, just send them to the app.
       toast({
         title: 'Account Created!',
         description: 'Your progress is now saved to your new account.',
       });
-      router.push('/profile');
+      router.push('/search'); // Redirect to search page
     } catch (error: any) {
       let title = 'Registration Failed';
       let description = 'An unexpected error occurred. Please try again.';
@@ -112,7 +115,7 @@ export function RegisterForm() {
         const userDocRef = doc(db, 'users', result.user.uid);
         await updateDoc(userDocRef, { email: result.user.email, isAnonymous: false });
         toast({ title: 'Account Created!', description: 'Your progress is now saved to your Google account.' });
-        router.push('/profile');
+        router.push('/search');
     } catch (error: any) {
         let description = 'An unexpected error occurred. Please try again.';
         if (error.code === 'auth/popup-closed-by-user') {

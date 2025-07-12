@@ -21,16 +21,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (loading) return;
     if (!firebaseUser) {
-      // This case should not be hit due to anonymous auth, but as a fallback
       router.push('/login');
-      return;
-    }
-    const isEmailPasswordUser = firebaseUser.providerData.some(
-      (provider) => provider.providerId === 'password'
-    );
-    // Do not redirect anonymous users from their profile page.
-    if (!firebaseUser.isAnonymous && isEmailPasswordUser && !firebaseUser.emailVerified) {
-      router.push('/verify-email');
     }
   }, [firebaseUser, loading, router]);
 
@@ -54,10 +45,6 @@ export default function ProfilePage() {
     return email.substring(0, 2).toUpperCase();
   }
   
-  const isEmailPasswordUser = firebaseUser?.providerData.some(
-    (provider) => provider.providerId === 'password'
-  );
-
   if (loading || !firebaseUser) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
