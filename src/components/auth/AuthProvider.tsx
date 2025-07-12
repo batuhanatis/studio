@@ -1,10 +1,9 @@
-
 'use client';
 
-import { 
-  auth, 
-  db, 
-  onAuthStateChanged, 
+import {
+  auth,
+  db,
+  onAuthStateChanged,
   signInAnonymously,
   doc,
   getDoc,
@@ -13,6 +12,7 @@ import {
   updateDoc,
   type User
 } from '@/lib/firebase';
+
 import { createContext, useEffect, useState, type ReactNode } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -23,13 +23,13 @@ interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper function to delay execution
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const createUserProfileDocument = async (firebaseUser: User) => {
-  if (!firebaseUser) return;
+  if (!firebaseUser?.uid) return;
+
   const userDocRef = doc(db, 'users', firebaseUser.uid);
-  
+
   let attempts = 0;
   const maxAttempts = 3;
 
@@ -37,42 +37,41 @@ const createUserProfileDocument = async (firebaseUser: User) => {
     try {
       const snapshot = await getDoc(userDocRef);
 
+      const { email, uid, isAnonymous } = firebaseUser;
+      const createdAt = serverTimestamp();
+
       if (!snapshot.exists()) {
-        const { email, uid, isAnonymous } = firebaseUser;
-        const createdAt = serverTimestamp();
-        
         await setDoc(userDocRef, {
-            uid,
-            email,
-            isAnonymous,
-            createdAt,
-            friends: [],
-            ratedMovies: [],
-            watchedMovies: [],
+          uid,
+          email,
+          isAnonymous,
+          createdAt,
+          friends: [],
+          ratedMovies: [],
+          watchedMovies: [],
         });
       } else {
         const data = snapshot.data();
         if (data.isAnonymous && !firebaseUser.isAnonymous) {
-            await updateDoc(userDocRef, { 
-                isAnonymous: false,
-                email: firebaseUser.email 
-            });
+          await updateDoc(userDocRef, {
+            isAnonymous: false,
+            email: firebaseUser.email,
+          });
         }
       }
-      return; // Success, exit the loop
+
+      return;
     } catch (error: any) {
       attempts++;
       if (error.code === 'permission-denied' && attempts < maxAttempts) {
         console.warn(`Attempt ${attempts} failed: Permission denied. Retrying in ${attempts * 200}ms...`);
-        await delay(attempts * 200); // Wait a bit before retrying
+        await delay(attempts * 200);
       } else {
-        // For other errors or if max attempts are reached, throw the error
         throw error;
       }
     }
   }
 };
-
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
@@ -93,7 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             description: 'Could not sync your profile. Please check Firestore rules.',
             duration: 9000,
           });
-          // Still set the user to allow app access, but with a warning.
           setFirebaseUser(newFirebaseUser);
         } finally {
           setLoading(false);
@@ -101,9 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setLoading(true);
         try {
-          const userCredential = await signInAnonymously(auth);
-          // onAuthStateChanged will fire again with the new anonymous user.
-          // The profile creation and loading state will be handled in that subsequent call.
+          await signInAnonymously(auth);
         } catch (error) {
           console.error("Anonymous sign-in failed:", error);
           toast({

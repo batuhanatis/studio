@@ -2,49 +2,46 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Default deny all reads and writes
-    match /{document=**} {
-      allow read, write: if false;
-    }
 
     // USERS
-    // - Anyone can create their own user document (on signup/anonymous login).
-    // - A logged-in user can read their own document.
-    // - A logged-in user can update their own document (e.g., add friends, rated movies, etc.).
-    // - Logged-in users can read the 'email' and 'uid' of other users (needed for friend features).
+    // - Kullanıcı sadece kendi dokümanını oluşturabilir, güncelleyebilir.
+    // - Herkes giriş yaptıysa diğer kullanıcıları kısmen okuyabilir (arkadaşlık için).
     match /users/{userId} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null; // UID ve email görmek için
       allow update: if request.auth.uid == userId;
     }
-    
+
     // WATCHLISTS
-    // - A logged-in user can create a watchlist for themselves.
-    // - A user can read, update, or delete a watchlist only if they are the owner.
+    // - Kullanıcı yalnızca kendi listelerini oluşturabilir, okuyabilir, güncelleyebilir, silebilir.
     match /watchlists/{listId} {
-      allow create: if request.auth.uid == request.resource.data.userId;
-      allow read, update, delete: if request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
     }
-    
+
     // FRIEND REQUESTS
-    // - A logged-in user can create a friend request.
-    // - The recipient of a request can read or update it (to accept/decline).
-    // - The sender of a request can read or delete it (to cancel).
     match /friendRequests/{requestId} {
-      allow create: if request.auth.uid == request.resource.data.fromUserId;
-      allow read: if request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId;
-      allow update: if request.auth.uid == resource.data.toUserId; // The recipient accepts/declines
-      allow delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.toUserId ||
+        request.auth.uid == resource.data.fromUserId
+      );
+      allow update: if request.auth != null && request.auth.uid == resource.data.toUserId;
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.toUserId ||
+        request.auth.uid == resource.data.fromUserId
+      );
     }
-    
+
     // RECOMMENDATIONS
-    // - A logged-in user can create a recommendation.
-    // - The recipient can read their recommendations.
-    // - The recipient can delete their recommendations.
     match /recommendations/{recommendationId} {
-      allow create: if request.auth.uid == request.resource.data.fromUserId;
-      allow read, delete: if request.auth.uid == resource.data.toUserId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+      allow read, delete: if request.auth != null && request.auth.uid == resource.data.toUserId;
+    }
+
+    // Default: deny everything else
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
