@@ -110,7 +110,12 @@ export function WatchlistDetail({ listId }: { listId: string }) {
         if (!watchlist || watchlist.movies.length === 0) return;
         setLoading(prev => ({...prev, recs: true}));
         try {
-            const movieTitles = watchlist.movies.map(m => m.title);
+            const movieTitles = watchlist.movies.map(m => m.title).filter((t): t is string => !!t);
+            if (movieTitles.length === 0) {
+              setLoading(prev => ({...prev, recs: false}));
+              return;
+            }
+            
             const result = await getWatchlistRecommendations({ movieTitles });
             
             if (result && result.recommendedTitles.length > 0) {
