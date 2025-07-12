@@ -1,39 +1,57 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Users can read any profile, but only write to their own.
+    // --- User Profiles ---
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
+      // Allow users to read their own document completely.
+      allow read: if request.auth.uid == userId;
+      
+      // Allow users to create their own document.
+      allow create: if request.auth.uid == userId;
+
+      // Allow any authenticated user to read basic, non-sensitive fields.
+      allow get: if request.auth != null;
+
+      // Allow a user to update their own document.
+      // Additionally, allow another user to update ONLY the 'activeBlendsWith' field
+      // if they are adding themselves to it. This is for accepting blend invites.
+      allow update: if request.auth.uid == userId ||
+                     (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeBlendsWith']) &&
+                      request.resource.data.activeBlendsWith == resource.data.activeBlendsWith.concat([request.auth.uid]));
     }
     
-    // Users can create recommendations for others, but can't see or delete them.
-    match /recommendations/{recommendationId} {
-      allow read: if request.auth.uid == resource.data.toUserId;
-      allow create: if request.auth.uid == request.resource.data.fromUserId;
-      allow delete, update: if false; // Recommendations are read-only once created
-    }
-
-    // Users can manage their own watchlists.
-    match /watchlists/{watchlistId} {
-      allow read, delete, update: if request.auth.uid == resource.data.userId;
-      allow create: if request.auth.uid == request.resource.data.userId;
-    }
-
-    // Users can send friend requests and manage incoming ones.
+    // --- Friend Requests ---
     match /friendRequests/{requestId} {
-      allow read: if request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId;
+      // Allow user to create requests for themselves.
       allow create: if request.auth.uid == request.resource.data.fromUserId;
-      allow delete: if request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId;
+      
+      // Allow user to read/delete requests sent to or from them.
+      allow read, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
     }
-
-    // Users can send blend requests and manage incoming ones.
-    match /blendRequests/{requestId} {
-      allow read: if request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId;
+    
+    // --- Recommendations ---
+    match /recommendations/{recommendationId} {
+      // Allow user to create recommendations for others.
       allow create: if request.auth.uid == request.resource.data.fromUserId;
-      allow delete: if request.auth.uid == resource.data.toUserId || request.auth.uid == resource.data.fromUserId;
+      
+      // Allow user to read/delete recommendations sent to them.
+      allow read, delete: if request.auth.uid == resource.data.toUserId;
+    }
+    
+    // --- Watchlists ---
+    match /watchlists/{listId} {
+        // A user can do anything with their own watchlist.
+        allow read, write, delete: if resource.data.userId == request.auth.uid;
+    }
+    
+    // --- Blend Requests ---
+    match /blendRequests/{requestId} {
+      // Allow user to create requests for themselves.
+      allow create: if request.auth.uid == request.resource.data.fromUserId;
+      
+      // Allow user to read/delete requests sent to or from them.
+      allow read, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
     }
   }
 }
