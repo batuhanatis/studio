@@ -1,3 +1,4 @@
+// Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { 
   getAuth, 
@@ -7,7 +8,8 @@ import {
   linkWithCredential, 
   EmailAuthProvider,
   onAuthStateChanged,
-  type User
+  type User,
+  signOut,
 } from "firebase/auth";
 import { 
   getFirestore,
@@ -26,7 +28,8 @@ import {
   arrayUnion,
   arrayRemove,
   onSnapshot,
-  orderBy
+  orderBy,
+  getDocs
 } from "firebase/firestore";
 
 // Your web app's Firebase configuration
@@ -40,7 +43,13 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+let app: FirebaseApp;
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApp();
+}
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
@@ -71,5 +80,7 @@ export {
   arrayRemove,
   onSnapshot,
   orderBy,
+  getDocs,
+  signOut,
   type User
 };
