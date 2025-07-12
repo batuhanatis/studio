@@ -1,6 +1,33 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInAnonymously, linkWithPopup, linkWithCredential, EmailAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInAnonymously, 
+  linkWithPopup, 
+  linkWithCredential, 
+  EmailAuthProvider,
+  onAuthStateChanged,
+  type User
+} from "firebase/auth";
+import { 
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  updateDoc,
+  collection,
+  query,
+  where,
+  addDoc,
+  deleteDoc,
+  writeBatch,
+  runTransaction,
+  arrayUnion,
+  arrayRemove,
+  onSnapshot,
+  orderBy
+} from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -12,11 +39,37 @@ const firebaseConfig = {
   appId: "1:226527022824:web:78c6557a8005dec26e435d"
 };
 
-
 // Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
-export { app, auth, db, googleProvider, signInAnonymously, linkWithPopup, linkWithCredential, EmailAuthProvider };
+export { 
+  app, 
+  auth, 
+  db, 
+  googleProvider, 
+  signInAnonymously, 
+  linkWithPopup, 
+  linkWithCredential, 
+  EmailAuthProvider,
+  onAuthStateChanged,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  updateDoc,
+  collection,
+  query,
+  where,
+  addDoc,
+  deleteDoc,
+  writeBatch,
+  runTransaction,
+  arrayUnion,
+  arrayRemove,
+  onSnapshot,
+  orderBy,
+  type User
+};

@@ -1,9 +1,18 @@
 
 'use client';
 
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, type User, signInAnonymously } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { 
+  auth, 
+  db, 
+  onAuthStateChanged, 
+  signInAnonymously,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  updateDoc,
+  type User
+} from '@/lib/firebase';
 import { createContext, useEffect, useState, type ReactNode } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
