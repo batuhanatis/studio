@@ -98,7 +98,7 @@ export function DiscoverFeed() {
         const popularMovies = (movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' as const }));
         const popularTv = (tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' as const }));
         
-        const allPopular = [...popularMovies, ...popularTv];
+        const allPopular: Movie[] = [...popularMovies, ...popularTv];
         const uniqueItems = Array.from(new Map(allPopular.map(item => [item.id, item])).values())
             .filter(item => item.poster_path && item.overview);
         
@@ -115,7 +115,7 @@ export function DiscoverFeed() {
         try {
             const res = await fetch(`https://api.themoviedb.org/3/trending/all/week?api_key=${API_KEY}`);
             const data = await res.json();
-            const trendingMovies = (data.results || []).filter((item: any) => item.poster_path && item.overview);
+            const trendingMovies = (data.results || []).filter((item: any) => item.poster_path && item.overview && (item.media_type === 'movie' || item.media_type === 'tv'));
             setMovies(trendingMovies);
             setCurrentIndex(trendingMovies.length - 1);
         } catch (fallbackError) {
