@@ -1,79 +1,52 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
 
-    // A user can read another user's profile IF they are friends.
-    function areFriends(otherUserId) {
-        return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.friends.hasAny([otherUserId])
-    }
-    
     match /users/{userId} {
-      // Allow create for any authenticated user (including anonymous)
-      allow create: if isSignedIn();
+      // Allow a user to read their own document fully
+      allow read: if request.auth.uid == userId;
+
+      // Allow a user to read a friend's document if they are in each other's friends list
+      allow read: if request.auth.uid != null &&
+                    get(/databases/$(database)/documents/users/$(userId)).data.friends.hasAny([request.auth.uid]);
+
+      // Allow a user to update their own document, but not change critical fields
+      allow update: if request.auth.uid == userId;
       
-      // Allow read only if it's the owner OR if they are friends.
-      allow read: if isOwner(userId) || areFriends(userId);
-      
-      // Allow updates only by the owner
-      allow update: if isOwner(userId);
-      
-      // Users cannot be deleted
-      allow delete: if false;
-    }
-    
-    match /watchlists/{listId} {
-        allow read, write: if isSignedIn() && isOwner(resource.data.userId);
-    }
-    
-    match /recommendations/{recId} {
-        // Allow creating a recommendation if you are the sender
-        allow create: if isSignedIn() && isOwner(request.resource.data.fromUserId);
-        
-        // Allow reading a recommendation if you are the recipient
-        allow read: if isSignedIn() && isOwner(resource.data.toUserId);
-        
-        // No one can update, recipient deletes
-        allow update: if false;
-        allow delete: if isSignedIn() && isOwner(resource.data.toUserId);
-    }
-    
-    match /friendRequests/{reqId} {
-        // Allow creating a request if you are the sender
-        allow create: if isSignedIn() && isOwner(request.resource.data.fromUserId);
-        
-        // Allow reading if you are the sender or receiver
-        allow read: if isSignedIn() && (isOwner(resource.data.fromUserId) || isOwner(resource.data.toUserId));
-        
-        // Allow deleting if you are the sender (cancel) or receiver (decline)
-        allow delete: if isSignedIn() && (isOwner(resource.data.fromUserId) || isOwner(resource.data.toUserId));
-        
-        // No updates allowed
-        allow update: if false;
+      // Allow a user to create their own document on signup
+      allow create: if request.auth.uid == userId;
     }
 
-    match /blendRequests/{reqId} {
-        // Allow creating a request if you are the sender
-        allow create: if isSignedIn() && isOwner(request.resource.data.fromUserId);
-        
-        // Allow reading if you are the sender or receiver
-        allow read: if isSignedIn() && (isOwner(resource.data.fromUserId) || isOwner(resource.data.toUserId));
+    match /friendRequests/{requestId} {
+       allow create: if request.auth.uid == request.resource.data.fromUserId &&
+                        request.resource.data.keys().hasAll(['fromUserId', 'fromUserEmail', 'toUserId', 'toUserEmail', 'status', 'createdAt']) &&
+                        request.resource.data.fromUserId is string &&
+                        request.resource.data.toUserId is string &&
+                        request.resource.data.fromUserEmail is string &&
+                        request.resource.data.toUserEmail is string &&
+                        request.resource.data.status == 'pending' &&
+                        request.resource.data.createdAt == request.time;
+      allow read, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
+    }
 
-        // Allow deleting if you are the sender or receiver
-        allow delete: if isSignedIn() && (isOwner(resource.data.fromUserId) || isOwner(resource.data.toUserId));
-        
-        // No updates allowed, this is handled by the batch write in FriendManager
-        allow update: if false;
+    match /blendRequests/{requestId} {
+      allow create: if request.auth.uid == request.resource.data.fromUserId;
+      allow read, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
+      allow update: if request.auth.uid == resource.data.toUserId; // To accept
+    }
+    
+    match /recommendations/{recommendationId} {
+        allow create: if request.auth.uid == request.resource.data.fromUserId;
+        allow read: if request.auth.uid == request.resource.data.toUserId;
+    }
+
+    match /watchlists/{watchlistId} {
+      // Anyone authenticated can read a watchlist IF they are the owner
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      
+      // Allow create, update, delete only for the owner of the watchlist
+      allow create, update, delete: if request.auth.uid == request.resource.data.userId;
     }
   }
 }
