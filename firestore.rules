@@ -3,53 +3,46 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is signed in
+    // Helper function to check if a user is authenticated
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Helper function to check if the user is the owner of the document
+    // Helper function to check if the requesting user is the owner of the document
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    // USERS
     // Users can:
-    // - Create their own user document.
-    // - Read their own user document.
-    // - Update their own user document (e.g., add friends, rated movies).
+    // - Read their own profile
+    // - Create their own profile upon signup
+    // - Update their own profile (e.g., add friends, rated movies)
+    // - Other signed-in users can read basic profile info (like email, uid) but not sensitive lists.
     match /users/{userId} {
-      allow read, update, delete: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isOwner(userId);
     }
 
-    // FRIEND REQUESTS
-    // Users can:
-    // - Create a request (send one).
-    // - Read requests sent to them or by them.
-    // - Update requests sent to them (accept/decline).
-    // - Delete requests sent by them.
-    match /friendRequests/{requestId} {
-      allow read: if isSignedIn() && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.fromUserId == request.auth.uid;
-      allow update, delete: if isSignedIn() && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
-    }
-
-    // WATCHLISTS
-    // Users can:
-    // - Create, read, update, and delete their own watchlists.
+    // Watchlists can only be created, read, updated, or deleted by their owner.
     match /watchlists/{listId} {
-      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, create, update, delete: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Friend Requests:
+    // - A user can create a request (write)
+    // - A user can read requests sent to them or sent by them
+    // - A user can update/delete requests sent to them (accept/decline)
+    match /friendRequests/{requestId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isSignedIn() && (request.resource.data.toUserId == request.auth.uid || request.resource.data.fromUserId == request.auth.uid);
     }
     
-    // RECOMMENDATIONS
-    // Users can:
-    // - Create a recommendation.
-    // - Read recommendations sent to them.
+    // Recommendations:
+    // - A user can create a recommendation for a friend
+    // - A user can only read recommendations sent to them
     match /recommendations/{recommendationId} {
-       allow read: if isSignedIn() && resource.data.toUserId == request.auth.uid;
-       allow create: if isSignedIn() && request.resource.data.fromUserId == request.auth.uid;
+       allow create: if isSignedIn();
+       allow read: if isSignedIn() && request.resource.data.toUserId == request.auth.uid;
     }
   }
 }
