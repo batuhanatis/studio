@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
@@ -71,10 +72,13 @@ export default function ProfilePage() {
                         Create a free account to permanently save your watchlists, ratings, and recommendations.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                     <Button asChild size="lg">
                         <Link href="/register">Create Account</Link>
                     </Button>
+                    <div className="mt-4 rounded-md border border-dashed p-2 text-sm font-mono text-muted-foreground">
+                        Auth Durumu: 0
+                    </div>
                 </CardContent>
             </Card>
           </main>
@@ -111,6 +115,10 @@ export default function ProfilePage() {
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </Button>
+
+            <div className="mt-4 rounded-md border border-dashed p-2 text-sm font-mono text-muted-foreground">
+                Auth Durumu: 1
+            </div>
           </CardContent>
         </Card>
       </main>
