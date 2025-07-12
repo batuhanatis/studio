@@ -4,9 +4,8 @@ import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAyPvD9_qqD9_qqD8R3ljCAjF5oCAOJJnU320Xk",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyDFG320Xk-invalid",
   authDomain: "movie-finder-kqqse.firebaseapp.com",
-  databaseURL: "https://movie-finder-kqqse-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "movie-finder-kqqse",
   storageBucket: "movie-finder-kqqse.appspot.com",
   messagingSenderId: "226527022824",
