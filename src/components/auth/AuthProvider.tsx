@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -39,7 +40,6 @@ const createUserProfileDocument = async (firebaseUser: User) => {
 
       if (!snapshot.exists()) {
         const { uid, email, displayName, photoURL } = firebaseUser;
-        // Yeni kullanıcı için daha zengin bir profil belgesi oluşturuluyor
         await setDoc(userDocRef, {
           uid: uid,
           email: email,
@@ -48,15 +48,15 @@ const createUserProfileDocument = async (firebaseUser: User) => {
           displayName: displayName || "",
           photoURL: photoURL || "",
           bio: "",
-          watchlist: [], // Kullanıcının izleme listesi
+          watchlists: [], 
           friends: [],
+          activeBlendsWith: [],
           ratedMovies: [],
           watchedMovies: [],
           createdAt: serverTimestamp(),
         });
       } else {
         const data = snapshot.data();
-        // Eğer anonim kullanıcı kalıcı hale geliyorsa, bilgilerini güncelle
         if (data.isAnonymous && !firebaseUser.isAnonymous) {
           await updateDoc(userDocRef, {
             isAnonymous: false,
@@ -67,14 +67,13 @@ const createUserProfileDocument = async (firebaseUser: User) => {
         }
       }
 
-      return; // İşlem başarılı, döngüden çık
+      return;
     } catch (error: any) {
       attempts++;
       if (error.code === 'permission-denied' && attempts < maxAttempts) {
         console.warn(`Attempt ${attempts} failed: Permission denied. Retrying in ${attempts * 200}ms...`);
         await delay(attempts * 200);
       } else {
-        // Yeniden deneme limiti aşıldıysa veya başka bir hata varsa, hatayı fırlat
         throw error;
       }
     }
@@ -100,17 +99,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             description: 'Please check your Firestore rules and make sure they are published.',
             duration: 9000,
           });
-          // Profil oluşturulamasa bile kullanıcıyı ayarlamaya devam et
           setFirebaseUser(newFirebaseUser);
         } finally {
           setLoading(false);
         }
       } else {
-        // Giriş yapmış kullanıcı yoksa, anonim oturum aç
         setLoading(true);
         try {
           await signInAnonymously(auth);
-          // onAuthStateChanged tekrar tetiklenecek ve anonim kullanıcıyı işleyecek
         } catch (error) {
           console.error("Anonymous sign-in failed:", error);
           toast({
@@ -138,3 +134,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
+    
