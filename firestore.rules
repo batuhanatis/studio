@@ -1,57 +1,64 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- User Profiles ---
+    // Default deny all reads and writes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Allow users to read, update and delete their own profile
     match /users/{userId} {
-      // Allow users to read their own document completely.
-      allow read: if request.auth.uid == userId;
-      
-      // Allow users to create their own document.
-      allow create: if request.auth.uid == userId;
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
 
-      // Allow any authenticated user to read basic, non-sensitive fields.
-      allow get: if request.auth != null;
+      // Allow creating a user document
+      allow create: if request.auth != null;
 
-      // Allow a user to update their own document.
-      // Additionally, allow another user to update ONLY the 'activeBlendsWith' field
-      // if they are adding themselves to it. This is for accepting blend invites.
-      allow update: if request.auth.uid == userId ||
-                     (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeBlendsWith']) &&
-                      request.resource.data.activeBlendsWith == resource.data.activeBlendsWith.concat([request.auth.uid]));
+      // Allow a user to update their own document
+      // Also, allow another user to update this user's 'activeBlendsWith' list
+      // only if they are adding their own UID to it. This is for accepting blend requests.
+      allow update: if request.auth != null && 
+        (
+          // Case 1: Updating your own document
+          request.auth.uid == userId
+          ||
+          // Case 2: Another authenticated user is adding themselves to your activeBlendsWith list
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeBlendsWith']) &&
+            request.resource.data.activeBlendsWith == resource.data.activeBlendsWith.concat([request.auth.uid])
+          )
+        );
     }
     
-    // --- Friend Requests ---
-    match /friendRequests/{requestId} {
-      // Allow user to create requests for themselves.
-      allow create: if request.auth.uid == request.resource.data.fromUserId;
-      
-      // Allow user to read/delete requests sent to or from them.
-      allow read, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
-    }
-    
-    // --- Recommendations ---
-    match /recommendations/{recommendationId} {
-      // Allow user to create recommendations for others.
-      allow create: if request.auth.uid == request.resource.data.fromUserId;
-      
-      // Allow user to read/delete recommendations sent to them.
-      allow read, delete: if request.auth.uid == resource.data.toUserId;
-    }
-    
-    // --- Watchlists ---
+    // Allow users to manage their own watchlists
     match /watchlists/{listId} {
-        // A user can do anything with their own watchlist.
-        allow read, write, delete: if resource.data.userId == request.auth.uid;
+      allow read, create, update, delete: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
     
-    // --- Blend Requests ---
+    // Friend Requests
+    match /friendRequests/{requestId} {
+      // Allow creating a request if it's from the authenticated user
+      allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
+      // Allow reading/deleting a request if it was sent to or by the authenticated user
+      allow read, delete: if request.auth != null && (request.resource.data.toUserId == request.auth.uid || request.resource.data.fromUserId == request.auth.uid);
+    }
+    
+    // Recommendations
+    match /recommendations/{recommendationId} {
+        // Allow creating a recommendation if it's from the authenticated user
+        allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
+        // Allow reading recommendations sent to the authenticated user
+        allow read: if request.auth != null && resource.data.toUserId == request.auth.uid;
+    }
+
+    // Blend Requests
     match /blendRequests/{requestId} {
-      // Allow user to create requests for themselves.
-      allow create: if request.auth.uid == request.resource.data.fromUserId;
-      
-      // Allow user to read/delete requests sent to or from them.
-      allow read, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
+      allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
+      allow read, delete: if request.auth != null && (request.resource.data.toUserId == request.auth.uid || request.resource.data.fromUserId == request.auth.uid);
     }
   }
 }
+
+    

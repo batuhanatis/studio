@@ -227,15 +227,20 @@ export function FriendManager() {
     try {
         if (accept) {
             const batch = writeBatch(db);
-            // ONLY update the current user's document
-            batch.update(doc(db, 'users', firebaseUser.uid), { activeBlendsWith: arrayUnion(request.fromUserId) });
-            // The friend will have to accept on their end too, which is checked on the blend page.
-            // For now, we just delete the request. The other user will still see the request until they accept.
-            // A better system would be a shared blend document, but this works for now.
+
+            // Update both users' documents to establish the blend
+            const currentUserDocRef = doc(db, 'users', firebaseUser.uid);
+            const friendDocRef = doc(db, 'users', request.fromUserId);
+
+            batch.update(currentUserDocRef, { activeBlendsWith: arrayUnion(request.fromUserId) });
+            batch.update(friendDocRef, { activeBlendsWith: arrayUnion(firebaseUser.uid) });
+            
+            // Delete the processed request
             batch.delete(requestDocRef);
+            
             await batch.commit();
 
-            toast({ title: 'Blend Accepted!', description: `You can now try to view your Blend with ${request.fromUserEmail}. They must accept too!` });
+            toast({ title: 'Blend Accepted!', description: `You can now view your Blend with ${request.fromUserEmail}.` });
             router.push(`/blend/${request.fromUserId}`);
         } else {
             await deleteDoc(requestDocRef);
@@ -243,7 +248,7 @@ export function FriendManager() {
         }
     } catch (error: any) {
         console.error("Error processing blend invite", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to process Blend invite.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to process Blend invite. Check your Firestore rules.' });
     } finally {
         setLoading(prev => ({ ...prev, action: false }));
     }
@@ -347,5 +352,7 @@ export function FriendManager() {
     </div>
   );
 }
+
+    
 
     

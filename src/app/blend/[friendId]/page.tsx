@@ -39,6 +39,7 @@ export default function BlendPage() {
         if (!userDoc.exists()) {
           setIsAuthorized(false);
           setAuthMessage("Your profile could not be found.");
+          setCheckingAuth(false);
           return;
         }
 
@@ -47,7 +48,8 @@ export default function BlendPage() {
         const userHasBlend = Array.isArray(userData.activeBlendsWith) && userData.activeBlendsWith.includes(friendId);
         if (!userHasBlend) {
             setIsAuthorized(false);
-            setAuthMessage("You haven't accepted the Blend invite from this user yet.");
+            setAuthMessage("You don't have an active Blend with this user.");
+            setCheckingAuth(false);
             return;
         }
 
@@ -58,6 +60,7 @@ export default function BlendPage() {
         if (!friendDoc.exists()) {
             setIsAuthorized(false);
             setAuthMessage("Your friend's profile could not be found.");
+            setCheckingAuth(false);
             return;
         }
         
@@ -66,11 +69,12 @@ export default function BlendPage() {
         const friendHasBlend = Array.isArray(friendData.activeBlendsWith) && friendData.activeBlendsWith.includes(firebaseUser.uid);
         if (!friendHasBlend) {
             setIsAuthorized(false);
-            setAuthMessage("Your friend has not accepted your Blend invite yet.");
+            setAuthMessage("This Blend is not active on your friend's side yet.");
+            setCheckingAuth(false);
             return;
         }
 
-        // Both users have accepted.
+        // Both users have the blend active.
         setIsAuthorized(true);
       } catch (error) {
         console.error("Error checking blend authorization:", error);
@@ -104,12 +108,12 @@ export default function BlendPage() {
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 mb-6">
                 <Lock className="h-8 w-8 text-destructive" />
             </div>
-            <h1 className="text-3xl font-bold font-headline">Blend Not Ready</h1>
+            <h1 className="text-3xl font-bold font-headline">Blend Not Active</h1>
             <p className="mt-2 text-lg text-muted-foreground">
                 {authMessage}
             </p>
             <p className="text-muted-foreground">
-                Go to your Friends list to send or accept a Blend invite. Both users must accept the invite to see recommendations.
+                Go to your Friends list to send or accept a Blend invite. The Blend will be active once one person accepts the invite.
             </p>
             <Button asChild className="mt-6">
                 <Link href="/friends">Go to Friends</Link>
