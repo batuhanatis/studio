@@ -4,7 +4,7 @@ service firebase.storage {
   match /b/{bucket}/o {
     // The app does not use Storage, so deny all access by default.
     match /{allPaths=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }
