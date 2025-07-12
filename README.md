@@ -13,7 +13,7 @@ Follow these steps exactly to fix it:
 ### Step 1: Go to Your Firebase Project
 
 - Open the [Firebase Console](https://console.firebase.google.com/).
-- Select your project: **movie-finder-kqqse**.
+- Select your project: **watchme-b8338**.
 
 ### Step 2: Navigate to Firestore Rules
 

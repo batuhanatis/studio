@@ -32,14 +32,15 @@ import {
   getDocs
 } from "firebase/firestore";
 
-// Your web app's Firebase configuration, explicitly for movie-finder-kqqse
+// Your web app's Firebase configuration for watchme-b8338
 const firebaseConfig = {
-  apiKey: "AIzaSyAyPvD9_qqD8R3ljCAjF5oCAOJJnU320Xk",
-  authDomain: "movie-finder-kqqse.firebaseapp.com",
-  projectId: "movie-finder-kqqse",
-  storageBucket: "movie-finder-kqqse.appspot.com",
-  messagingSenderId: "226527022824",
-  appId: "1:226527022824:web:78c6557a8005dec26e435d"
+  apiKey: "AIzaSyAWmjaDJyPlr3ObiP2wKFxriNkNzA4f_DM",
+  authDomain: "watchme-b8338.firebaseapp.com",
+  projectId: "watchme-b8338",
+  storageBucket: "watchme-b8338.appspot.com",
+  messagingSenderId: "184640156630",
+  appId: "1:184640156630:web:e5a38718ee3f540e746a77",
+  measurementId: "G-ZM8DPW9F7T"
 };
 
 // Initialize Firebase App
