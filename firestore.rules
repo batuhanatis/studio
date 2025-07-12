@@ -2,39 +2,54 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Rule: Users can only manage their own profile.
-    // They can read and update it if they are the owner.
-    // They can create it if the new document's ID matches their own user ID.
+
+    // Helper function to check if a user is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the user is the owner of the document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // USERS
+    // Users can:
+    // - Create their own user document.
+    // - Read their own user document.
+    // - Update their own user document (e.g., add friends, rated movies).
     match /users/{userId} {
-      allow read, update: if request.auth.uid == userId;
-      allow create: if request.auth.uid == userId;
+      allow read, update, delete: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn();
     }
-    
-    // Rule: Users can manage their own watchlists.
-    // They can perform all actions on a watchlist if the document's `userId` field matches their user ID.
-    // They can create a new watchlist if they are logged in and the new list is for themselves.
-    match /watchlists/{listId} {
-      allow read, update, delete: if request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-    }
-    
-    // Rule: Users can manage friend requests they are involved in.
-    // They can read or delete a request if they are the sender or the receiver.
-    // Only the receiver can update the request (e.g., to change status to 'accepted').
-    // Any logged-in user can create a request, as long as they are the sender.
+
+    // FRIEND REQUESTS
+    // Users can:
+    // - Create a request (send one).
+    // - Read requests sent to them or by them.
+    // - Update requests sent to them (accept/decline).
+    // - Delete requests sent by them.
     match /friendRequests/{requestId} {
-      allow read, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
-      allow update: if request.auth.uid == resource.data.toUserId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+      allow read: if isSignedIn() && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.fromUserId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
+    }
+
+    // WATCHLISTS
+    // Users can:
+    // - Create, read, update, and delete their own watchlists.
+    match /watchlists/{listId} {
+      allow read, write: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
     
-    // Rule: Users can send recommendations and read recommendations sent to them.
-    // They can read a recommendation only if they are the recipient.
-    // Any logged-in user can create a recommendation for another user.
+    // RECOMMENDATIONS
+    // Users can:
+    // - Create a recommendation.
+    // - Read recommendations sent to them.
     match /recommendations/{recommendationId} {
-      allow read: if request.auth.uid == resource.data.toUserId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+       allow read: if isSignedIn() && resource.data.toUserId == request.auth.uid;
+       allow create: if isSignedIn() && request.resource.data.fromUserId == request.auth.uid;
     }
   }
 }
