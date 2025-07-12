@@ -32,7 +32,7 @@ import {
   getDocs
 } from "firebase/firestore";
 
-// Your web app's Firebase configuration
+// Your web app's Firebase configuration, explicitly for movie-finder-kqqse
 const firebaseConfig = {
   apiKey: "AIzaSyAyPvD9_qqD8R3ljCAjF5oCAOJJnU320Xk",
   authDomain: "movie-finder-kqqse.firebaseapp.com",
@@ -42,7 +42,8 @@ const firebaseConfig = {
   appId: "1:226527022824:web:78c6557a8005dec26e435d"
 };
 
-// Initialize Firebase
+// Initialize Firebase App
+// This pattern ensures that Firebase is initialized only once.
 let app: FirebaseApp;
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
@@ -50,8 +51,13 @@ if (!getApps().length) {
   app = getApp();
 }
 
+// Get Auth instance
 const auth = getAuth(app);
+
+// Get Firestore instance - This specifically connects to the (default) Cloud Firestore database.
 const db = getFirestore(app);
+
+// Initialize other Firebase services
 const googleProvider = new GoogleAuthProvider();
 
 export { 
