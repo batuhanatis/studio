@@ -3,13 +3,13 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, Mail, LogOut, User } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { signOut } from 'firebase/auth';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -18,6 +18,19 @@ export default function ProfilePage() {
   const { firebaseUser, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const [authStatus, setAuthStatus] = useState('Checking auth state...');
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setAuthStatus(`Kullanıcı giriş yaptı: ${user.uid} (Anonymous: ${user.isAnonymous})`);
+      } else {
+        setAuthStatus("Giriş yapan kullanıcı yok");
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (loading) return;
@@ -29,8 +42,6 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      // After logout, AuthProvider will automatically create a new anonymous session
-      // and redirect to /search.
       router.push('/search');
     } catch (error) {
       toast({
@@ -77,7 +88,7 @@ export default function ProfilePage() {
                         <Link href="/register">Create Account</Link>
                     </Button>
                     <div className="mt-4 rounded-md border border-dashed p-2 text-sm font-mono text-muted-foreground">
-                        Auth Durumu: 0
+                        {authStatus}
                     </div>
                 </CardContent>
             </Card>
@@ -117,7 +128,7 @@ export default function ProfilePage() {
             </Button>
 
             <div className="mt-4 rounded-md border border-dashed p-2 text-sm font-mono text-muted-foreground">
-                Auth Durumu: 1
+                {authStatus}
             </div>
           </CardContent>
         </Card>
