@@ -1,4 +1,3 @@
-
 'use client';
 
 // This component is a direct wrapper for FriendManager.

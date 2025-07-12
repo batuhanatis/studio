@@ -158,7 +158,7 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
               <p className="font-semibold text-lg text-foreground">No friends yet!</p>
               <p>Add friends to share movies with them.</p>
               <Button asChild className="mt-4" onClick={() => setIsOpen(false)}>
-                  <Link href="/friends">
+                  <Link href="/profile">
                       <UserPlus className="mr-2 h-4 w-4" />
                       Add Friends
                   </Link>

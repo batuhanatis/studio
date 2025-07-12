@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -79,6 +78,11 @@ export function ProfileBlends() {
                     Go to the Friends tab to send a Blend invite to a friend. Once they accept, your blend will appear here.
                 </CardDescription>
             </CardHeader>
+            <CardContent>
+                <Button asChild>
+                    <Link href="/profile">Go to Friends</Link>
+                </Button>
+            </CardContent>
         </Card>
     );
   }

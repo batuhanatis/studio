@@ -3,7 +3,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Film, Users, Gift, Compass, Sparkles, List, Menu, User, LogIn } from 'lucide-react';
+import { Film, Compass, Sparkles, List, Menu, User, LogIn } from 'lucide-react';
 import Link from 'next/link';
 import {
   Sheet,
@@ -53,6 +53,12 @@ export function Header() {
   const navLinks = (
     <>
       <Button asChild variant="ghost" size="sm">
+        <Link href="/search">
+          <Film className="mr-2 h-4 w-4" />
+          Search
+        </Link>
+      </Button>
+      <Button asChild variant="ghost" size="sm">
         <Link href="/discover">
           <Compass className="mr-2 h-4 w-4" />
           Discover
@@ -76,6 +82,12 @@ export function Header() {
 
   const mobileNavLinks = (
     <nav className="flex flex-col gap-2">
+        <SheetClose asChild>
+            <Link href="/search" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+                <Film className="h-5 w-5" />
+                <span className="font-medium">Search</span>
+            </Link>
+        </SheetClose>
         <SheetClose asChild>
             <Link href="/discover" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
                 <Compass className="h-5 w-5" />
