@@ -20,6 +20,7 @@ export default function BlendPage() {
   const friendId = params.friendId as string;
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authMessage, setAuthMessage] = useState('Verifying Blend...');
 
   useEffect(() => {
     if (authLoading) return;
@@ -30,20 +31,51 @@ export default function BlendPage() {
 
     const checkBlendAuthorization = async () => {
       try {
+        setCheckingAuth(true);
+        setAuthMessage('Checking your profile...');
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          // A blend is authorized if the friendId is in the user's `activeBlendsWith` array.
-          if (Array.isArray(userData.activeBlendsWith) && userData.activeBlendsWith.includes(friendId)) {
-            setIsAuthorized(true);
-          } else {
-            setIsAuthorized(false);
-          }
+        
+        if (!userDoc.exists()) {
+          setIsAuthorized(false);
+          setAuthMessage("Your profile could not be found.");
+          return;
         }
+
+        const userData = userDoc.data();
+        // Check if the current user has an active blend with the friend.
+        const userHasBlend = Array.isArray(userData.activeBlendsWith) && userData.activeBlendsWith.includes(friendId);
+        if (!userHasBlend) {
+            setIsAuthorized(false);
+            setAuthMessage("You haven't accepted the Blend invite from this user yet.");
+            return;
+        }
+
+        setAuthMessage(`Checking your friend's profile...`);
+        const friendDocRef = doc(db, 'users', friendId);
+        const friendDoc = await getDoc(friendDocRef);
+
+        if (!friendDoc.exists()) {
+            setIsAuthorized(false);
+            setAuthMessage("Your friend's profile could not be found.");
+            return;
+        }
+        
+        const friendData = friendDoc.data();
+        // Check if the friend also has an active blend with the current user. This confirms mutual agreement.
+        const friendHasBlend = Array.isArray(friendData.activeBlendsWith) && friendData.activeBlendsWith.includes(firebaseUser.uid);
+        if (!friendHasBlend) {
+            setIsAuthorized(false);
+            setAuthMessage("Your friend has not accepted your Blend invite yet.");
+            return;
+        }
+
+        // Both users have accepted.
+        setIsAuthorized(true);
       } catch (error) {
         console.error("Error checking blend authorization:", error);
         setIsAuthorized(false);
+        setAuthMessage("An error occurred while verifying the Blend.");
       } finally {
         setCheckingAuth(false);
       }
@@ -58,7 +90,7 @@ export default function BlendPage() {
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="text-muted-foreground">Verifying Blend...</p>
+          <p className="text-muted-foreground">{authMessage}</p>
         </div>
       </div>
     );
@@ -72,12 +104,12 @@ export default function BlendPage() {
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10 mb-6">
                 <Lock className="h-8 w-8 text-destructive" />
             </div>
-            <h1 className="text-3xl font-bold font-headline">Access Denied</h1>
+            <h1 className="text-3xl font-bold font-headline">Blend Not Ready</h1>
             <p className="mt-2 text-lg text-muted-foreground">
-                You don't have an active Blend with this user.
+                {authMessage}
             </p>
             <p className="text-muted-foreground">
-                Go to your Friends list to send or accept a Blend invite.
+                Go to your Friends list to send or accept a Blend invite. Both users must accept the invite to see recommendations.
             </p>
             <Button asChild className="mt-6">
                 <Link href="/friends">Go to Friends</Link>
