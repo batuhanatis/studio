@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -69,18 +70,6 @@ export function Header() {
           Watchlists
         </Link>
       </Button>
-      <Button asChild variant="ghost" size="sm">
-        <Link href="/recommendations">
-          <Gift className="mr-2 h-4 w-4" />
-          Recommendations
-        </Link>
-      </Button>
-      <Button asChild variant="ghost" size="sm">
-        <Link href="/friends">
-          <Users className="mr-2 h-4 w-4" />
-          Friends
-        </Link>
-      </Button>
       {authNav}
     </>
   );
@@ -103,18 +92,6 @@ export function Header() {
             <Link href="/watchlists" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
                 <List className="h-5 w-5" />
                 <span className="font-medium">Watchlists</span>
-            </Link>
-        </SheetClose>
-        <SheetClose asChild>
-            <Link href="/recommendations" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
-                <Gift className="h-5 w-5" />
-                <span className="font-medium">Recommendations</span>
-            </Link>
-        </SheetClose>
-        <SheetClose asChild>
-            <Link href="/friends" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
-                <Users className="h-5 w-5" />
-                <span className="font-medium">Friends</span>
             </Link>
         </SheetClose>
         {mobileAuthNav}
