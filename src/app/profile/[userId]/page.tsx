@@ -4,9 +4,9 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader2, User, LogOut, Star, Users, Gift, Combine, ArrowLeft } from 'lucide-react';
+import { Loader2, User, LogOut, Star, Users, Gift, Combine, ArrowLeft, Tv, Clapperboard, Check } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
@@ -18,11 +18,15 @@ import { ProfileRatings } from '@/components/profile/ProfileRatings';
 import { ProfileFriends } from '@/components/profile/ProfileFriends';
 import { ProfileRecommendations } from '@/components/profile/ProfileRecommendations';
 import { ProfileBlends } from '@/components/profile/ProfileBlends';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface UserProfileData {
     username?: string;
     email?: string;
+    photoURL?: string;
     ratedMovies?: any[];
+    watchedMovies?: any[];
     friends?: string[];
     activeBlendsWith?: string[];
 }
@@ -112,27 +116,31 @@ export default function ProfilePage() {
         <div className="min-h-screen w-full bg-background">
           <Header />
           <main className="container mx-auto max-w-2xl px-4 py-16">
-            <div className="text-center">
+            <Card className="text-center p-8">
                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
                     <User className="h-8 w-8 text-primary" />
                 </div>
-                <h1 className="text-2xl font-bold font-headline">You are browsing as a guest</h1>
-                <p className="mt-2 text-lg text-muted-foreground">
+                <CardTitle className="text-2xl font-bold font-headline">You are browsing as a guest</CardTitle>
+                <CardDescription className="mt-2 text-lg text-muted-foreground">
                     Create a free account to get a profile, save your watchlists, ratings, and recommendations permanently.
-                </p>
+                </CardDescription>
                 <Button asChild size="lg" className="mt-6">
                     <Link href="/register">Create Account</Link>
                 </Button>
-            </div>
+            </Card>
           </main>
         </div>
       );
   }
 
+  const ratedMovieCount = profileData?.ratedMovies?.filter(m => m.mediaType === 'movie').length || 0;
+  const ratedTvCount = profileData?.ratedMovies?.filter(m => m.mediaType === 'tv').length || 0;
+  const watchedCount = profileData?.watchedMovies?.length || 0;
+
   return (
     <div className="min-h-screen w-full bg-background">
       <Header />
-      <main className="container mx-auto max-w-7xl px-4 py-8">
+      <main className="container mx-auto max-w-5xl px-4 py-8">
         {!isOwnProfile && (
              <div className="mb-4">
                 <Button asChild variant="outline" size="sm" onClick={() => router.back()}>
@@ -140,17 +148,24 @@ export default function ProfilePage() {
                 </Button>
              </div>
         )}
-        <div className="flex flex-col md:flex-row items-start gap-8">
-            <div className="flex-shrink-0 flex flex-col items-center md:items-start text-center md:text-left w-full md:w-64">
-                <Avatar className="h-28 w-28 text-5xl">
+        <div className="flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-12">
+            <div className="flex-shrink-0 flex flex-col items-center w-full md:w-64">
+                <Avatar className="h-32 w-32 text-5xl border-4 border-primary/20">
+                    {profileData?.photoURL && <AvatarImage src={profileData.photoURL} alt={profileData.username || profileData.email} />}
                     <AvatarFallback>{getInitials(profileData?.email)}</AvatarFallback>
                 </Avatar>
-                <h1 className="mt-4 text-2xl font-bold font-headline">{profileData?.username || profileData?.email}</h1>
+                <h1 className="mt-4 text-3xl font-bold font-headline">{profileData?.username || profileData?.email}</h1>
                 <p className="text-muted-foreground">{profileData?.email}</p>
-                 <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
-                    <div><span className="font-bold text-foreground">{profileData?.ratedMovies?.length || 0}</span> Ratings</div>
-                    {isOwnProfile && <div><span className="font-bold text-foreground">{profileData?.friends?.length || 0}</span> Friends</div>}
-                 </div>
+                 
+                <Card className="w-full mt-6 text-sm">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Clapperboard /> Movies Rated</span> <Badge variant="secondary">{ratedMovieCount}</Badge></div>
+                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Tv /> TV Shows Rated</span> <Badge variant="secondary">{ratedTvCount}</Badge></div>
+                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Check /> Items Watched</span> <Badge variant="secondary">{watchedCount}</Badge></div>
+                    {isOwnProfile && <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Users /> Friends</span> <Badge variant="secondary">{profileData?.friends?.length || 0}</Badge></div>}
+                  </CardContent>
+                </Card>
+
                 {isOwnProfile && (
                     <Button variant="outline" onClick={handleLogout} className="mt-6 w-full">
                         <LogOut className="mr-2 h-4 w-4" />
@@ -163,7 +178,7 @@ export default function ProfilePage() {
                     <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1'}`}>
                         <TabsTrigger value="ratings"><Star className="mr-2 h-4 w-4" />Ratings</TabsTrigger>
                         {isOwnProfile && <TabsTrigger value="friends"><Users className="mr-2 h-4 w-4" />Friends</TabsTrigger>}
-                        {isOwnProfile && <TabsTrigger value="recommendations"><Gift className="mr-2 h-4 w-4" />Recommendations</TabsTrigger>}
+                        {isOwnProfile && <TabsTrigger value="recommendations"><Gift className="mr-2 h-4 w-4" />For You</TabsTrigger>}
                         {isOwnProfile && <TabsTrigger value="blends"><Combine className="mr-2 h-4 w-4" />Blends</TabsTrigger>}
                     </TabsList>
                     <TabsContent value="ratings" className="mt-6">

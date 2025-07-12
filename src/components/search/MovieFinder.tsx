@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, Keyboard, Film, Star } from 'lucide-react';
+import { Loader2, Search, Keyboard, Film, Star, Sparkles } from 'lucide-react';
 import { MovieResultCard } from './MovieResultCard';
 
 interface SearchResult {
@@ -77,7 +77,21 @@ export function MovieFinder() {
       if (authLoading) return;
       setLoadingRecs(true);
       if (!firebaseUser) {
-        setLoadingRecs(false);
+        // For guests, show trending movies
+        try {
+            const res = await fetch(`https://api.themoviedb.org/3/trending/all/week?api_key=${API_KEY}`, { signal });
+            if (!res.ok) throw new Error('Could not fetch trending.');
+            const data = await res.json();
+            if (signal.aborted) return;
+            const trendingItems = (data.results || [])
+              .filter((item: any) => item.poster_path && (item.media_type === 'movie' || item.media_type === 'tv'))
+              .slice(0, 10);
+            setRecommendations(trendingItems);
+        } catch (error) {
+            if (!signal.aborted) setRecommendations([]);
+        } finally {
+            if (!signal.aborted) setLoadingRecs(false);
+        }
         return;
       }
       
@@ -235,16 +249,16 @@ export function MovieFinder() {
       return (
         <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p>Loading recommendations for you...</p>
+          <p>Loading great things for you...</p>
         </div>
       );
     }
     
     if (recommendations.length > 0) {
       return (
-        <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h2 className="text-2xl font-bold font-headline">Recommended For You</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <h2 className="text-2xl font-bold font-headline flex items-center gap-2"><Sparkles className="text-accent" /> {firebaseUser && !firebaseUser.isAnonymous ? "Recommended For You" : "Trending This Week"}</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {recommendations.map((item) => (
                 <MovieResultCard
                     key={item.id}
@@ -259,10 +273,10 @@ export function MovieFinder() {
     }
 
     return (
-      <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-        <Star className="h-16 w-16" />
-        <p className="text-lg">Welcome to Movie Finder!</p>
-        <p className="text-sm">Go to the Discover page to rate movies and get personalized recommendations.</p>
+      <div className="pt-16 text-center text-muted-foreground flex flex-col items-center gap-4">
+        <Star className="h-16 w-16 text-accent/30" />
+        <p className="text-lg font-medium text-foreground">Welcome to WatchMe!</p>
+        <p className="max-w-md">Go to the Discover page to start rating movies and shows. Your ratings will help us recommend titles you'll love.</p>
       </div>
     );
   };
@@ -280,20 +294,20 @@ export function MovieFinder() {
     const trimmedQuery = query.trim();
     if (hasSearched && trimmedQuery.length > 0 && trimmedQuery.length < 3) {
         return (
-             <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-               <Keyboard className="h-16 w-16" />
-               <p className="text-lg">Keep typing...</p>
-               <p className="text-sm">Enter at least 3 characters to see results.</p>
+             <div className="pt-16 text-center text-muted-foreground flex flex-col items-center gap-4">
+               <Keyboard className="h-16 w-16 text-muted-foreground/30" />
+               <p className="text-lg font-medium text-foreground">Keep typing...</p>
+               <p>Enter at least 3 characters to see results.</p>
              </div>
         );
     }
     
     if (hasSearched && !isLoading && results.length === 0 && trimmedQuery.length >= 3) {
       return (
-         <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-            <Search className="h-16 w-16" />
-           <p className="text-lg">No results found for &quot;{query}&quot;.</p>
-           <p className="text-sm">Try a different search term.</p>
+         <div className="pt-16 text-center text-muted-foreground flex flex-col items-center gap-4">
+            <Search className="h-16 w-16 text-muted-foreground/30" />
+           <p className="text-lg font-medium text-foreground">No results found for &quot;{query}&quot;.</p>
+           <p>Try a different search term.</p>
          </div>
       );
     }
@@ -302,24 +316,24 @@ export function MovieFinder() {
 
   return (
     <div className="flex flex-col items-center gap-8">
-      <div className="w-full text-left sm:text-center">
-        <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
+      <div className="w-full text-center max-w-2xl">
+        <h1 className="text-4xl font-bold font-headline tracking-tight md:text-5xl">
           Find Movies & TV Shows
         </h1>
-        <p className="mt-2 text-lg text-muted-foreground">
-          Discover where to watch your favorite movies and series.
+        <p className="mt-4 text-lg text-muted-foreground">
+          Discover where to watch your favorite movies and series, get recommendations, and share them with friends.
         </p>
       </div>
 
       <form onSubmit={(e) => e.preventDefault()} className="w-full max-w-2xl">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Start typing to search..."
+            placeholder="Search for titles like 'Inception', 'The Office'..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-12 w-full rounded-full bg-card py-3 pl-10 pr-4 text-base shadow-sm"
+            className="h-14 w-full rounded-full bg-card py-3 pl-12 pr-4 text-base shadow-lg shadow-black/20"
           />
         </div>
       </form>
@@ -329,7 +343,7 @@ export function MovieFinder() {
 
       {results.length > 0 && !isLoading && (
         <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {results.map((item) => (
                 <MovieResultCard
                     key={item.id}

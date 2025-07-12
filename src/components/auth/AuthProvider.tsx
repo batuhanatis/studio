@@ -44,7 +44,7 @@ const createUserProfileDocument = async (firebaseUser: User) => {
           uid: uid,
           email: email,
           isAnonymous: firebaseUser.isAnonymous,
-          username: "batuhanatis", // Varsayılan bir kullanıcı adı
+          username: email?.split('@')[0] || `user_${uid.substring(0,6)}`,
           displayName: displayName || "",
           photoURL: photoURL || "",
           bio: "",
@@ -134,5 +134,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
-
-    

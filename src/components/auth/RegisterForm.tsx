@@ -9,7 +9,6 @@ import { auth, googleProvider, db, linkWithCredential, linkWithPopup, EmailAuthP
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
-import { sendEmailVerification } from 'firebase/auth';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -41,7 +40,6 @@ const formSchema = z.object({
   }),
 });
 
-// Simple inline SVG for Google's G logo
 const GoogleIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20px" height="20px">
         <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
@@ -79,12 +77,11 @@ export function RegisterForm() {
       const userDocRef = doc(db, 'users', auth.currentUser.uid);
       await updateDoc(userDocRef, { email: values.email, isAnonymous: false });
       
-      // We don't need to ask for verification anymore, just send them to the app.
       toast({
         title: 'Account Created!',
         description: 'Your progress is now saved to your new account.',
       });
-      router.push('/search'); // Redirect to search page
+      router.push('/search');
     } catch (error: any) {
       let title = 'Registration Failed';
       let description = 'An unexpected error occurred. Please try again.';
@@ -113,7 +110,7 @@ export function RegisterForm() {
     try {
         const result = await linkWithPopup(auth.currentUser, googleProvider);
         const userDocRef = doc(db, 'users', result.user.uid);
-        await updateDoc(userDocRef, { email: result.user.email, isAnonymous: false });
+        await updateDoc(userDocRef, { email: result.user.email, isAnonymous: false, photoURL: result.user.photoURL });
         toast({ title: 'Account Created!', description: 'Your progress is now saved to your Google account.' });
         router.push('/search');
     } catch (error: any) {
@@ -136,62 +133,64 @@ export function RegisterForm() {
   }
 
   return (
-    <Card className="shadow-lg">
+    <Card className="shadow-2xl shadow-black/25 border-border/50">
       <CardHeader className="items-center text-center">
         <div className="mb-4 rounded-full bg-primary/10 p-4 text-primary">
           <Clapperboard className="h-10 w-10" />
         </div>
         <CardTitle className="text-2xl font-headline">Save Your Progress</CardTitle>
-        <CardDescription>Create a permanent account to save your watchlists and ratings.</CardDescription>
+        <CardDescription>Create a free account to save your watchlists and ratings permanently.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="you@example.com" {...field} disabled={isLoading || isGoogleLoading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} disabled={isLoading || isGoogleLoading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
+         <div className="space-y-4">
+             <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isLoading || isGoogleLoading}>
+                {isGoogleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon />}
+                Continue with Google
             </Button>
-          </form>
-        </Form>
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">
-              Or with
-            </span>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isLoading || isGoogleLoading}>
-            {isGoogleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon />}
-            Google
-        </Button>
+            <div className="relative my-2">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border/50" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">
+                  Or with your email
+                </span>
+              </div>
+            </div>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="you@example.com" {...field} disabled={isLoading || isGoogleLoading} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} disabled={isLoading || isGoogleLoading} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
+                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Create Account'}
+                </Button>
+              </form>
+            </Form>
+         </div>
       </CardContent>
       <CardFooter className="flex justify-center">
         <p className="text-sm text-muted-foreground">

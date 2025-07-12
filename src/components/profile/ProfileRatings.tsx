@@ -12,6 +12,7 @@ import {
   CardContent,
 } from '@/components/ui/card';
 import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
 
 
 interface RatedMovie {
@@ -76,26 +77,35 @@ export function ProfileRatings({ userId }: ProfileRatingsProps) {
 
   if (ratedMovies.length === 0) {
     return (
-      <div className="text-center py-10">
-        <p className="text-muted-foreground">No ratings yet.</p>
-        <p className="text-sm text-muted-foreground">Go to Discover to start rating movies and shows!</p>
-        <Button asChild className="mt-4">
-            <Link href="/discover">Discover</Link>
-        </Button>
-      </div>
+      <Card className="text-center py-10 flex flex-col items-center justify-center">
+        <CardHeader>
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
+                <Star className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle>No Ratings Yet</CardTitle>
+            <CardDescription>
+                Go to the Discover page to start rating movies and shows!
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button asChild>
+                <Link href="/discover">Start Rating</Link>
+            </Button>
+        </CardContent>
+    </Card>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4">
       {ratedMovies.map((movie) => {
         const posterUrl = movie.poster
           ? `https://image.tmdb.org/t/p/w500${movie.poster}`
           : 'https://placehold.co/500x750.png';
-        const href = `/search/${movie.mediaType}/${movie.movieId}?title=${encodeURIComponent(movie.title)}`;
+        const href = `/search/${movie.mediaType}/${movie.movieId}`;
 
         return (
-          <Link href={href} key={movie.movieId}>
+          <Link href={href} key={`${movie.movieId}-${movie.mediaType}`}>
             <Card className="overflow-hidden group relative">
                 <div className="aspect-[2/3] w-full bg-muted">
                     <Image
@@ -108,10 +118,13 @@ export function ProfileRatings({ userId }: ProfileRatingsProps) {
                     />
                 </div>
                 <div className="absolute top-2 right-2">
-                    <Badge variant="destructive" className="flex items-center gap-1">
-                        <Star className="h-3 w-3" /> {movie.rating}
+                    <Badge variant="destructive" className="flex items-center gap-1 text-base bg-black/70 backdrop-blur-sm border-accent/50 text-accent font-bold">
+                        <Star className="h-4 w-4 fill-accent" /> {movie.rating}
                     </Badge>
                 </div>
+                 <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/90 to-transparent p-3 flex items-end">
+                    <h3 className="text-white font-bold text-lg leading-tight line-clamp-2">{movie.title}</h3>
+                 </div>
             </Card>
           </Link>
         );
@@ -119,4 +132,3 @@ export function ProfileRatings({ userId }: ProfileRatingsProps) {
     </div>
   );
 }
-
