@@ -185,7 +185,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
           {watchlist.movies.map((item) => (
             <MovieResultCard
               key={item.id}
-              item={{...item, poster_path: item.poster, name: item.title, popularity: item.popularity || 0, genre_ids: []}}
+              item={{...item, poster_path: item.poster || item.poster_path, name: item.title, popularity: item.popularity || 0, genre_ids: []}}
               isWatched={watchedIds.has(String(item.id))}
               onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
             />
