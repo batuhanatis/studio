@@ -3,62 +3,77 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+  
+    function isSignedIn() {
+      return request.auth != null;
+    }
     
-    // Default deny all reads and writes
-    match /{document=**} {
-      allow read, write: if false;
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
 
-    // Allow users to read, update and delete their own profile
+    // A user can read another user's profile IF they are friends.
+    function areFriends(otherUserId) {
+        return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.friends.hasAny([otherUserId])
+    }
+    
     match /users/{userId} {
-      allow read, delete: if request.auth != null && request.auth.uid == userId;
-
-      // Allow creating a user document
-      allow create: if request.auth != null;
-
-      // Allow a user to update their own document
-      // Also, allow another user to update this user's 'activeBlendsWith' list
-      // only if they are adding their own UID to it. This is for accepting blend requests.
-      allow update: if request.auth != null && 
-        (
-          // Case 1: Updating your own document
-          request.auth.uid == userId
-          ||
-          // Case 2: Another authenticated user is adding themselves to your activeBlendsWith list
-          (
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeBlendsWith']) &&
-            request.resource.data.activeBlendsWith == resource.data.activeBlendsWith.concat([request.auth.uid])
-          )
-        );
+      // Allow create for any authenticated user (including anonymous)
+      allow create: if isSignedIn();
+      
+      // Allow read only if it's the owner OR if they are friends.
+      allow read: if isOwner(userId) || areFriends(userId);
+      
+      // Allow updates only by the owner
+      allow update: if isOwner(userId);
+      
+      // Users cannot be deleted
+      allow delete: if false;
     }
     
-    // Allow users to manage their own watchlists
     match /watchlists/{listId} {
-      allow read, create, update, delete: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        allow read, write: if isSignedIn() && isOwner(resource.data.userId);
     }
     
-    // Friend Requests
-    match /friendRequests/{requestId} {
-      // Allow creating a request if it's from the authenticated user
-      allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
-      // Allow reading/deleting a request if it was sent to or by the authenticated user
-      allow read, delete: if request.auth != null && (request.resource.data.toUserId == request.auth.uid || request.resource.data.fromUserId == request.auth.uid);
+    match /recommendations/{recId} {
+        // Allow creating a recommendation if you are the sender
+        allow create: if isSignedIn() && isOwner(request.resource.data.fromUserId);
+        
+        // Allow reading a recommendation if you are the recipient
+        allow read: if isSignedIn() && isOwner(resource.data.toUserId);
+        
+        // No one can update, recipient deletes
+        allow update: if false;
+        allow delete: if isSignedIn() && isOwner(resource.data.toUserId);
     }
     
-    // Recommendations
-    match /recommendations/{recommendationId} {
-        // Allow creating a recommendation if it's from the authenticated user
-        allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
-        // Allow reading recommendations sent to the authenticated user
-        allow read: if request.auth != null && resource.data.toUserId == request.auth.uid;
+    match /friendRequests/{reqId} {
+        // Allow creating a request if you are the sender
+        allow create: if isSignedIn() && isOwner(request.resource.data.fromUserId);
+        
+        // Allow reading if you are the sender or receiver
+        allow read: if isSignedIn() && (isOwner(resource.data.fromUserId) || isOwner(resource.data.toUserId));
+        
+        // Allow deleting if you are the sender (cancel) or receiver (decline)
+        allow delete: if isSignedIn() && (isOwner(resource.data.fromUserId) || isOwner(resource.data.toUserId));
+        
+        // No updates allowed
+        allow update: if false;
     }
 
-    // Blend Requests
-    match /blendRequests/{requestId} {
-      allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
-      allow read, delete: if request.auth != null && (request.resource.data.toUserId == request.auth.uid || request.resource.data.fromUserId == request.auth.uid);
+    match /blendRequests/{reqId} {
+        // Allow creating a request if you are the sender
+        allow create: if isSignedIn() && isOwner(request.resource.data.fromUserId);
+        
+        // Allow reading if you are the sender or receiver
+        allow read: if isSignedIn() && (isOwner(resource.data.fromUserId) || isOwner(resource.data.toUserId));
+
+        // Allow deleting if you are the sender or receiver
+        allow delete: if isSignedIn() && (isOwner(resource.data.fromUserId) || isOwner(resource.data.toUserId));
+        
+        // No updates allowed, this is handled by the batch write in FriendManager
+        allow update: if false;
     }
   }
 }
-
-    

@@ -225,27 +225,25 @@ export function FriendManager() {
     setLoading(prev => ({ ...prev, action: true }));
     const requestDocRef = doc(db, 'blendRequests', request.id);
     try {
-        if (accept) {
-            const batch = writeBatch(db);
-
-            // Update both users' documents to establish the blend
-            const currentUserDocRef = doc(db, 'users', firebaseUser.uid);
-            const friendDocRef = doc(db, 'users', request.fromUserId);
-
-            batch.update(currentUserDocRef, { activeBlendsWith: arrayUnion(request.fromUserId) });
-            batch.update(friendDocRef, { activeBlendsWith: arrayUnion(firebaseUser.uid) });
-            
-            // Delete the processed request
-            batch.delete(requestDocRef);
-            
-            await batch.commit();
-
-            toast({ title: 'Blend Accepted!', description: `You can now view your Blend with ${request.fromUserEmail}.` });
-            router.push(`/blend/${request.fromUserId}`);
-        } else {
-            await deleteDoc(requestDocRef);
-            toast({ title: 'Declined', description: `You declined the Blend invite.` });
-        }
+      if (accept) {
+        const batch = writeBatch(db);
+  
+        const currentUserDocRef = doc(db, 'users', firebaseUser.uid);
+        const friendDocRef = doc(db, 'users', request.fromUserId);
+  
+        batch.update(currentUserDocRef, { activeBlendsWith: arrayUnion(request.fromUserId) });
+        batch.update(friendDocRef, { activeBlendsWith: arrayUnion(firebaseUser.uid) });
+        
+        batch.delete(requestDocRef);
+        
+        await batch.commit();
+  
+        toast({ title: 'Blend Accepted!', description: `You can now view your Blend with ${request.fromUserEmail}.` });
+        router.push(`/blend/${request.fromUserId}`);
+      } else {
+        await deleteDoc(requestDocRef);
+        toast({ title: 'Declined', description: `You declined the Blend invite.` });
+      }
     } catch (error: any) {
         console.error("Error processing blend invite", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to process Blend invite. Check your Firestore rules.' });
@@ -323,8 +321,10 @@ export function FriendManager() {
               <ul className="space-y-3">
                 {friends.map((friend) => (
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
-                    <Avatar><AvatarFallback>{getInitials(friend.email)}</AvatarFallback></Avatar>
-                    <span className="font-medium">{friend.email}</span>
+                    <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
+                        <Avatar><AvatarFallback>{getInitials(friend.email)}</AvatarFallback></Avatar>
+                        <span className="font-medium">{friend.email}</span>
+                    </Link>
                     <div className="ml-auto">
                         {hasActiveBlendWith(friend.uid) ? (
                              <Button asChild size="sm">
@@ -352,7 +352,3 @@ export function FriendManager() {
     </div>
   );
 }
-
-    
-
-    

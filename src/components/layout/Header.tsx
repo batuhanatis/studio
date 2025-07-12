@@ -27,7 +27,7 @@ export function Header() {
     </Button>
   ) : (
     <Button asChild variant="ghost" size="sm">
-      <Link href="/profile">
+      <Link href={`/profile/${firebaseUser?.uid}`}>
         <User className="mr-2 h-4 w-4" />
         Profile
       </Link>
@@ -43,7 +43,7 @@ export function Header() {
     </SheetClose>
   ) : (
     <SheetClose asChild>
-      <Link href="/profile" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
+      <Link href={`/profile/${firebaseUser?.uid}`} className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-accent">
         <User className="h-5 w-5" />
         <span className="font-medium">Profile</span>
       </Link>
