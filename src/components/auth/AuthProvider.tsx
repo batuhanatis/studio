@@ -183,11 +183,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       where('toUserId', '==', firebaseUser.uid),
       where('status', '==', 'pending')
     );
-    // New query to check for unread messages in chats
+
     const chatsQuery = query(
-      collection(db, 'chats'),
-      where('users', 'array-contains', firebaseUser.uid),
-      where('lastMessage.readBy', 'array-contains-any', [firebaseUser.uid, 'read-by-no-one'])
+        collection(db, 'chats'),
+        where('users', 'array-contains', firebaseUser.uid)
     );
 
     let friendRequestCount = 0;
@@ -211,9 +210,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     unsubscribers.push(blendUnsub);
 
     const chatsUnsub = onSnapshot(chatsQuery, (snapshot) => {
-        // We only count chats where the last message was NOT sent by the current user.
-        unreadChatsCount = snapshot.docs.filter(d => d.data().lastMessage?.senderId !== firebaseUser.uid).length;
+        unreadChatsCount = 0;
+        snapshot.docs.forEach(d => {
+            const chatData = d.data();
+            const lastMessage = chatData.lastMessage;
+            if (lastMessage && lastMessage.senderId !== firebaseUser.uid) {
+                if (!lastMessage.readBy || !lastMessage.readBy.includes(firebaseUser.uid)) {
+                    unreadChatsCount++;
+                }
+            }
+        });
         updateTotal();
+    }, (error) => {
+      console.error("Chat notification listener error: ", error);
     });
     unsubscribers.push(chatsUnsub);
 
