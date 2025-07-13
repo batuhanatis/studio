@@ -17,9 +17,11 @@ import {
   onSnapshot,
   type Unsubscribe,
   type User,
+  deleteDoc,
+  deleteUser
 } from '@/lib/firebase';
 
-import { createContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useEffect, useState, type ReactNode, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
@@ -94,6 +96,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [notificationCount, setNotificationCount] = useState(0);
   const { toast } = useToast();
+  const userRef = useRef<User | null>(null);
+
+  useEffect(() => {
+    userRef.current = firebaseUser;
+  }, [firebaseUser]);
+
+  useEffect(() => {
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      if (userRef.current && userRef.current.isAnonymous) {
+        try {
+          // This is often not guaranteed to run, but it's the best client-side effort.
+          // A more robust solution would be a backend cron job.
+          await deleteDoc(doc(db, 'users', userRef.current.uid));
+          await deleteUser(userRef.current);
+        } catch (error) {
+           // We can't do much here as the browser is closing.
+           console.error("Failed to clean up anonymous user on exit.", error);
+        }
+      }
+    };
+  
+    window.addEventListener('beforeunload', handleBeforeUnload);
+  
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (newFirebaseUser) => {

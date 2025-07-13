@@ -10,6 +10,7 @@ import {
   onAuthStateChanged,
   type User,
   signOut,
+  deleteUser,
 } from "firebase/auth";
 import { 
   getFirestore,
@@ -89,5 +90,6 @@ export {
   orderBy,
   getDocs,
   signOut,
+  deleteUser,
   type User
 };
