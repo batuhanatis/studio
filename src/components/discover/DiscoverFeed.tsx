@@ -312,6 +312,13 @@ export function DiscoverFeed() {
                         />
                     </TinderCard>
                 ))
+            ) : loadingMore ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-2xl">
+                    <div className="flex flex-col items-center gap-4 text-primary">
+                        <Loader2 className="h-12 w-12 animate-spin" />
+                        <p className="text-lg font-semibold text-foreground">Finding more titles...</p>
+                    </div>
+                </div>
             ) : (
                  <Card className="w-full h-full flex items-center justify-center p-8">
                     <div className="text-center text-muted-foreground flex flex-col items-center gap-4">
@@ -322,14 +329,6 @@ export function DiscoverFeed() {
                         </Button>
                     </div>
                 </Card>
-            )}
-             {loadingMore && movies.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-2xl">
-                    <div className="flex flex-col items-center gap-4 text-primary">
-                        <Loader2 className="h-12 w-12 animate-spin" />
-                        <p className="text-lg font-semibold text-foreground">Finding more titles...</p>
-                    </div>
-                </div>
             )}
          </div>
       )
