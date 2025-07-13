@@ -36,7 +36,7 @@ interface UserMovieData {
   mediaType: 'movie' | 'tv';
 }
 
-interface LikedMovieData extends UserMovieData {
+interface MovieFeedbackData extends UserMovieData {
   title: string;
   poster: string | null;
 }
@@ -77,8 +77,13 @@ export function DiscoverFeed() {
             if (userDoc.exists()) {
                 const data = userDoc.data();
                 const liked = data.likedMovies || [];
+                const disliked = data.dislikedMovies || [];
                 const watched = data.watchedMovies || [];
-                seenMovieIds = new Set([...liked.map((m: any) => m.movieId), ...watched.map((m: any) => m.movieId)]);
+                seenMovieIds = new Set([
+                    ...liked.map((m: any) => m.movieId), 
+                    ...disliked.map((m: any) => m.movieId), 
+                    ...watched.map((m: any) => m.movieId)
+                ]);
             }
         } catch {}
     }
@@ -173,17 +178,40 @@ export function DiscoverFeed() {
     if (!firebaseUser) return;
     const ref = doc(db, 'users', firebaseUser.uid);
     try {
-      const newLike: LikedMovieData = {
+      const newLike: MovieFeedbackData = {
         movieId: String(movie.id),
         mediaType: movie.media_type,
         title: movie.title || movie.name || 'Untitled',
         poster: movie.poster_path,
       };
       
-      await updateDoc(ref, { likedMovies: arrayUnion(newLike) });
+      await updateDoc(ref, { 
+          likedMovies: arrayUnion(newLike),
+          dislikedMovies: arrayRemove(newLike)
+      });
+      toast({ title: 'Liked!', description: `Added "${newLike.title}" to your likes.`});
 
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Like failed', description: e.message });
+    }
+  };
+
+  const handleDislikeMovie = async (movie: Movie) => {
+    if (!firebaseUser) return;
+    const ref = doc(db, 'users', firebaseUser.uid);
+    try {
+        const newDislike: MovieFeedbackData = {
+            movieId: String(movie.id),
+            mediaType: movie.media_type,
+            title: movie.title || movie.name || 'Untitled',
+            poster: movie.poster_path,
+        };
+        await updateDoc(ref, {
+            dislikedMovies: arrayUnion(newDislike),
+            likedMovies: arrayRemove(newDislike)
+        });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Dislike failed', description: e.message });
     }
   };
 
@@ -212,7 +240,8 @@ export function DiscoverFeed() {
     setLastSwipedMovie(movie);
     if (direction === 'right') {
       handleLikeMovie(movie);
-      toast({ title: 'Liked!', description: `Added "${movie.title || movie.name}" to your likes.`});
+    } else if (direction === 'left') {
+      handleDislikeMovie(movie);
     }
 
     // This is a stable way to remove the top card

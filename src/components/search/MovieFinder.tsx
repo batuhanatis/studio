@@ -93,6 +93,7 @@ export function MovieFinder() {
 
   const [watched, setWatched] = useState<UserMovieData[]>([]);
   const [liked, setLiked] = useState<UserMovieData[]>([]);
+  const [disliked, setDisliked] = useState<UserMovieData[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
   const [preferredGenreIds, setPreferredGenreIds] = useState<string>('');
 
@@ -116,6 +117,7 @@ export function MovieFinder() {
         const data = docSnap.data();
         setWatched(data.watchedMovies || []);
         setLiked(data.likedMovies || []);
+        setDisliked(data.dislikedMovies || []);
         
         const likedMovies: LikedMovieData[] = data.likedMovies || [];
         
@@ -308,13 +310,40 @@ export function MovieFinder() {
   
     try {
       if (isLiked) {
-        await updateDoc(userDocRef, { likedMovies: arrayUnion(movieIdentifier) });
+        await updateDoc(userDocRef, { 
+            likedMovies: arrayUnion(movieIdentifier),
+            dislikedMovies: arrayRemove(movieIdentifier)
+        });
         toast({ title: 'Liked!', description: `Added "${movieIdentifier.title}" to your likes.`});
       } else {
         await updateDoc(userDocRef, { likedMovies: arrayRemove(movieIdentifier) });
       }
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not update like status.' });
+    }
+  };
+
+  const handleToggleDislike = async (item: SearchResult, isDisliked: boolean) => {
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const movieIdentifier = {
+      movieId: String(item.id),
+      mediaType: item.media_type,
+      title: item.title || item.name,
+      poster: item.poster_path,
+    };
+
+    try {
+      if (isDisliked) {
+        await updateDoc(userDocRef, {
+            dislikedMovies: arrayUnion(movieIdentifier),
+            likedMovies: arrayRemove(movieIdentifier)
+        });
+      } else {
+        await updateDoc(userDocRef, { dislikedMovies: arrayRemove(movieIdentifier) });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update dislike status.' });
     }
   };
 
@@ -334,10 +363,10 @@ export function MovieFinder() {
   const activeFilterCount = filters.genres.length + filters.platforms.length + (filters.mediaType !== 'all' ? 1 : 0);
   const watchedIds = new Set(watched.map(item => String(item.movieId)));
   const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
+  const dislikedIds = new Set(disliked.map(item => String(item.movieId)));
   
-  const displayedResults = filters.hideWatched
-    ? results.filter(movie => !watchedIds.has(String(movie.id)))
-    : results;
+  const displayedResults = results.filter(movie => !dislikedIds.has(String(movie.id)))
+                                 .filter(movie => !filters.hideWatched || !watchedIds.has(String(movie.id)));
 
   const renderStatus = () => {
     if (isLoading || (authLoading && loadingUserData)) {
@@ -482,8 +511,10 @@ export function MovieFinder() {
                         item={item}
                         isWatched={watchedIds.has(String(item.id))}
                         isLiked={likedIds.has(`${item.id}-${item.media_type}`)}
+                        isDisliked={dislikedIds.has(String(item.id))}
                         onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
                         onToggleLike={(isLiked) => handleToggleLike(item, isLiked)}
+                        onToggleDislike={(isDisliked) => handleToggleDislike(item, isDisliked)}
                     />
                 ))}
             </div>
@@ -494,5 +525,3 @@ export function MovieFinder() {
     </div>
   );
 }
-
-    

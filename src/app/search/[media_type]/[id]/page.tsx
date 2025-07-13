@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Star, Eye, Heart } from 'lucide-react';
+import { ArrowLeft, Star, Eye, Heart, ThumbsDown } from 'lucide-react';
 import Image from 'next/image';
 import { AddToWatchlistButton } from '@/components/watchlists/AddToWatchlistButton';
 import { useAuth } from '@/hooks/useAuth';
@@ -48,6 +48,7 @@ export default function DetailPage() {
   
   const [isWatched, setIsWatched] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [isDisliked, setIsDisliked] = useState(false);
   const [loadingUserData, setLoadingUserData] = useState(true);
 
   useEffect(() => {
@@ -101,8 +102,10 @@ export default function DetailPage() {
             const movieIdentifier = `${id}-${media_type}`;
             const watchedMovie = (data.watchedMovies || []).some((m: any) => `${m.movieId}-${m.mediaType}` === movieIdentifier);
             const likedMovie = (data.likedMovies || []).some((m: any) => `${m.movieId}-${m.mediaType}` === movieIdentifier);
+            const dislikedMovie = (data.dislikedMovies || []).some((m: any) => `${m.movieId}-${m.mediaType}` === movieIdentifier);
             setIsWatched(watchedMovie);
             setIsLiked(likedMovie);
+            setIsDisliked(dislikedMovie);
         }
         setLoadingUserData(false);
     }, (error) => {
@@ -148,13 +151,41 @@ export default function DetailPage() {
   
     try {
       if (!isLiked) {
-        await updateDoc(userDocRef, { likedMovies: arrayUnion(movieIdentifier) });
+        await updateDoc(userDocRef, { 
+            likedMovies: arrayUnion(movieIdentifier),
+            dislikedMovies: arrayRemove(movieIdentifier) // Ensure it's not in dislikes
+        });
         toast({ title: 'Liked!', description: `Added "${movieIdentifier.title}" to your likes.`});
       } else {
         await updateDoc(userDocRef, { likedMovies: arrayRemove(movieIdentifier) });
       }
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not update like status.' });
+    }
+  };
+
+  const handleToggleDislike = async () => {
+    if (!firebaseUser || !details) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const movieIdentifier = {
+      movieId: id,
+      mediaType: media_type,
+      title: details.title || details.name,
+      poster: details.poster_path,
+    };
+  
+    try {
+      if (!isDisliked) {
+        await updateDoc(userDocRef, { 
+            dislikedMovies: arrayUnion(movieIdentifier),
+            likedMovies: arrayRemove(movieIdentifier) // Ensure it's not in likes
+        });
+        toast({ title: 'Disliked!', description: `You won't see recommendations for "${movieIdentifier.title}".`});
+      } else {
+        await updateDoc(userDocRef, { dislikedMovies: arrayRemove(movieIdentifier) });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update dislike status.' });
     }
   };
 
@@ -256,6 +287,15 @@ export default function DetailPage() {
                         >
                             <Heart className={cn("h-5 w-5", isLiked ? 'text-red-500 fill-current' : 'text-muted-foreground')} />
                         </Button>
+                         <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={handleToggleDislike}
+                            disabled={loadingUserData}
+                            aria-label="Dislike or un-dislike"
+                        >
+                            <ThumbsDown className={cn("h-5 w-5", isDisliked ? 'text-blue-500 fill-current' : 'text-muted-foreground')} />
+                        </Button>
                         {movieDetailsForButton && <AddToWatchlistButton movie={movieDetailsForButton} />}
                         {movieDetailsForButton && <SendRecommendationButton movie={{...movieDetailsForButton, id: String(id)}} />}
                     </div>
@@ -317,5 +357,3 @@ export default function DetailPage() {
     </div>
   );
 }
-
-    

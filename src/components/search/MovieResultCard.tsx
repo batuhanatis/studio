@@ -3,7 +3,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Film, Tv, Star, Heart } from 'lucide-react';
+import { Film, Tv, Star, Heart, ThumbsDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '../ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -27,11 +27,13 @@ interface MovieResultCardProps {
   item: SearchResult;
   isWatched: boolean;
   isLiked: boolean;
+  isDisliked: boolean;
   onToggleWatched: (watched: boolean) => void;
   onToggleLike: (liked: boolean) => void;
+  onToggleDislike: (disliked: boolean) => void;
 }
 
-export function MovieResultCard({ item, isWatched, isLiked, onToggleWatched, onToggleLike }: MovieResultCardProps) {
+export function MovieResultCard({ item, isWatched, isLiked, isDisliked, onToggleWatched, onToggleLike, onToggleDislike }: MovieResultCardProps) {
   const title = item.title || item.name || 'Untitled';
   const releaseYear = item.release_date?.substring(0, 4) || item.first_air_date?.substring(0, 4);
   const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://placehold.co/500x750.png';
@@ -79,7 +81,7 @@ export function MovieResultCard({ item, isWatched, isLiked, onToggleWatched, onT
             </div>
           
             <div className="flex items-center justify-between mt-2 border-t border-border/60 pt-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -90,6 +92,17 @@ export function MovieResultCard({ item, isWatched, isLiked, onToggleWatched, onT
                       }}
                     >
                       <Heart className={cn("h-4 w-4", isLiked ? 'text-red-500 fill-current' : 'text-muted-foreground')} />
+                    </Button>
+                     <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleDislike(!isDisliked);
+                      }}
+                    >
+                      <ThumbsDown className={cn("h-4 w-4", isDisliked ? 'text-blue-500 fill-current' : 'text-muted-foreground')} />
                     </Button>
                     <Checkbox
                         id={`watched-card-${item.id}`}
@@ -111,5 +124,3 @@ export function MovieResultCard({ item, isWatched, isLiked, onToggleWatched, onT
     </Card>
   );
 }
-
-    
