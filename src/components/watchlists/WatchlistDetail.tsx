@@ -181,7 +181,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
             <p className="text-sm">Add movies and shows from the Search page.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {watchlist.movies.map((item) => (
             <MovieResultCard
               key={item.id}
@@ -207,7 +207,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
                 <Wand2 className="h-6 w-6 text-primary" />
                 <h2 className="text-2xl font-bold font-headline">Recommended For You</h2>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {recommendations.map((item) => (
                     <MovieResultCard
                         key={item.id}

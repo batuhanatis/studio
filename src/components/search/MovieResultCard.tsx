@@ -53,7 +53,7 @@ export function MovieResultCard({ item, isWatched, onToggleWatched }: MovieResul
             alt={title}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-300"
-            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
             data-ai-hint="movie poster"
           />
         </div>

@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { BlendFeed } from '@/components/blend/BlendFeed';
 import { doc, getDoc } from 'firebase/firestore';
@@ -127,10 +127,11 @@ export default function BlendPage() {
     <div className="min-h-screen w-full bg-background">
       <Header />
       <main className="container mx-auto max-w-7xl px-4 py-8">
+        <Button asChild variant="outline" size="sm" className="mb-4">
+          <Link href={`/profile/${firebaseUser?.uid}`}><ArrowLeft className="mr-2 h-4 w-4" /> Back to Profile</Link>
+        </Button>
         <BlendFeed friendId={friendId} />
       </main>
     </div>
   );
 }
-
-    

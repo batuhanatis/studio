@@ -96,7 +96,7 @@ export function ProfileWatched({ userId }: ProfileWatchedProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
       {watchedMovies.map((movie) => {
         const posterUrl = movie.poster
           ? `https://image.tmdb.org/t/p/w500${movie.poster}`
@@ -112,7 +112,7 @@ export function ProfileWatched({ userId }: ProfileWatchedProps) {
                         alt={`Poster for ${movie.title}`}
                         fill
                         className="object-cover transition-transform group-hover:scale-105"
-                        sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                        sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                         data-ai-hint="movie poster"
                     />
                 </div>

@@ -10,6 +10,8 @@ import { Film, Heart, X as XIcon, RefreshCw } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { DiscoverCard } from './DiscoverCard';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '../ui/skeleton';
 
 interface Movie {
   id: number;
@@ -66,11 +68,8 @@ export function DiscoverFeed() {
   const canSwipe = currentIndex >= 0 && currentIndex < movies.length;
 
   const swipe = async (dir: 'left' | 'right') => {
-    if (canSwipe) {
-      const cardRef = childRefs[currentIndex];
-      if (cardRef && cardRef.current) {
-        await cardRef.current.swipe(dir);
-      }
+    if (canSwipe && childRefs[currentIndex]) {
+      await childRefs[currentIndex]?.current?.swipe(dir);
     }
   }
 
@@ -229,45 +228,55 @@ export function DiscoverFeed() {
   };
   
   const outOfFrame = (name: string, idx: number) => {
-    if (currentIndexRef.current >= idx && childRefs[idx].current) {
-        childRefs[idx].current = null;
+     // This check prevents updating state on cards that have already been swiped
+     // in cases of fast succession.
+    if (currentIndexRef.current >= idx) {
+       // A new ref array is created on each render, so we can't always rely on childRefs[idx].current
+       // This logic can be simplified.
     }
-    updateCurrentIndex(prev => Math.min(prev, idx - 1));
   }
 
   const renderContent = () => {
       if (loading || authLoading) {
-        return <DiscoverCard onRate={()=>{}} onToggleWatched={()=>{}}/>;
+        return (
+            <Card className="w-full max-w-sm h-[70vh] md:h-[75vh] mx-auto overflow-hidden shadow-2xl rounded-2xl">
+              <Skeleton className="w-full h-full" />
+            </Card>
+        );
       }
     
       if (movies.length === 0) {
         return (
-            <div className="text-center text-muted-foreground flex flex-col items-center gap-4">
-              <Film className="h-16 w-16" />
-              <p className="text-lg">Could Not Load Movies</p>
-              <p className="text-sm">Please check your connection and try again later.</p>
-               <Button onClick={() => fetchDiscoverMovies(true)}>
-                  <RefreshCw className="mr-2 h-4 w-4" /> Try Again
-               </Button>
-            </div>
+            <Card className="w-full max-w-sm h-[70vh] md:h-[75vh] flex items-center justify-center p-8">
+              <div className="text-center text-muted-foreground flex flex-col items-center gap-4">
+                <Film className="h-16 w-16" />
+                <p className="text-lg">Could Not Load Movies</p>
+                <p className="text-sm">Please check your connection and try again later.</p>
+                 <Button onClick={() => fetchDiscoverMovies(true)}>
+                    <RefreshCw className="mr-2 h-4 w-4" /> Try Again
+                 </Button>
+              </div>
+            </Card>
         );
       }
       
-      if (currentIndex < 0) {
+      if (!canSwipe) {
         return (
+           <Card className="w-full max-w-sm h-[70vh] md:h-[75vh] flex items-center justify-center p-8">
             <div className="text-center text-muted-foreground flex flex-col items-center gap-4">
               <Film className="h-16 w-16" />
               <p className="text-lg">That's all for now!</p>
-              <p className="text-sm">You've swiped through all the available titles.</p>
+              <p className="text-sm">You've swiped through all available titles.</p>
               <Button onClick={() => fetchDiscoverMovies(true)}>
                   <RefreshCw className="mr-2 h-4 w-4" /> Load More
               </Button>
             </div>
+          </Card>
         )
       }
 
       return (
-         <div className="relative w-full max-w-sm h-[75vh]">
+         <div className="relative w-full max-w-sm h-[70vh] md:h-[75vh]">
             {movies.map((movie, index) => (
                 <TinderCard
                     ref={childRefs[index]}
@@ -291,7 +300,7 @@ export function DiscoverFeed() {
   }
 
   return (
-    <div className="flex flex-col items-center w-full h-full">
+    <div className="flex flex-col items-center justify-center w-full h-full">
       <div className="text-center mb-4">
         <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
             Discover New Titles
@@ -305,16 +314,14 @@ export function DiscoverFeed() {
         {renderContent()}
       </div>
 
-      {!loading && !authLoading && movies.length > 0 && currentIndex >= 0 && (
-        <div className="flex items-center gap-6 mt-4 z-10">
-            <Button variant="outline" size="icon" className="w-16 h-16 rounded-full border-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => swipe('left')} disabled={!canSwipe}>
-                <XIcon className="h-8 w-8" />
-            </Button>
-            <Button variant="outline" size="icon" className="w-16 h-16 rounded-full border-2 border-primary text-primary hover:bg-primary/10" onClick={() => swipe('right')} disabled={!canSwipe}>
-                <Heart className="h-8 w-8" />
-            </Button>
-        </div>
-      )}
+      <div className="flex items-center gap-6 mt-4 z-10">
+          <Button variant="outline" size="icon" className="w-16 h-16 rounded-full border-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => swipe('left')} disabled={!canSwipe}>
+              <XIcon className="h-8 w-8" />
+          </Button>
+          <Button variant="outline" size="icon" className="w-16 h-16 rounded-full border-2 border-primary text-primary hover:bg-primary/10" onClick={() => swipe('right')} disabled={!canSwipe}>
+              <Heart className="h-8 w-8" />
+          </Button>
+      </div>
     </div>
   );
 }

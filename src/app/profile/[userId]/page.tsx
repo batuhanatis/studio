@@ -155,8 +155,8 @@ export default function ProfilePage() {
                     {profileData?.photoURL && <AvatarImage src={profileData.photoURL} alt={profileData.username || profileData.email} />}
                     <AvatarFallback>{getInitials(profileData?.email)}</AvatarFallback>
                 </Avatar>
-                <h1 className="mt-4 text-3xl font-bold font-headline">{profileData?.username || profileData?.email}</h1>
-                <p className="text-muted-foreground">{profileData?.email}</p>
+                <h1 className="mt-4 text-3xl font-bold font-headline text-center">{profileData?.username || profileData?.email}</h1>
+                <p className="text-muted-foreground text-center">{profileData?.email}</p>
                  
                 <Card className="w-full mt-6 text-sm">
                   <CardContent className="p-4 space-y-3">

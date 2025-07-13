@@ -8,17 +8,21 @@ import { Loader2, Users, Combine } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { Avatar, AvatarFallback } from '../ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 interface UserProfile {
     uid: string;
+    username?: string;
     email: string;
+    photoURL?: string;
     activeBlendsWith?: string[];
 }
 
 interface BlendPartner {
     uid: string;
+    username?: string;
     email: string;
+    photoURL?: string;
 }
 
 export function ProfileBlends() {
@@ -56,7 +60,10 @@ export function ProfileBlends() {
     return () => unsubscribe();
   }, [firebaseUser, authLoading]);
   
-  const getInitials = (email: string) => email.substring(0, 2).toUpperCase();
+  const getInitials = (email: string | undefined) => {
+    if (!email) return '?';
+    return email.substring(0, 2).toUpperCase();
+  }
 
   if (loading || authLoading) {
     return (
@@ -79,8 +86,8 @@ export function ProfileBlends() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <Button asChild>
-                    <Link href="/profile">Go to Friends</Link>
+                 <Button asChild>
+                    <Link href={`/profile/${firebaseUser?.uid}`}>Go to Friends</Link>
                 </Button>
             </CardContent>
         </Card>
@@ -94,11 +101,12 @@ export function ProfileBlends() {
           <CardHeader>
             <div className="flex items-center gap-4">
                 <Avatar className="h-12 w-12">
+                    {blendPartner.photoURL && <AvatarImage src={blendPartner.photoURL} alt={blendPartner.username} />}
                     <AvatarFallback className="text-xl">{getInitials(blendPartner.email)}</AvatarFallback>
                 </Avatar>
                 <div>
                     <CardTitle className="text-lg">Blend with</CardTitle>
-                    <CardDescription>{blendPartner.email}</CardDescription>
+                    <CardDescription>{blendPartner.username || blendPartner.email}</CardDescription>
                 </div>
             </div>
           </CardHeader>

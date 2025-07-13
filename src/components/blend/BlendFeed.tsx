@@ -25,6 +25,7 @@ interface Movie {
 
 interface UserProfile {
     uid: string;
+    username: string;
     email: string;
     ratedMovies: { movieId: string; mediaType: 'movie' | 'tv'; rating: number }[];
 }
@@ -171,7 +172,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
     <div className="space-y-8">
       <div className="text-center">
         <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
-          A Blend for You & {friendProfile?.email}
+          A Blend for You & {friendProfile?.username || friendProfile?.email}
         </h1>
         <p className="mt-2 text-lg text-muted-foreground">
           Movies and shows you might both enjoy, based on your ratings.
@@ -185,7 +186,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
             <p className="text-sm">The AI couldn't find a good match. Try rating more movies!</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {blendMovies.map((item) => (
             <MovieResultCard
               key={item.id}

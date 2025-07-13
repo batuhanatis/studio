@@ -269,7 +269,7 @@ export function MovieFinder() {
     if (recommendations.length > 0) {
       return (
         <div className="w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h2 className="text-2xl font-bold font-headline flex items-center gap-2"><Sparkles className="text-accent" /> {firebaseUser && !firebaseUser.isAnonymous ? "Recommended For You" : "Trending This Week"}</h2>
+          <h2 className="text-2xl font-bold font-headline flex items-center justify-center gap-2"><Sparkles className="text-accent" /> {firebaseUser && !firebaseUser.isAnonymous ? "Recommended For You" : "Trending This Week"}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {recommendations.map((item) => (
                 <MovieResultCard
@@ -331,10 +331,10 @@ export function MovieFinder() {
   return (
     <div className="flex flex-col items-center gap-8">
       <div className="w-full text-center max-w-2xl">
-        <h1 className="text-4xl font-bold font-headline tracking-tight md:text-5xl">
+        <h1 className="text-4xl font-bold font-headline tracking-tight text-center md:text-5xl">
           Find Movies & TV Shows
         </h1>
-        <p className="mt-4 text-lg text-muted-foreground">
+        <p className="mt-4 text-lg text-muted-foreground text-center">
           Discover where to watch your favorite movies and series, get recommendations, and share them with friends.
         </p>
       </div>
