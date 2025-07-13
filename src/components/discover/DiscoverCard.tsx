@@ -1,12 +1,13 @@
+
 'use client';
 
-import React, { useEffect, useState, forwardRef } from 'react';
+import React, { forwardRef } from 'react';
 import Image from 'next/image';
 import { Rating } from './Rating';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Eye } from 'lucide-react';
-
-const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
+import { Eye, Star } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { AddToWatchlistButton } from '../watchlists/AddToWatchlistButton';
 
 interface DiscoverCardProps {
     movie: any;
@@ -14,31 +15,11 @@ interface DiscoverCardProps {
     isWatched?: boolean;
     onRate: (rating: number) => void;
     onToggleWatched: (watched: boolean) => void;
+    swipeDirection: 'left' | 'right' | null;
+    swipeOpacity: number;
 }
 
-export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(function DiscoverCard({ movie, rating = 0, isWatched = false, onRate, onToggleWatched }, ref) {
-  const [platforms, setPlatforms] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!movie) return;
-    async function fetchProviders() {
-      try {
-        const res = await fetch(`https://api.themoviedb.org/3/${movie.media_type}/${movie.id}/watch/providers?api_key=${API_KEY}`);
-        const data = await res.json();
-        const tr = data.results?.TR;
-        if (tr) {
-            const all = [...(tr.flatrate || []), ...(tr.rent || []), ...(tr.buy || [])];
-            const unique = all.filter((v, i, a) => a.findIndex(t => t.provider_id === v.provider_id) === i);
-            setPlatforms(unique);
-        } else {
-            setPlatforms([]);
-        }
-      } catch {
-        setPlatforms([]);
-      }
-    }
-    fetchProviders();
-  }, [movie]);
+export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(function DiscoverCard({ movie, rating = 0, isWatched = false, onRate, onToggleWatched, swipeDirection, swipeOpacity }, ref) {
 
   if (!movie) return null;
 
@@ -46,48 +27,82 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
   const year = movie.release_date?.slice(0, 4) || movie.first_air_date?.slice(0, 4);
   const posterUrl = movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'https://placehold.co/500x750.png';
 
+  const movieDetailsForButton = {
+    id: movie.id,
+    media_type: movie.media_type,
+    title: title,
+    poster: movie.poster_path,
+    vote_average: movie.vote_average,
+    release_date: movie.release_date,
+    first_air_date: movie.first_air_date,
+  };
+
   return (
-    <div ref={ref} className="relative w-full h-full rounded-lg overflow-hidden shadow-2xl bg-card">
-      <Image
-        src={posterUrl}
-        alt={title}
-        fill
-        className="object-cover"
-        sizes="100vw"
-        data-ai-hint="movie poster"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
+    <Card
+      ref={ref}
+      className="h-full w-full overflow-y-auto scrollbar-hide bg-card shadow-2xl"
+    >
+      {/* Poster and Overlay */}
+      <div className="relative aspect-[2/3] w-full flex-shrink-0">
+        <Image
+          src={posterUrl}
+          alt={title}
+          fill
+          className="object-cover"
+          sizes="100vw"
+          priority
+          data-ai-hint="movie poster"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
+        
+        {/* Swipe Feedback */}
+        <div
+          className="absolute inset-0 flex items-center justify-center transition-opacity duration-200"
+          style={{ opacity: swipeOpacity }}
+        >
+          {swipeDirection === 'right' && (
+            <div className="transform -rotate-12 rounded-lg border-4 border-green-500 bg-green-500/10 px-8 py-4 font-bold text-green-500 text-5xl tracking-widest">
+              LIKE
+            </div>
+          )}
+          {swipeDirection === 'left' && (
+            <div className="transform rotate-12 rounded-lg border-4 border-destructive bg-destructive/10 px-8 py-4 font-bold text-destructive text-5xl tracking-widest">
+              NOPE
+            </div>
+          )}
+        </div>
+      </div>
 
-      <div className="absolute bottom-0 w-full text-white p-4 space-y-3">
+      {/* Details Section */}
+      <div className="w-full bg-card p-4 text-white">
         <h1 className="text-3xl font-bold font-headline mb-1">{title}</h1>
-        <p className="text-sm text-muted-foreground mb-2">{year} · {movie.vote_average.toFixed(1)} / 10</p>
-        <p className="text-base leading-relaxed line-clamp-3">{movie.overview}</p>
-
-        <div className="space-y-4 pt-2">
-          <div>
-            <Rating rating={rating} onRatingChange={onRate} />
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox id={`watched-${movie.id}`} checked={isWatched} onCheckedChange={onToggleWatched} />
-            <label htmlFor={`watched-${movie.id}`} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-              <Eye className="w-4 h-4" /> Mark as Watched
-            </label>
-          </div>
+        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+            <span>{year}</span>
+            <div className="flex items-center gap-1.5 text-foreground">
+                <Star className="h-5 w-5 text-accent fill-accent" />
+                <span className="font-bold text-lg">{movie.vote_average.toFixed(1)}</span>
+                <span className="text-sm text-muted-foreground">/ 10</span>
+            </div>
         </div>
 
-        {platforms.length > 0 && (
-          <div className="mt-4">
-            <h3 className="text-sm font-semibold mb-2">Available in Türkiye:</h3>
-            <div className="flex flex-wrap gap-2">
-              {platforms.slice(0, 5).map(p => (
-                <div key={p.provider_id} className="relative w-10 h-10 rounded-md bg-white/80 overflow-hidden">
-                  <Image src={`https://image.tmdb.org/t/p/original${p.logo_path}`} alt={p.provider_name} fill className="object-contain p-1" />
-                </div>
-              ))}
-            </div>
+        <p className="text-base leading-relaxed line-clamp-4 text-foreground/80">{movie.overview}</p>
+
+        <div className="space-y-4 pt-6">
+          <div>
+            <p className="text-sm font-semibold text-muted-foreground mb-2">Your Rating</p>
+            <Rating rating={rating} onRatingChange={onRate} />
           </div>
-        )}
+          <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Checkbox id={`watched-${movie.id}`} checked={isWatched} onCheckedChange={onToggleWatched} />
+                <label htmlFor={`watched-${movie.id}`} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <Eye className="w-4 h-4" /> Watched
+                </label>
+              </div>
+              <AddToWatchlistButton movie={movieDetailsForButton} isIconOnly />
+          </div>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 });
