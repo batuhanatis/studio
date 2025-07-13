@@ -109,10 +109,10 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
 
     return (
       <div ref={ref} className="w-full max-w-sm mx-auto">
-        <Card className="w-full h-[75vh] overflow-y-auto shadow-2xl rounded-2xl group cursor-grab active:cursor-grabbing snap-y snap-mandatory">
+        <Card className="w-full h-[75vh] overflow-y-auto shadow-2xl rounded-2xl group cursor-grab active:cursor-grabbing snap-y snap-mandatory scrollbar-hide">
             {/* Poster Section */}
             <div className="h-full w-full flex-shrink-0 snap-start">
-              <div style={{ position: "relative", width: "100%", height: "100%" }}>
+              <div className="relative w-full aspect-[2/3]">
                   <Image
                     src={posterUrl}
                     alt={`Poster for ${title}`}
