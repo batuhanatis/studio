@@ -52,7 +52,8 @@ export function WatchlistDetail({ listId }: { listId: string }) {
   const [loading, setLoading] = useState({ list: true, recommendations: false });
   const [error, setError] = useState<string | null>(null);
   
-  const [recommendations, setRecommendations] = useState<MovieDetails[]>([]);
+  const [allRecommendations, setAllRecommendations] = useState<MovieDetails[]>([]);
+  const [visibleRecommendationsCount, setVisibleRecommendationsCount] = useState(5);
   
   const [watched, setWatched] = useState<UserMovieData[]>([]);
   const [liked, setLiked] = useState<UserMovieData[]>([]);
@@ -121,12 +122,15 @@ export function WatchlistDetail({ listId }: { listId: string }) {
       return;
     }
     setLoading(prev => ({...prev, recommendations: true}));
+    setVisibleRecommendationsCount(5); // Reset count on new request
+    setAllRecommendations([]); // Clear old recommendations
     try {
       const movieTitles = watchlist.movies.map(m => m.title);
       const result = await getWatchlistRecommendations({ movieTitles });
       
       if (!result || result.recommendedTitles.length === 0) {
         toast({ title: 'No Results', description: "The AI couldn't find any recommendations right now." });
+        setLoading(prev => ({...prev, recommendations: false}));
         return;
       }
       
@@ -134,7 +138,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
       const movies = (await Promise.all(moviePromises)).filter((m): m is MovieDetails => m !== null);
       
       const uniqueMovies = Array.from(new Map(movies.map(m => [m.id, m])).values());
-      setRecommendations(uniqueMovies);
+      setAllRecommendations(uniqueMovies);
 
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not get recommendations.' });
@@ -232,6 +236,8 @@ export function WatchlistDetail({ listId }: { listId: string }) {
     return <div className="text-center py-12 text-muted-foreground">Watchlist not found.</div>;
   }
 
+  const visibleRecommendations = allRecommendations.slice(0, visibleRecommendationsCount);
+
   return (
     <div className="space-y-8">
       <div>
@@ -277,12 +283,12 @@ export function WatchlistDetail({ listId }: { listId: string }) {
         </div>
       )}
 
-      {recommendations.length > 0 && (
+      {allRecommendations.length > 0 && (
         <div className="space-y-6 pt-8">
             <Separator />
             <h2 className="text-2xl font-bold font-headline">AI Recommendations for You</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {recommendations.map((item) => (
+            {visibleRecommendations.map((item) => (
                 <MovieResultCard
                 key={`${item.id}-${item.media_type}`}
                 item={item}
@@ -295,6 +301,16 @@ export function WatchlistDetail({ listId }: { listId: string }) {
                 />
             ))}
             </div>
+            {visibleRecommendationsCount < allRecommendations.length && (
+                <div className="text-center">
+                    <Button
+                        variant="secondary"
+                        onClick={() => setVisibleRecommendationsCount(prev => prev + 5)}
+                    >
+                        Load More
+                    </Button>
+                </div>
+            )}
         </div>
       )}
     </div>
