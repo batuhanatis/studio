@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, runTransaction, updateDoc, arrayUnion, arrayRemove, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Heart, X as XIcon, RefreshCw, Loader2, Undo } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
@@ -50,17 +50,17 @@ export function DiscoverFeed() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [userWatched, setUserWatched] = useState<UserMovieData[]>([]);
   
-  const [lastSwipedMovie, setLastSwipedMovie] = useState<Movie | null>(null);
+  const [lastSwipedMovie, setLastSwipedMovie] = useState<{movie: Movie; direction: 'left' | 'right' } | null>(null);
   
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
   const [swipeOpacity, setSwipeOpacity] = useState(0);
-
-  const tinderCardRefs = useMemo(() => Array(movies.length).fill(0).map(() => React.createRef<any>()), [movies.length]);
-  const currentIndexRef = useRef(0);
   
   const [platforms, setPlatforms] = useState<WatchProvider[]>([]);
 
   const [triggerFetch, setTriggerFetch] = useState(0);
+  
+  const currentIndexRef = useRef(movies.length - 1);
+  const tinderCardRefs = useMemo(() => Array(movies.length).fill(0).map(() => React.createRef<any>()), [movies.length]);
 
   const fetchMovies = useCallback(async (isRestart = false) => {
     if (authLoading) return;
@@ -146,7 +146,6 @@ export function DiscoverFeed() {
     }
   }, []);
 
-  // Fetch providers for the top card whenever the movie list changes
   useEffect(() => {
     if (movies.length > 0) {
         const topMovie = movies[movies.length - 1];
@@ -156,12 +155,10 @@ export function DiscoverFeed() {
     }
   }, [movies, fetchProviders]);
 
-  // Initial fetch and subsequent fetches
   useEffect(() => {
     fetchMovies(movies.length === 0);
-  }, [triggerFetch, fetchMovies]);
+  }, [triggerFetch]);
 
-  // User data listener
   useEffect(() => {
     if (!firebaseUser) return;
     const ref = doc(db, 'users', firebaseUser.uid);
@@ -217,21 +214,18 @@ export function DiscoverFeed() {
     }
   };
 
-  const swiped = (direction: string, movie: Movie) => {
-    setLastSwipedMovie(movie);
+  const swiped = (direction: 'left' | 'right', movie: Movie) => {
+    setLastSwipedMovie({movie, direction});
     if (direction === 'right') {
       handleLikeMovie(movie);
     }
 
-    // This is a stable way to remove the top card
-    setMovies((prevMovies) => prevMovies.slice(0, prevMovies.length - 1));
+    setMovies((prevMovies) => prevMovies.filter(m => m.id !== movie.id));
     
-    // Reset swipe feedback
     setSwipeDirection(null);
     setSwipeOpacity(0);
   };
   
-  // Fetch more movies when the stack runs low
   useEffect(() => {
     if (movies.length <= 4 && !loadingMore && !loading) {
       setTriggerFetch(c => c + 1);
@@ -239,15 +233,32 @@ export function DiscoverFeed() {
   }, [movies.length, loadingMore, loading]);
 
   const swipe = async (dir: 'left' | 'right') => {
-    if (movies.length > 0 && currentIndexRef.current < movies.length && tinderCardRefs[currentIndexRef.current]) {
-      await tinderCardRefs[currentIndexRef.current].current.swipe(dir);
+    const topCardIndex = movies.length - 1;
+    if (topCardIndex >= 0 && tinderCardRefs[topCardIndex]) {
+      await tinderCardRefs[topCardIndex].current.swipe(dir);
     }
   };
   
   const restoreCard = async () => {
     if(lastSwipedMovie) {
-        // This is a more stable way to add the card back
-        setMovies(prev => [...prev, lastSwipedMovie]);
+        const { movie, direction } = lastSwipedMovie;
+        // Undo the like if it was a right swipe
+        if (direction === 'right' && firebaseUser) {
+            const ref = doc(db, 'users', firebaseUser.uid);
+            const movieIdentifier = {
+                movieId: String(movie.id),
+                mediaType: movie.media_type,
+                title: movie.title || movie.name || 'Untitled',
+                poster: movie.poster_path,
+            };
+            try {
+                await updateDoc(ref, { likedMovies: arrayRemove(movieIdentifier) });
+                toast({ title: 'Like Undone' });
+            } catch (e) {
+                // handle error if needed
+            }
+        }
+        setMovies(prev => [...prev, movie]);
         setLastSwipedMovie(null);
     }
   }
@@ -300,9 +311,9 @@ export function DiscoverFeed() {
                 ref={tinderCardRefs[index]}
                 className="absolute inset-0"
                 key={movie.id}
-                onSwipe={(dir) => swiped(dir, movie)}
+                onSwipe={(dir) => swiped(dir as 'left' | 'right', movie)}
                 onSwipeRequirementUnfulfilled={() => { setSwipeDirection(null); setSwipeOpacity(0); }}
-                onSwipeProgress={(p, d) => isTopCard && handleSwipeProgress(p, d)}
+                onSwipeProgress={(p, d) => isTopCard && handleSwipeProgress(p, d as any)}
                 preventSwipe={['up', 'down']}
             >
                 <DiscoverCard
@@ -315,7 +326,7 @@ export function DiscoverFeed() {
                 />
             </TinderCard>
         );
-    }).reverse(); // Reverse to get the stack effect correct with the new removal logic
+    });
   }
 
   return (
