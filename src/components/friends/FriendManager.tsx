@@ -100,8 +100,8 @@ export function FriendManager({ userId }: FriendManagerProps) {
 
   // Debounced search function
   const debouncedSearch = useCallback(
-    debounce(async (query: string) => {
-      if (query.trim().length < 2) {
+    debounce(async (searchQuery: string) => {
+      if (searchQuery.trim().length < 2) {
         setSearchResults([]);
         setIsSearching(false);
         return;
@@ -113,8 +113,8 @@ export function FriendManager({ userId }: FriendManagerProps) {
         const q = query(
           usersRef,
           orderBy('username'),
-          startAt(query.toLowerCase()),
-          endAt(query.toLowerCase() + '\uf8ff'),
+          startAt(searchQuery.toLowerCase()),
+          endAt(searchQuery.toLowerCase() + '\uf8ff'),
           limit(10)
         );
         const querySnapshot = await getDocs(q);
@@ -129,7 +129,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
         setIsSearching(false);
       }
     }, 500),
-    [firebaseUser]
+    [firebaseUser, toast]
   );
 
   useEffect(() => {
