@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Film, Compass, Sparkles, User, LogIn, Menu } from 'lucide-react';
+import { Film, Compass, User, LogIn, Menu, List } from 'lucide-react';
 import Link from 'next/link';
 import {
   Sheet,
@@ -73,15 +73,9 @@ export function Header() {
           Discover
         </Link>
       </Button>
-      <Button asChild variant="ghost" size="sm">
-        <Link href="/foryou">
-          <Sparkles className="mr-2 h-4 w-4" />
-          For You
-        </Link>
-      </Button>
        <Button asChild variant="ghost" size="sm">
         <Link href="/watchlists">
-          <Sparkles className="mr-2 h-4 w-4" />
+          <List className="mr-2 h-4 w-4" />
           Watchlists
         </Link>
       </Button>
@@ -103,14 +97,8 @@ export function Header() {
             </Link>
         </SheetClose>
         <SheetClose asChild>
-            <Link href="/foryou" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-secondary">
-                <Sparkles className="h-5 w-5" />
-                <span className="font-medium">For You</span>
-            </Link>
-        </SheetClose>
-        <SheetClose asChild>
             <Link href="/watchlists" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-secondary">
-                <Sparkles className="h-5 w-5" />
+                <List className="h-5 w-5" />
                 <span className="font-medium">Watchlists</span>
             </Link>
         </SheetClose>
