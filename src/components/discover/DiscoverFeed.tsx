@@ -391,5 +391,3 @@ export function DiscoverFeed() {
     </div>
   );
 }
-
-    
