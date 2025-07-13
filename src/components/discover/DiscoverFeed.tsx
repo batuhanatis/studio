@@ -49,12 +49,16 @@ export function DiscoverFeed() {
 
   const tinderCardRef = useRef<any>(null);
 
-  const fetchMovies = useCallback(async (isRestart = false, genreSeed: string | null = null) => {
+  const fetchMovies = useCallback(async (isRestart = false) => {
     if (authLoading) return;
-    setLoading(true);
+    if (isRestart) {
+        setLoading(true);
+    } else {
+        setLoadingMore(true);
+    }
 
     let seenMovieIds = new Set();
-    if (firebaseUser && !isRestart) {
+    if (firebaseUser) {
         try {
             const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
             if (userDoc.exists()) {
@@ -67,10 +71,9 @@ export function DiscoverFeed() {
     }
 
     try {
-      const page = Math.floor(Math.random() * 10) + 1; // Fetch from a random page for variety
-      const genreQuery = genreSeed ? `&with_genres=${genreSeed}` : '';
-      const movieReq = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&page=${page}${genreQuery}`);
-      const tvReq = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&page=${page}${genreQuery}`);
+      const page = Math.floor(Math.random() * 20) + 1;
+      const movieReq = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&page=${page}`);
+      const tvReq = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&page=${page}`);
       
       const [movieRes, tvRes] = await Promise.all([movieReq, tvReq]);
       const [moviesJson, tvJson] = await Promise.all([movieRes.json(), tvRes.json()]);
@@ -80,19 +83,18 @@ export function DiscoverFeed() {
         ...(tvJson.results || []).map((t: any) => ({ ...t, media_type: 'tv' }))
       ];
       
-      const unique = Array.from(new Map(allResults.map(m => [m.id, m])).values())
-                        .filter(m => m.poster_path && m.overview);
+      const uniqueAndFiltered = Array.from(new Map(allResults.map(m => [m.id, m])).values())
+                        .filter(m => m.poster_path && m.overview)
+                        .filter(m => !seenMovieIds.has(String(m.id)));
       
-      const filtered = unique.filter(m => !seenMovieIds.has(String(m.id)));
+      const shuffled = uniqueAndFiltered.sort(() => 0.5 - Math.random());
       
-      const shuffled = (filtered.length > 5 ? filtered : unique).sort(() => 0.5 - Math.random());
-      
-      setMovies(prev => isRestart ? shuffled.slice(0, 5) : [...prev, ...shuffled.slice(0, 5)]);
+      setMovies(prev => isRestart ? shuffled.slice(0, 10) : [...prev, ...shuffled.slice(0, 5)]);
 
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not load movies.' });
     } finally {
-      setLoading(false);
+      if (isRestart) setLoading(false);
       setLoadingMore(false);
     }
   }, [firebaseUser, toast, authLoading]);
@@ -100,7 +102,7 @@ export function DiscoverFeed() {
   // Initial fetch
   useEffect(() => {
     fetchMovies(true);
-  }, [fetchMovies]);
+  }, []);
 
   // User data listener
   useEffect(() => {
@@ -131,8 +133,6 @@ export function DiscoverFeed() {
       await runTransaction(db, async tx => {
         const snap = await tx.get(ref);
         if (!snap.exists()) {
-          // If the user document doesn't exist, create it.
-          // This can happen if AuthProvider is slow to create the initial document.
           tx.set(ref, { ratedMovies: [newRating] }, { merge: true });
           return;
         }
@@ -180,25 +180,14 @@ export function DiscoverFeed() {
       handleRateMovie(movie, 5);
       toast({ title: 'Liked!', description: `You rated "${movie.title || movie.name}" 5 stars.`});
     }
-    setMovies(prev => prev.filter(m => m.id !== movie.id));
+    const newMovies = movies.filter(m => m.id !== movie.id);
+    setMovies(newMovies);
+
+    if (newMovies.length <= 5 && !loadingMore) {
+        fetchMovies(false);
+    }
   };
   
-  // Fetch more movies when the stack is low
-  useEffect(() => {
-    if (!loading && movies.length <= 3) {
-        setLoadingMore(true);
-        const highRated = userRatings.filter(r => r.rating >= 4);
-        if (highRated.length > 0) {
-            // Pick a random liked movie to get recommendations from
-            const seedMovieId = highRated[Math.floor(Math.random() * highRated.length)].movieId;
-            fetchMovies(false, seedMovieId);
-        } else {
-            // Fetch random popular movies if no ratings yet
-            fetchMovies(false);
-        }
-    }
-  }, [movies.length, loading, fetchMovies, userRatings]);
-
   const swipe = async (dir: 'left' | 'right') => {
     if (movies.length > 0 && tinderCardRef.current) {
       await tinderCardRef.current.swipe(dir);
@@ -223,6 +212,14 @@ export function DiscoverFeed() {
     }
     
     if (movies.length === 0) {
+        if (loadingMore) {
+            return (
+                <div className="flex flex-col items-center justify-center text-center h-full">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    <p className="text-lg text-muted-foreground mt-4">Finding more titles...</p>
+                </div>
+            );
+        }
         return (
             <div className="flex flex-col items-center justify-center text-center h-full">
                 <p className="text-lg text-muted-foreground">You've seen everything for now!</p>
