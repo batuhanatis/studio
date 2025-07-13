@@ -23,6 +23,7 @@ interface Movie {
   vote_average: number;
   release_date?: string;
   first_air_date?: string;
+  popularity: number;
 }
 
 interface UserMovieData {
@@ -51,17 +52,20 @@ export function DiscoverFeed() {
   const [userWatched, setUserWatched] = useState<UserMovieData[]>([]);
   const [seenMovieIds, setSeenMovieIds] = useState<Set<string>>(new Set());
   
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  const tinderCardsRef = useRef<any[]>([]);
-
-  const canSwipe = currentIndex < movies.length;
+  const canSwipe = movies.length > 0;
 
   const swipe = async (dir: 'left' | 'right') => {
-    if (canSwipe && tinderCardsRef.current[currentIndex]) {
-      await tinderCardsRef.current[currentIndex].swipe(dir);
+    // This function is for programmatic swiping via buttons.
+    // We simulate a swipe on the last card in the array (which is the top one).
+    if (canSwipe) {
+      const movieToSwipe = movies[movies.length - 1];
+      if (dir === 'right') {
+        handleRateMovie(movieToSwipe, 5);
+      }
+      // Remove the swiped movie from the state
+      setMovies(prevMovies => prevMovies.slice(0, prevMovies.length - 1));
     }
-  }
+  };
   
   const fetchPersonalizedRecommendations = useCallback(async (currentSeenIds: Set<string>) => {
     if (!firebaseUser || authLoading) return [];
@@ -81,7 +85,7 @@ export function DiscoverFeed() {
 
                 const data = await res.json();
                 const recommendedItems = (data.results || [])
-                    .map((item: any) => ({ ...item, media_type: seedMovie.mediaType }))
+                    .map((item: any) => ({ ...item, media_type: seedMovie.mediaType, popularity: item.popularity || 0 }))
                     .filter((item: any) => item.poster_path && !currentSeenIds.has(String(item.id)))
                     .sort((a: Movie, b: Movie) => (b.vote_average || 0) - (a.vote_average || 0));
                 
@@ -103,8 +107,8 @@ export function DiscoverFeed() {
         const [movieData, tvData] = await Promise.all([movieRes.json(), tvRes.json()]);
 
         const allPopular = [
-            ...(movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' as const })),
-            ...(tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' as const }))
+            ...(movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' as const, popularity: m.popularity || 0 })),
+            ...(tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' as const, popularity: t.popularity || 0 }))
         ];
 
         const filtered = allPopular
@@ -120,6 +124,7 @@ export function DiscoverFeed() {
   }, [toast]);
   
   const loadMoreMovies = useCallback(async (forceGeneric = false) => {
+    if (loadingMore) return;
     setLoadingMore(true);
     let newMovies: Movie[] = [];
     const newSeenIds = new Set(seenMovieIds);
@@ -142,39 +147,42 @@ export function DiscoverFeed() {
     }
     
     setLoadingMore(false);
-  }, [seenMovieIds, firebaseUser, fetchPersonalizedRecommendations, fetchGenericMovies, toast]);
+  }, [seenMovieIds, firebaseUser, fetchPersonalizedRecommendations, fetchGenericMovies, toast, loadingMore]);
 
-  const initializeFeed = useCallback(async () => {
-    setLoading(true);
-    let initialSeenIds = new Set<string>();
-    if (firebaseUser) {
-        try {
-            const userDocRef = doc(db, 'users', firebaseUser.uid);
-            const userDoc = await getDoc(userDocRef);
-            if (userDoc.exists()) {
-                const userData = userDoc.data();
-                const rated: UserMovieData[] = userData.ratedMovies || [];
-                const watched: UserMovieData[] = userData.watchedMovies || [];
-                initialSeenIds = new Set([...rated.map(m => m.movieId), ...watched.map(m => m.movieId)]);
-            }
-        } catch (dbError) {
-            console.warn("Could not fetch user seen movies, showing generic titles.", dbError);
-        }
-    }
-    setSeenMovieIds(initialSeenIds);
-    
-    const initialMovies = await fetchGenericMovies(initialSeenIds);
-    setMovies(initialMovies);
-    setCurrentIndex(0);
-    tinderCardsRef.current = Array(initialMovies.length).fill(0).map((_, i) => React.createRef());
-    setLoading(false);
-  }, [firebaseUser, fetchGenericMovies]);
-
+  // Load initial movies when component mounts or user changes
   useEffect(() => {
-    if (authLoading) return;
-    initializeFeed();
-  }, [authLoading, initializeFeed]);
+    const initializeFeed = async () => {
+      setLoading(true);
+      setMovies([]); // Reset movies
+      let initialSeenIds = new Set<string>();
+      if (firebaseUser) {
+          try {
+              const userDocRef = doc(db, 'users', firebaseUser.uid);
+              const userDoc = await getDoc(userDocRef);
+              if (userDoc.exists()) {
+                  const userData = userDoc.data();
+                  const rated: UserMovieData[] = userData.ratedMovies || [];
+                  const watched: UserMovieData[] = userData.watchedMovies || [];
+                  initialSeenIds = new Set([...rated.map(m => m.movieId), ...watched.map(m => m.movieId)]);
+              }
+          } catch (dbError) {
+              console.warn("Could not fetch user seen movies, showing generic titles.", dbError);
+          }
+      }
+      setSeenMovieIds(initialSeenIds);
+      
+      const initialMovies = await fetchGenericMovies(initialSeenIds);
+      setMovies(initialMovies);
+      setLoading(false);
+    };
 
+    if (!authLoading) {
+      initializeFeed();
+    }
+  }, [authLoading, firebaseUser, fetchGenericMovies]);
+
+
+  // Subscribe to user's ratings and watched list
   useEffect(() => {
     if (authLoading || !firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -262,17 +270,23 @@ export function DiscoverFeed() {
     }
   };
 
-  const swiped = (direction: 'left' | 'right', movie: Movie, index: number) => {
+  const swiped = (direction: 'left' | 'right', movie: Movie) => {
     if (direction === 'right') {
         handleRateMovie(movie, 5);
     }
-    setCurrentIndex(prev => prev + 1);
-
-    if (index === movies.length - 2) {
-      loadMoreMovies();
-    }
   };
   
+  const onCardLeftScreen = (myIdentifier: number) => {
+    setMovies(prevMovies => prevMovies.filter(m => m.id !== myIdentifier));
+  };
+  
+  useEffect(() => {
+    if (!loading && movies.length < MOVIES_PER_BATCH) {
+        loadMoreMovies();
+    }
+  }, [movies.length, loading, loadMoreMovies]);
+
+
   const renderContent = () => {
       if (loading) {
         return (
@@ -281,43 +295,28 @@ export function DiscoverFeed() {
             </Card>
         );
       }
-    
-      if (movies.length === 0) {
-        return (
-            <Card className="w-full max-w-sm h-[75vh] flex items-center justify-center p-8">
-              <div className="text-center text-muted-foreground flex flex-col items-center gap-4">
-                <Film className="h-16 w-16" />
-                <p className="text-lg">Could Not Load Movies</p>
-                <p className="text-sm">Please check your connection and try again later.</p>
-                 <Button onClick={() => initializeFeed()}>
-                    <RefreshCw className="mr-2 h-4 w-4" /> Try Again
-                 </Button>
-              </div>
-            </Card>
-        );
-      }
 
       return (
          <div className="relative w-full max-w-sm h-[75vh]">
-            {movies.map((movie, index) => (
-                <TinderCard
-                    ref={(el) => (tinderCardsRef.current[index] = el)}
-                    className="absolute w-full h-full"
-                    key={movie.id}
-                    onSwipe={(dir) => swiped(dir as 'left' | 'right', movie, index)}
-                    preventSwipe={['up', 'down']}
-                    onCardLeftScreen={() => {}}
-                >
-                    <DiscoverCard
-                        movie={movie}
-                        rating={userRatings.find(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type)?.rating || 0}
-                        isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
-                        onRate={(rating) => handleRateMovie(movie, rating)}
-                        onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
-                    />
-                </TinderCard>
-            ))}
-            {!canSwipe && !loadingMore && (
+            {movies.length > 0 ? (
+                movies.map((movie) => (
+                    <TinderCard
+                        className="absolute w-full h-full"
+                        key={movie.id}
+                        onSwipe={(dir) => swiped(dir as 'left' | 'right', movie)}
+                        preventSwipe={['up', 'down']}
+                        onCardLeftScreen={() => onCardLeftScreen(movie.id)}
+                    >
+                        <DiscoverCard
+                            movie={movie}
+                            rating={userRatings.find(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type)?.rating || 0}
+                            isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
+                            onRate={(rating) => handleRateMovie(movie, rating)}
+                            onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
+                        />
+                    </TinderCard>
+                ))
+            ) : (
                  <Card className="w-full h-full flex items-center justify-center p-8">
                     <div className="text-center text-muted-foreground flex flex-col items-center gap-4">
                         <Film className="h-16 w-16" />
@@ -366,5 +365,7 @@ export function DiscoverFeed() {
     </div>
   );
 }
+
+    
 
     
