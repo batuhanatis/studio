@@ -2,12 +2,12 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { MovieFinder } from '@/components/search/MovieFinder';
 
-export default function SearchPage() {
+function SearchPageContent() {
   const { firebaseUser, loading } = useAuth();
   const router = useRouter();
 
@@ -37,5 +37,14 @@ export default function SearchPage() {
         <MovieFinder />
       </main>
     </div>
+  );
+}
+
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SearchPageContent />
+    </Suspense>
   );
 }

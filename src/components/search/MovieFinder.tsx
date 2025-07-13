@@ -1,11 +1,12 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 
 import { Input } from '@/components/ui/input';
 import { Loader2, Search, Keyboard, Film, Star, Sparkles } from 'lucide-react';
@@ -37,10 +38,15 @@ interface UserMovieData {
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
 export function MovieFinder() {
-  const [query, setQuery] = useState('');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const urlQuery = searchParams.get('query') || '';
+
+  const [query, setQuery] = useState(urlQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [hasSearched, setHasSearched] = useState(!!urlQuery);
   const [recommendations, setRecommendations] = useState<SearchResult[]>([]);
   const [loadingRecs, setLoadingRecs] = useState(true);
   
@@ -49,6 +55,10 @@ export function MovieFinder() {
 
   const [watched, setWatched] = useState<UserMovieData[]>([]);
   const [loadingWatched, setLoadingWatched] = useState(true);
+
+  useEffect(() => {
+    setQuery(urlQuery);
+  }, [urlQuery]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -113,6 +123,7 @@ export function MovieFinder() {
             );
             if (signal.aborted || !res.ok) {
               setRecommendations([]);
+              setLoadingRecs(false);
               return;
             }
             const data = await res.json();
@@ -140,88 +151,89 @@ export function MovieFinder() {
       }
     };
 
-    if (query.trim().length === 0 && !hasSearched) {
+    if (query.trim().length === 0) {
       fetchRecommendations();
     } else {
-      setLoadingRecs(true);
+      setLoadingRecs(false);
       setRecommendations([]);
     }
 
     return () => controller.abort();
-  }, [query, hasSearched, firebaseUser, authLoading]);
+  }, [query, firebaseUser, authLoading]);
+
+  const searchMovies = useCallback(async (searchQuery: string) => {
+    const trimmedQuery = searchQuery.trim();
+
+    if (trimmedQuery.length === 0) {
+      setResults([]);
+      setHasSearched(false);
+      setIsLoading(false);
+      return;
+    }
+    
+    setHasSearched(true);
+
+    if (trimmedQuery.length < 3) {
+      setResults([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const res = await fetch(
+        `https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(
+          trimmedQuery
+        )}&include_adult=false`
+      );
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.status_message || 'Failed to fetch from TMDB');
+      }
+
+      const data = await res.json();
+      const sortedResults = (data.results || [])
+        .filter((item: any) => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path)
+        .sort((a: SearchResult, b: SearchResult) => b.popularity - a.popularity);
+      setResults(sortedResults);
+    } catch (error: any) {
+      console.error('Error fetching movie data:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Search Failed',
+        description: error.message || 'Could not fetch movie data. Please try again.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+  
 
   useEffect(() => {
-    const controller = new AbortController();
-    const { signal } = controller;
+    if (urlQuery) {
+        searchMovies(urlQuery);
+    }
+  }, [urlQuery, searchMovies]);
 
-    const searchMovies = async (searchQuery: string) => {
-      const trimmedQuery = searchQuery.trim();
-
-      if (trimmedQuery.length === 0) {
-        setResults([]);
-        setHasSearched(false);
-        setIsLoading(false);
-        return;
-      }
-      
-      setHasSearched(true);
-
-      if (trimmedQuery.length < 3) {
-        setResults([]);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-
-      try {
-        const res = await fetch(
-          `https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(
-            trimmedQuery
-          )}&include_adult=false`,
-          { signal }
-        );
-
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.status_message || 'Failed to fetch from TMDB');
-        }
-
-        const data = await res.json();
-        if (!signal.aborted) {
-          const sortedResults = (data.results || [])
-            .filter((item: any) => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path)
-            .sort((a: SearchResult, b: SearchResult) => b.popularity - a.popularity);
-          setResults(sortedResults);
-        }
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          return;
-        }
-        if (!signal.aborted) {
-          console.error('Error fetching movie data:', error);
-          toast({
-            variant: 'destructive',
-            title: 'Search Failed',
-            description: error.message || 'Could not fetch movie data. Please try again.',
-          });
-        }
-      } finally {
-        if (!signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
+  useEffect(() => {
     const debounceTimer = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (query) {
+        params.set('query', query);
+      } else {
+        params.delete('query');
+      }
+      // Use replace to avoid adding to history on every keystroke
+      router.replace(`${pathname}?${params.toString()}`);
       searchMovies(query);
-    }, 300);
+    }, 500); // 500ms debounce
 
     return () => {
       clearTimeout(debounceTimer);
-      controller.abort();
     };
-  }, [query, toast]);
+  }, [query, pathname, router, searchParams, searchMovies]);
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!firebaseUser) return;
@@ -243,7 +255,7 @@ export function MovieFinder() {
   const watchedIds = new Set(watched.map(item => item.movieId));
 
   const renderRecommendations = () => {
-    if (query.trim().length > 0 || hasSearched) return null;
+    if (hasSearched) return null;
 
     if (loadingRecs || loadingWatched || authLoading) {
       return (
@@ -282,6 +294,8 @@ export function MovieFinder() {
   };
 
   const renderStatus = () => {
+    if (!hasSearched) return null;
+
     if (isLoading) {
       return (
         <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
@@ -339,9 +353,8 @@ export function MovieFinder() {
       </form>
 
       {renderRecommendations()}
-      {renderStatus()}
-
-      {results.length > 0 && !isLoading && (
+      
+      {hasSearched && !isLoading && results.length > 0 && (
         <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {results.map((item) => (
@@ -355,6 +368,8 @@ export function MovieFinder() {
            </div>
         </div>
       )}
+
+      {renderStatus()}
     </div>
   );
 }
