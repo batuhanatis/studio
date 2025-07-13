@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 export function Header() {
   const router = useRouter();
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, notificationCount } = useAuth();
   const isAnonymous = firebaseUser?.isAnonymous;
 
   const authNav = isAnonymous ? (
@@ -25,10 +25,15 @@ export function Header() {
       </Link>
     </Button>
   ) : (
-     <Button asChild variant="secondary">
+     <Button asChild variant="secondary" className="relative">
         <Link href={`/profile/${firebaseUser?.uid}`}>
           <User className="mr-2 h-4 w-4" />
           Profile
+          {notificationCount > 0 && (
+            <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
+                {notificationCount}
+            </span>
+          )}
         </Link>
       </Button>
   );
@@ -42,9 +47,14 @@ export function Header() {
     </SheetClose>
   ) : (
     <SheetClose asChild>
-      <Link href={`/profile/${firebaseUser?.uid}`} className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-secondary">
+      <Link href={`/profile/${firebaseUser?.uid}`} className="relative flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-secondary">
         <User className="h-5 w-5" />
         <span className="font-medium">Profile</span>
+        {notificationCount > 0 && (
+          <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
+              {notificationCount}
+          </span>
+        )}
       </Link>
     </SheetClose>
   );
@@ -67,6 +77,12 @@ export function Header() {
         <Link href="/foryou">
           <Sparkles className="mr-2 h-4 w-4" />
           For You
+        </Link>
+      </Button>
+       <Button asChild variant="ghost" size="sm">
+        <Link href="/watchlists">
+          <Sparkles className="mr-2 h-4 w-4" />
+          Watchlists
         </Link>
       </Button>
     </>

@@ -11,7 +11,12 @@ import {
   setDoc,
   serverTimestamp,
   updateDoc,
-  type User
+  collection,
+  query,
+  where,
+  onSnapshot,
+  type Unsubscribe,
+  type User,
 } from '@/lib/firebase';
 
 import { createContext, useEffect, useState, type ReactNode } from 'react';
@@ -20,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 interface AuthContextType {
   firebaseUser: User | null;
   loading: boolean;
+  notificationCount: number;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,9 +64,6 @@ const createUserProfileDocument = async (firebaseUser: User) => {
       } else {
         const data = snapshot.data();
         if (data.isAnonymous && !firebaseUser.isAnonymous) {
-          // When an anonymous user signs up, their profile gets upgraded.
-          // The username is now set during the registration process.
-          // We only update the necessary fields that change upon linking.
           const updateData: { isAnonymous: boolean; email?: string | null; displayName?: string | null; photoURL?: string | null } = {
             isAnonymous: false,
           };
@@ -88,10 +91,11 @@ const createUserProfileDocument = async (firebaseUser: User) => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notificationCount, setNotificationCount] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (newFirebaseUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (newFirebaseUser) => {
       if (newFirebaseUser) {
         try {
           await createUserProfileDocument(newFirebaseUser);
@@ -110,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setLoading(true);
+        setFirebaseUser(null);
         try {
           await signInAnonymously(auth);
         } catch (error) {
@@ -119,18 +124,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             title: 'Authentication Failed',
             description: 'Could not start an anonymous session. Please refresh the page.',
           });
-          setFirebaseUser(null);
           setLoading(false);
         }
       }
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeAuth();
   }, [toast]);
+
+  useEffect(() => {
+    if (!firebaseUser || firebaseUser.isAnonymous) {
+      setNotificationCount(0);
+      return;
+    }
+
+    let unsubscribers: Unsubscribe[] = [];
+    
+    const friendRequestQuery = query(
+      collection(db, 'friendRequests'),
+      where('toUserId', '==', firebaseUser.uid),
+      where('status', '==', 'pending')
+    );
+    const blendRequestQuery = query(
+      collection(db, 'blendRequests'),
+      where('toUserId', '==', firebaseUser.uid),
+      where('status', '==', 'pending')
+    );
+
+    let friendRequestCount = 0;
+    let blendRequestCount = 0;
+
+    const updateTotal = () => {
+        setNotificationCount(friendRequestCount + blendRequestCount);
+    }
+
+    const friendUnsub = onSnapshot(friendRequestQuery, (snapshot) => {
+        friendRequestCount = snapshot.size;
+        updateTotal();
+    });
+    unsubscribers.push(friendUnsub);
+
+    const blendUnsub = onSnapshot(blendRequestQuery, (snapshot) => {
+        blendRequestCount = snapshot.size;
+        updateTotal();
+    });
+    unsubscribers.push(blendUnsub);
+
+    return () => {
+        unsubscribers.forEach(unsub => unsub());
+    }
+
+  }, [firebaseUser]);
 
   const value = {
     firebaseUser,
     loading,
+    notificationCount,
   };
 
   return (
