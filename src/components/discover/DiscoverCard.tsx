@@ -39,7 +39,7 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
   return (
     <Card
       ref={ref}
-      className="h-full w-full overflow-y-auto scrollbar-hide bg-card shadow-2xl"
+      className="h-full w-full overflow-y-auto bg-card shadow-2xl scrollbar-hide"
     >
       <div className="relative aspect-[2/3] w-full flex-shrink-0">
         <Image
