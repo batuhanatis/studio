@@ -165,10 +165,8 @@ export function MovieFinder() {
     fetchFilterOptions();
   }, [toast]);
   
-  const fetchDiscoverData = useCallback(async (currentFilters: Filters, genrePrefs: string) => {
+  const fetchDiscoverData = useCallback(async (currentFilters: Filters, genrePrefs: string, currentResults: SearchResult[] = []) => {
     setIsLoading(true);
-    // Do not clear results on refresh, so the user can see the old ones while new ones are loading.
-    // setResults([]); 
     try {
         const genreQuery = currentFilters.genres.length > 0 
             ? currentFilters.genres.join(',')
@@ -185,30 +183,27 @@ export function MovieFinder() {
         if (!res.ok) throw new Error('Failed to fetch from TMDB');
         const data = await res.json();
         
-        const currentResultIds = new Set(results.map(r => r.id));
+        const currentResultIds = new Set(currentResults.map(r => r.id));
         const items = (data.results || [])
             .filter((item: any) => item.poster_path && !currentResultIds.has(item.id))
             .map((item: any) => ({ ...item, media_type: item.media_type || currentFilters.mediaType }));
         
-        if (refreshCount > 0) {
-            setResults(items); // On refresh, replace the results.
-        } else {
-            setResults(items); // Initial load.
-        }
+        setResults(items); 
 
     } catch (error: any) {
         console.error("Error fetching recommendations:", error);
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not load recommendations.' });
+        setResults([]);
     } finally {
         setIsLoading(false);
     }
-  }, [toast, results, refreshCount]);
+  }, [toast]);
   
   const searchMovies = useCallback(async (searchQuery: string, currentFilters: Filters) => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
         setHasSearched(false);
-        fetchDiscoverData(currentFilters, preferredGenreIds);
+        fetchDiscoverData(currentFilters, preferredGenreIds, []);
         return;
     }
     
@@ -243,13 +238,15 @@ export function MovieFinder() {
       setResults(filteredResults);
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Search Failed', description: error.message });
+        setResults([]);
     } finally {
       setIsLoading(false);
     }
   }, [toast, fetchDiscoverData, preferredGenreIds]);
 
-  const debouncedSearch = useCallback(debounce(searchMovies, 500), [searchMovies]);
+  const debouncedSearch = useCallback(debounce((q: string, f: Filters) => searchMovies(q, f), 500), [searchMovies]);
 
+  // Effect for handling search query changes
   useEffect(() => {
     const newParams = new URLSearchParams(searchParams.toString());
     if (query) {
@@ -257,11 +254,24 @@ export function MovieFinder() {
     } else {
       newParams.delete('query');
     }
-    // Using replace to avoid polluting browser history on every keystroke
     router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
     
     debouncedSearch(query, filters);
-  }, [query, filters, refreshCount, router, pathname, searchParams, debouncedSearch]);
+  }, [query, filters, router, pathname, searchParams, debouncedSearch]);
+
+  // Effect for initial load of recommendations when search is empty
+  useEffect(() => {
+    if (!query && !hasSearched) {
+      fetchDiscoverData(filters, preferredGenreIds, []);
+    }
+  }, [query, hasSearched, filters, preferredGenreIds, fetchDiscoverData]);
+  
+  // Effect for the refresh button
+  useEffect(() => {
+    if (refreshCount > 0) {
+      fetchDiscoverData(filters, preferredGenreIds, results);
+    }
+  }, [refreshCount]);
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!firebaseUser) return;
@@ -460,5 +470,3 @@ export function MovieFinder() {
     </div>
   );
 }
-
-    
