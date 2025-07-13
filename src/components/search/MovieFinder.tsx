@@ -219,9 +219,7 @@ export function MovieFinder() {
   const searchMovies = useCallback(async (searchQuery: string, currentFilters: Filters) => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
-        if (!loadingUserData) {
-          fetchDiscoverData(currentFilters, liked);
-        }
+        // This case is handled by the main useEffect
         return;
     }
     
@@ -258,7 +256,7 @@ export function MovieFinder() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, fetchDiscoverData, loadingUserData, liked]);
+  }, [toast, filters.genres, filters.mediaType]);
 
   const debouncedSearch = useCallback(debounce((q: string) => {
     const newParams = new URLSearchParams(searchParams.toString());
@@ -272,13 +270,17 @@ export function MovieFinder() {
 
   useEffect(() => {
     setQuery(urlQuery);
-    // Do not run search if query is empty and results are already there
-    // This prevents re-fetching on back navigation.
-    if (urlQuery === '' && results.length > 0) {
-      return;
+    if (loadingUserData) return;
+
+    if (urlQuery) {
+      searchMovies(urlQuery, filters);
+    } else {
+      // Load initial recommendations or when refresh is clicked
+      if (results.length === 0 || refreshCount > 0) {
+        fetchDiscoverData(filters, liked);
+      }
     }
-    searchMovies(urlQuery, filters);
-  }, [urlQuery, filters, refreshCount]); // Removed searchMovies from deps to control it better
+  }, [urlQuery, filters, liked, loadingUserData, refreshCount, fetchDiscoverData, searchMovies]);
 
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
@@ -503,7 +505,7 @@ export function MovieFinder() {
       
       <Separator />
 
-      {!urlQuery && !isLoading && (
+      {!urlQuery && (
         <div className="w-full text-right">
             <Button variant="outline" onClick={() => setRefreshCount(c => c + 1)} disabled={isLoading}>
                 <RefreshCw className="mr-2 h-4 w-4" />
