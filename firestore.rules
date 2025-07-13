@@ -2,51 +2,60 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
+    
+    // Users can read their own profile, and friends can read each other's profiles.
+    // Anyone can create their own user document.
+    // Users can only update their own document.
     match /users/{userId} {
-      // Allow a user to read their own document fully
-      allow read: if request.auth.uid == userId;
-
-      // Allow a user to read a friend's document if they are in each other's friends list
-      allow read: if request.auth.uid != null &&
-                    get(/databases/$(database)/documents/users/$(userId)).data.friends.hasAny([request.auth.uid]);
-
-      // Allow a user to update their own document, but not change critical fields
-      allow update: if request.auth.uid == userId;
-      
-      // Allow a user to create their own document on signup
-      allow create: if request.auth.uid == userId;
+      allow read: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.friends.hasAny([userId]));
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
     }
 
+    // A user can create a friend request if the `fromUserId` is their own UID.
+    // They can read/delete requests sent to them or by them.
     match /friendRequests/{requestId} {
-       allow create: if request.auth.uid == request.resource.data.fromUserId &&
-                        request.resource.data.keys().hasAll(['fromUserId', 'fromUserEmail', 'toUserId', 'toUserEmail', 'status', 'createdAt']) &&
-                        request.resource.data.fromUserId is string &&
-                        request.resource.data.toUserId is string &&
-                        request.resource.data.fromUserEmail is string &&
-                        request.resource.data.toUserEmail is string &&
-                        request.resource.data.status == 'pending' &&
-                        request.resource.data.createdAt == request.time;
-      allow read, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
-    }
-
-    match /blendRequests/{requestId} {
-      allow create: if request.auth.uid == request.resource.data.fromUserId;
-      allow read, delete: if request.auth.uid == resource.data.fromUserId || request.auth.uid == resource.data.toUserId;
-      allow update: if request.auth.uid == resource.data.toUserId; // To accept
+      allow read, delete: if request.auth != null && (request.resource.data.toUserId == request.auth.uid || request.resource.data.fromUserId == request.auth.uid);
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId
+                      && 'fromUserId' in request.resource.data && request.resource.data.fromUserId == request.auth.uid
+                      && 'toUserId' in request.resource.data && request.resource.data.toUserId != request.auth.uid
+                      && 'fromUserEmail' in request.resource.data
+                      && 'toUserEmail' in request.resource.data
+                      && request.resource.data.status == 'pending'
+                      && 'createdAt' in request.resource.data;
     }
     
-    match /recommendations/{recommendationId} {
-        allow create: if request.auth.uid == request.resource.data.fromUserId;
-        allow read: if request.auth.uid == request.resource.data.toUserId;
+    // Blend Requests can be created by the sender.
+    // They can be read/deleted by either the sender or receiver.
+    // The `users` collection can be updated by a user to add a friend to their `activeBlendsWith` list
+    // only if there is a corresponding blend request. This allows for the atomic update on accept.
+    match /blendRequests/{requestId} {
+      allow read, delete: if request.auth != null && (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromUserId;
+    }
+    
+    match /users/{friendId} {
+       allow update: if request.auth != null &&
+                      // The field being updated must be 'activeBlendsWith'
+                      request.resource.data.keys().hasOnly(['activeBlendsWith']) &&
+                      // The user's own ID must be what's added to the friend's list
+                      request.resource.data.activeBlendsWith == resource.data.activeBlendsWith.concat([request.auth.uid]) &&
+                      // A blend request must exist from the friend to the current user
+                      exists(/databases/$(database)/documents/blendRequests/{id}) where 
+                      get(/databases/$(database)/documents/blendRequests/{id}).data.fromUserId == friendId &&
+                      get(/databases/$(database)/documents/blendRequests/{id}).data.toUserId == request.auth.uid;
     }
 
-    match /watchlists/{watchlistId} {
-      // Anyone authenticated can read a watchlist IF they are the owner
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-      
-      // Allow create, update, delete only for the owner of the watchlist
-      allow create, update, delete: if request.auth.uid == request.resource.data.userId;
+    // Users can only read, create, update, and delete their own watchlists.
+    match /watchlists/{listId} {
+      allow read, create, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    // Users can send recommendations to other users.
+    // Users can only read recommendations sent to them.
+    match /recommendations/{recId} {
+      allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
+      allow read: if request.auth != null && resource.data.toUserId == request.auth.uid;
     }
   }
 }

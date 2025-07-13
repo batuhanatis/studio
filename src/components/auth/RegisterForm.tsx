@@ -4,7 +4,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
 import { auth, googleProvider, db, linkWithCredential, linkWithPopup, EmailAuthProvider } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -32,6 +32,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Clapperboard, Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
+  username: z.string().min(3, {
+    message: 'Username must be at least 3 characters long.',
+  }).max(20, {
+    message: 'Username must be 20 characters or less.',
+  }).regex(/^[a-zA-Z0-9_]+$/, {
+    message: 'Username can only contain letters, numbers, and underscores.',
+  }),
   email: z.string().email({
     message: 'Please enter a valid email address.',
   }),
@@ -58,6 +65,7 @@ export function RegisterForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      username: '',
       email: '',
       password: '',
     },
@@ -72,10 +80,26 @@ export function RegisterForm() {
     }
 
     try {
+      // 1. Check if username is unique
+      const usernameQuery = query(collection(db, 'users'), where('username', '==', values.username));
+      const usernameSnapshot = await getDocs(usernameQuery);
+      if (!usernameSnapshot.empty) {
+        toast({ variant: 'destructive', title: 'Username Taken', description: 'This username is already in use. Please choose another one.' });
+        form.setError('username', { message: 'This username is already taken.' });
+        return;
+      }
+      
+      // 2. Link account
       const credential = EmailAuthProvider.credential(values.email, values.password);
       await linkWithCredential(auth.currentUser, credential);
+
+      // 3. Update user profile with username
       const userDocRef = doc(db, 'users', auth.currentUser.uid);
-      await updateDoc(userDocRef, { email: values.email, isAnonymous: false });
+      await updateDoc(userDocRef, { 
+          email: values.email, 
+          username: values.username,
+          isAnonymous: false 
+      });
       
       toast({
         title: 'Account Created!',
@@ -109,8 +133,21 @@ export function RegisterForm() {
 
     try {
         const result = await linkWithPopup(auth.currentUser, googleProvider);
-        const userDocRef = doc(db, 'users', result.user.uid);
-        await updateDoc(userDocRef, { email: result.user.email, isAnonymous: false, photoURL: result.user.photoURL });
+        const user = result.user;
+        const userDocRef = doc(db, 'users', user.uid);
+        
+        // Use email as a fallback username if display name is not available
+        const username = user.displayName?.replace(/\s/g, '').toLowerCase() || user.email?.split('@')[0];
+        
+        // Since Google sign-in doesn't have a username step, we can't guarantee uniqueness beforehand.
+        // We will just set it, but a more robust system might ask the user to confirm/change it on first login.
+        await updateDoc(userDocRef, { 
+            email: user.email, 
+            username: username,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            isAnonymous: false,
+        });
         toast({ title: 'Account Created!', description: 'Your progress is now saved to your Google account.' });
         router.push('/search');
     } catch (error: any) {
@@ -159,6 +196,19 @@ export function RegisterForm() {
             </div>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="your_username" {...field} disabled={isLoading || isGoogleLoading} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="email"

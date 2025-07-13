@@ -58,12 +58,17 @@ const createUserProfileDocument = async (firebaseUser: User) => {
       } else {
         const data = snapshot.data();
         if (data.isAnonymous && !firebaseUser.isAnonymous) {
-          await updateDoc(userDocRef, {
+          // When an anonymous user signs up, their profile gets upgraded.
+          // The username is now set during the registration process.
+          // We only update the necessary fields that change upon linking.
+          const updateData: { isAnonymous: boolean; email?: string | null; displayName?: string | null; photoURL?: string | null } = {
             isAnonymous: false,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName || "",
-            photoURL: firebaseUser.photoURL || "",
-          });
+          };
+          if (firebaseUser.email) updateData.email = firebaseUser.email;
+          if (firebaseUser.displayName) updateData.displayName = firebaseUser.displayName;
+          if (firebaseUser.photoURL) updateData.photoURL = firebaseUser.photoURL;
+
+          await updateDoc(userDocRef, updateData);
         }
       }
 
