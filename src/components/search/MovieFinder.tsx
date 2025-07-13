@@ -10,7 +10,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { debounce } from 'lodash';
 
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, Keyboard, Film, Star, Filter, X, Sparkles, Tv } from 'lucide-react';
+import { Loader2, Search, Film, Filter, X, Tv, RefreshCw } from 'lucide-react';
 import { MovieResultCard } from './MovieResultCard';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -85,6 +85,8 @@ export function MovieFinder() {
     mediaType: 'all',
   });
   
+  const [refreshCount, setRefreshCount] = useState(0);
+
   const { toast } = useToast();
   const { firebaseUser, loading: authLoading } = useAuth();
 
@@ -95,7 +97,9 @@ export function MovieFinder() {
 
   useEffect(() => {
     setQuery(urlQuery);
-    setHasSearched(!!urlQuery);
+    if(urlQuery) {
+        setHasSearched(true);
+    }
   }, [urlQuery]);
 
   // User data listener
@@ -163,40 +167,52 @@ export function MovieFinder() {
   
   const fetchDiscoverData = useCallback(async (currentFilters: Filters, genrePrefs: string) => {
     setIsLoading(true);
-    setResults([]);
+    // Do not clear results on refresh, so the user can see the old ones while new ones are loading.
+    // setResults([]); 
     try {
         const genreQuery = currentFilters.genres.length > 0 
             ? currentFilters.genres.join(',')
             : genrePrefs;
         
         const mediaTypePath = currentFilters.mediaType === 'all' ? 'trending/all/week' : `discover/${currentFilters.mediaType}`;
+        const page = Math.floor(Math.random() * 20) + 1;
+
         const discoverUrl = currentFilters.mediaType === 'all'
-            ? `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US`
-            : `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&${currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date'}.gte=${currentFilters.year[0]}-01-01&${currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date'}.lte=${currentFilters.year[1]}-12-31`;
+            ? `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US&page=${page}`
+            : `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=${page}&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&${currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date'}.gte=${currentFilters.year[0]}-01-01&${currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date'}.lte=${currentFilters.year[1]}-12-31`;
 
         const res = await fetch(discoverUrl);
         if (!res.ok) throw new Error('Failed to fetch from TMDB');
         const data = await res.json();
         
+        const currentResultIds = new Set(results.map(r => r.id));
         const items = (data.results || [])
-            .filter((item: any) => item.poster_path)
+            .filter((item: any) => item.poster_path && !currentResultIds.has(item.id))
             .map((item: any) => ({ ...item, media_type: item.media_type || currentFilters.mediaType }));
+        
+        if (refreshCount > 0) {
+            setResults(items); // On refresh, replace the results.
+        } else {
+            setResults(items); // Initial load.
+        }
 
-        setResults(items);
     } catch (error: any) {
         console.error("Error fetching recommendations:", error);
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not load recommendations.' });
     } finally {
         setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, results, refreshCount]);
   
   const searchMovies = useCallback(async (searchQuery: string, currentFilters: Filters) => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
+        setHasSearched(false);
         fetchDiscoverData(currentFilters, preferredGenreIds);
         return;
     }
+    
+    setHasSearched(true);
     
     if (trimmedQuery.length < 2) {
       setResults([]);
@@ -241,10 +257,11 @@ export function MovieFinder() {
     } else {
       newParams.delete('query');
     }
-    router.replace(`${pathname}?${newParams.toString()}`);
+    // Using replace to avoid polluting browser history on every keystroke
+    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
     
     debouncedSearch(query, filters);
-  }, [query, filters, router, pathname, searchParams, debouncedSearch]);
+  }, [query, filters, refreshCount, router, pathname, searchParams, debouncedSearch]);
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!firebaseUser) return;
@@ -291,7 +308,7 @@ export function MovieFinder() {
     : results;
 
   const renderStatus = () => {
-    if (isLoading || loadingWatched || loadingProfile || authLoading) {
+    if (isLoading) {
       return (
         <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -303,14 +320,13 @@ export function MovieFinder() {
     if (query && query.length > 0 && query.length < 2) {
       return (
         <div className="pt-16 text-center text-muted-foreground flex flex-col items-center gap-4">
-          <Keyboard className="h-16 w-16 text-muted-foreground/30" />
           <p className="text-lg font-medium text-foreground">Keep typing...</p>
           <p>Enter at least 2 characters to search.</p>
         </div>
       );
     }
     
-    if (displayedResults.length === 0) {
+    if (hasSearched && displayedResults.length === 0) {
       return (
         <div className="pt-16 text-center text-muted-foreground flex flex-col items-center gap-4">
           <Search className="h-16 w-16 text-muted-foreground/30" />
@@ -334,7 +350,7 @@ export function MovieFinder() {
       </div>
       
       <div className="w-full max-w-3xl space-y-4">
-        <form onSubmit={(e) => e.preventDefault()} className="w-full">
+        <form onSubmit={(e) => {e.preventDefault(); searchMovies(query, filters)}} className="w-full">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
@@ -416,12 +432,21 @@ export function MovieFinder() {
       
       <Separator />
 
+      {!hasSearched && !isLoading && (
+        <div className="w-full text-right">
+            <Button variant="outline" onClick={() => setRefreshCount(c => c + 1)} disabled={isLoading}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh Recommendations
+            </Button>
+        </div>
+      )}
+
       {displayedResults.length > 0 && (
          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {displayedResults.map((item) => (
                     <MovieResultCard
-                        key={item.id}
+                        key={`${item.id}-${item.media_type}`}
                         item={item}
                         isWatched={watchedIds.has(String(item.id))}
                         onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
@@ -435,3 +460,5 @@ export function MovieFinder() {
     </div>
   );
 }
+
+    
