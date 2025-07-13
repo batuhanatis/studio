@@ -20,6 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { getWatchlistRecommendations } from '@/ai/flows/watchlist-recommendations';
 
 interface SearchResult {
   id: number;
@@ -37,9 +38,6 @@ interface SearchResult {
 interface UserMovieData {
   movieId: string;
   mediaType: 'movie' | 'tv';
-}
-
-interface LikedMovieData extends UserMovieData {
   title: string;
   poster: string | null;
 }
@@ -94,7 +92,6 @@ export function MovieFinder() {
   const [disliked, setDisliked] = useState<UserMovieData[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const preferredGenreIds = useRef<string>('');
   
   // User data listener
   useEffect(() => {
@@ -109,19 +106,6 @@ export function MovieFinder() {
         setWatched(data.watchedMovies || []);
         setLiked(data.likedMovies || []);
         setDisliked(data.dislikedMovies || []);
-        
-        const likedMovies: LikedMovieData[] = data.likedMovies || [];
-        
-        if (likedMovies.length > 0) {
-            const genreDetailsPromises = likedMovies.slice(0, 5).map(m => 
-                fetch(`https://api.themoviedb.org/3/${m.mediaType}/${m.movieId}?api_key=${API_KEY}`)
-                    .then(res => res.ok ? res.json() : Promise.resolve({ genres: [] }))
-                    .then(details => details.genres?.map((g: Genre) => g.id) || [])
-            );
-            const genreIdArrays = await Promise.all(genreDetailsPromises);
-            const uniqueGenreIds = [...new Set(genreIdArrays.flat())];
-            preferredGenreIds.current = uniqueGenreIds.join('|');
-        }
       }
       setLoadingUserData(false);
     }, (err) => {
@@ -159,30 +143,65 @@ export function MovieFinder() {
     fetchFilterOptions();
   }, [toast]);
   
-  const fetchDiscoverData = useCallback(async (currentFilters: Filters, genrePrefs: string) => {
+  const fetchGenericDiscoverData = useCallback(async (currentFilters: Filters) => {
+    const genreQuery = currentFilters.genres.join(',');
+    const mediaTypePath = currentFilters.mediaType === 'all' ? 'trending/all/week' : `discover/${currentFilters.mediaType}`;
+    const page = Math.floor(Math.random() * 20) + 1;
+
+    const discoverUrl = currentFilters.mediaType === 'all'
+        ? `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US&page=${page}`
+        : `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=${page}&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&${currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date'}.gte=${currentFilters.year[0]}-01-01&${currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date'}.lte=${currentFilters.year[1]}-12-31`;
+
+    const res = await fetch(discoverUrl);
+    if (!res.ok) throw new Error('Failed to fetch from TMDB');
+    const data = await res.json();
+    
+    return (data.results || [])
+        .filter((item: any) => item.poster_path)
+        .map((item: any) => ({ ...item, media_type: item.media_type || currentFilters.mediaType }));
+  }, []);
+
+  const searchMovieByTitle = useCallback(async (title: string): Promise<SearchResult | null> => {
+     try {
+        const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(title)}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        const result = (data.results || []).find((item: any) => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path);
+        return result || null;
+     } catch {
+        return null;
+     }
+  }, []);
+
+  const fetchAiDiscoverData = useCallback(async (likedMovies: UserMovieData[]) => {
+    try {
+        const movieTitles = likedMovies.map(m => m.title);
+        const result = await getWatchlistRecommendations({ movieTitles });
+        
+        if (!result || result.recommendedTitles.length === 0) {
+            return [];
+        }
+        
+        const moviePromises = result.recommendedTitles.map(title => searchMovieByTitle(title));
+        const movies = (await Promise.all(moviePromises)).filter((m): m is SearchResult => m !== null);
+        
+        return Array.from(new Map(movies.map(m => [m.id, m])).values());
+    } catch (err: any) {
+        toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not get AI recommendations.' });
+        return [];
+    }
+  }, [searchMovieByTitle, toast]);
+  
+  const fetchDiscoverData = useCallback(async (currentFilters: Filters, userLikedMovies: UserMovieData[]) => {
     setIsLoading(true);
     try {
-        const genreQuery = currentFilters.genres.length > 0 
-            ? currentFilters.genres.join(',')
-            : genrePrefs;
-        
-        const mediaTypePath = currentFilters.mediaType === 'all' ? 'trending/all/week' : `discover/${currentFilters.mediaType}`;
-        const page = Math.floor(Math.random() * 20) + 1;
-
-        const discoverUrl = currentFilters.mediaType === 'all'
-            ? `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US&page=${page}`
-            : `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=${page}&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&${currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date'}.gte=${currentFilters.year[0]}-01-01&${currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date'}.lte=${currentFilters.year[1]}-12-31`;
-
-        const res = await fetch(discoverUrl);
-        if (!res.ok) throw new Error('Failed to fetch from TMDB');
-        const data = await res.json();
-        
-        const items = (data.results || [])
-            .filter((item: any) => item.poster_path)
-            .map((item: any) => ({ ...item, media_type: item.media_type || currentFilters.mediaType }));
-        
+        let items: SearchResult[];
+        if (userLikedMovies.length > 0) {
+            items = await fetchAiDiscoverData(userLikedMovies);
+        } else {
+            items = await fetchGenericDiscoverData(currentFilters);
+        }
         setResults(items);
-
     } catch (error: any) {
         console.error("Error fetching recommendations:", error);
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not load recommendations.' });
@@ -190,12 +209,14 @@ export function MovieFinder() {
     } finally {
         setIsLoading(false);
     }
-  }, [toast]);
-  
+  }, [toast, fetchAiDiscoverData, fetchGenericDiscoverData]);
+
   const searchMovies = useCallback(async (searchQuery: string, currentFilters: Filters) => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
-        fetchDiscoverData(currentFilters, preferredGenreIds.current);
+        if (!loadingUserData) {
+          fetchDiscoverData(currentFilters, liked);
+        }
         return;
     }
     
@@ -232,7 +253,7 @@ export function MovieFinder() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, fetchDiscoverData]);
+  }, [toast, fetchDiscoverData, loadingUserData, liked]);
 
   const debouncedSearch = useCallback(debounce((q: string) => {
     const newParams = new URLSearchParams(searchParams.toString());
@@ -256,10 +277,10 @@ export function MovieFinder() {
     const movieData = results.find(r => r.id === movieId && r.media_type === mediaType);
     if(!movieData) return;
 
-    const movieIdentifier = { 
+    const movieIdentifier: UserMovieData = { 
         movieId: String(movieId), 
         mediaType: mediaType,
-        title: movieData.title || movieData.name,
+        title: movieData.title || movieData.name || 'Untitled',
         poster: movieData.poster_path
     };
 
@@ -277,10 +298,10 @@ export function MovieFinder() {
   const handleToggleLike = async (item: SearchResult, isLiked: boolean) => {
     if (!firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier = {
+    const movieIdentifier: UserMovieData = {
       movieId: String(item.id),
       mediaType: item.media_type,
-      title: item.title || item.name,
+      title: item.title || item.name || 'Untitled',
       poster: item.poster_path,
     };
   
@@ -302,10 +323,10 @@ export function MovieFinder() {
   const handleToggleDislike = async (item: SearchResult, isDisliked: boolean) => {
     if (!firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier = {
+    const movieIdentifier: UserMovieData = {
       movieId: String(item.id),
       mediaType: item.media_type,
-      title: item.title || item.name,
+      title: item.title || item.name || 'Untitled',
       poster: item.poster_path,
     };
 
@@ -339,7 +360,7 @@ export function MovieFinder() {
   const activeFilterCount = filters.genres.length + filters.platforms.length + (filters.mediaType !== 'all' ? 1 : 0);
   const watchedIds = new Set(watched.map(item => String(item.movieId)));
   const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
-  const dislikedIds = new Set(disliked.map(item => String(item.id)));
+  const dislikedIds = new Set(disliked.map(item => String(item.movieId)));
   
   const displayedResults = results.filter(movie => !dislikedIds.has(String(movie.id)))
                                  .filter(movie => !filters.hideWatched || !watchedIds.has(String(movie.id)));
@@ -504,5 +525,3 @@ export function MovieFinder() {
     </div>
   );
 }
-
-    

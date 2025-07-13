@@ -10,6 +10,7 @@ import { Heart, X as XIcon, RefreshCw, Loader2, Undo } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { DiscoverCard } from './DiscoverCard';
 import { Button } from '@/components/ui/button';
+import { getWatchlistRecommendations } from '@/ai/flows/watchlist-recommendations';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -34,9 +35,6 @@ interface WatchProvider {
 interface UserMovieData {
   movieId: string;
   mediaType: 'movie' | 'tv';
-}
-
-interface MovieFeedbackData extends UserMovieData {
   title: string;
   poster: string | null;
 }
@@ -62,8 +60,20 @@ export function DiscoverFeed() {
   const currentIndexRef = useRef(movies.length - 1);
   const tinderCardRefs = useMemo(() => Array(movies.length).fill(0).map(() => React.createRef<any>()), [movies.length]);
 
+  const searchMovieByTitle = useCallback(async (title: string): Promise<Movie | null> => {
+     try {
+        const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(title)}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        const result = (data.results || []).find((item: any) => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path);
+        return result || null;
+     } catch {
+        return null;
+     }
+  }, []);
+
   const fetchMovies = useCallback(async (isRestart = false) => {
-    if (authLoading) return;
+    if (authLoading || !firebaseUser) return;
     if (isRestart) {
         setLoading(true);
     } else {
@@ -71,35 +81,48 @@ export function DiscoverFeed() {
     }
 
     let seenMovieIds = new Set();
-    if (firebaseUser) {
-        try {
-            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-            if (userDoc.exists()) {
-                const data = userDoc.data();
-                const liked = data.likedMovies || [];
-                const disliked = data.dislikedMovies || [];
-                const watched = data.watchedMovies || [];
-                seenMovieIds = new Set([
-                    ...liked.map((m: any) => m.movieId), 
-                    ...disliked.map((m: any) => m.movieId), 
-                    ...watched.map((m: any) => m.movieId)
-                ]);
-            }
-        } catch {}
-    }
+    let likedMovies: UserMovieData[] = [];
+    try {
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (userDoc.exists()) {
+            const data = userDoc.data();
+            likedMovies = data.likedMovies || [];
+            const disliked = data.dislikedMovies || [];
+            const watched = data.watchedMovies || [];
+            seenMovieIds = new Set([
+                ...likedMovies.map((m: any) => m.movieId), 
+                ...disliked.map((m: any) => m.movieId), 
+                ...watched.map((m: any) => m.movieId)
+            ]);
+        }
+    } catch {}
 
     try {
-      const page = Math.floor(Math.random() * 20) + 1;
-      const movieReq = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&page=${page}`);
-      const tvReq = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&page=${page}`);
+      let allResults: Movie[] = [];
+      if (likedMovies.length > 0) {
+        const movieTitles = likedMovies.map(m => m.title);
+        const result = await getWatchlistRecommendations({ movieTitles });
+        if (result && result.recommendedTitles.length > 0) {
+          const moviePromises = result.recommendedTitles.map(title => searchMovieByTitle(title));
+          const moviesFromAi = (await Promise.all(moviePromises)).filter((m): m is Movie => m !== null);
+          allResults = Array.from(new Map(moviesFromAi.map(m => [m.id, m])).values());
+        }
+      } 
       
-      const [movieRes, tvRes] = await Promise.all([movieReq, tvReq]);
-      const [moviesJson, tvJson] = await Promise.all([movieRes.json(), tvRes.json()]);
+      if (allResults.length === 0) {
+          const page = Math.floor(Math.random() * 20) + 1;
+          const movieReq = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&page=${page}`);
+          const tvReq = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&page=${page}`);
+          
+          const [movieRes, tvRes] = await Promise.all([movieReq, tvReq]);
+          const [moviesJson, tvJson] = await Promise.all([movieRes.json(), tvRes.json()]);
 
-      const allResults = [
-        ...(moviesJson.results || []).map((m: any) => ({ ...m, media_type: 'movie' })),
-        ...(tvJson.results || []).map((t: any) => ({ ...t, media_type: 'tv' }))
-      ];
+          const tmdbResults = [
+            ...(moviesJson.results || []).map((m: any) => ({ ...m, media_type: 'movie' })),
+            ...(tvJson.results || []).map((t: any) => ({ ...t, media_type: 'tv' }))
+          ];
+          allResults = tmdbResults;
+      }
       
       const uniqueAndFiltered = Array.from(new Map(allResults.map(m => [m.id, m])).values())
                         .filter(m => m.poster_path && m.overview)
@@ -119,7 +142,7 @@ export function DiscoverFeed() {
       if (isRestart) setLoading(false);
       setLoadingMore(false);
     }
-  }, [firebaseUser, toast, authLoading]);
+  }, [firebaseUser, toast, authLoading, searchMovieByTitle]);
   
   const fetchProviders = useCallback(async (movie: Movie | null) => {
     if (!movie) {
@@ -156,8 +179,8 @@ export function DiscoverFeed() {
   }, [movies, fetchProviders]);
 
   useEffect(() => {
-    fetchMovies(movies.length === 0);
-  }, [triggerFetch]);
+    fetchMovies(true);
+  }, [triggerFetch, firebaseUser]); // Re-fetch when user changes
 
   useEffect(() => {
     if (!firebaseUser) return;
@@ -175,7 +198,7 @@ export function DiscoverFeed() {
     if (!firebaseUser) return;
     const ref = doc(db, 'users', firebaseUser.uid);
     try {
-      const newLike: MovieFeedbackData = {
+      const newLike: UserMovieData = {
         movieId: String(movie.id),
         mediaType: movie.media_type,
         title: movie.title || movie.name || 'Untitled',
@@ -196,7 +219,7 @@ export function DiscoverFeed() {
   const handleToggleWatched = async (movie: Movie, watched: boolean) => {
     if (!firebaseUser) return;
     const ref = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier: UserMovieData & { title: string; poster: string | null } = {
+    const movieIdentifier: UserMovieData = {
         movieId: String(movie.id),
         mediaType: movie.media_type,
         title: movie.title || movie.name || 'Untitled',
@@ -228,9 +251,9 @@ export function DiscoverFeed() {
   
   useEffect(() => {
     if (movies.length <= 4 && !loadingMore && !loading) {
-      setTriggerFetch(c => c + 1);
+      fetchMovies(false);
     }
-  }, [movies.length, loadingMore, loading]);
+  }, [movies.length, loadingMore, loading, fetchMovies]);
 
   const swipe = async (dir: 'left' | 'right') => {
     const topCardIndex = movies.length - 1;
@@ -269,11 +292,6 @@ export function DiscoverFeed() {
           setSwipeOpacity(Math.min(progress * 2, 1));
       }
   };
-  
-  const handleSwipeRequirementFulfilled = () => {
-      setSwipeDirection(null);
-      setSwipeOpacity(0);
-  }
 
   const renderContent = () => {
     if (loading) {
