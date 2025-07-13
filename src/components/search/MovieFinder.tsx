@@ -64,10 +64,6 @@ interface Filters {
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
-let initialResults: SearchResult[] = [];
-let initialHasSearched = false;
-
-
 export function MovieFinder() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -75,8 +71,7 @@ export function MovieFinder() {
   const urlQuery = searchParams.get('query') || '';
 
   const [query, setQuery] = useState(urlQuery);
-  const [results, setResults] = useState<SearchResult[]>(() => initialResults);
-  const [hasSearched, setHasSearched] = useState(() => initialHasSearched);
+  const [results, setResults] = useState<SearchResult[]>([]);
   
   const [allGenres, setAllGenres] = useState<Genre[]>([]);
   const [allPlatforms, setAllPlatforms] = useState<Platform[]>([]);
@@ -101,29 +96,11 @@ export function MovieFinder() {
   const [isLoading, setIsLoading] = useState(false);
   const preferredGenreIds = useRef<string>('');
   
-  // Update the singleton state when results change
-  useEffect(() => {
-    initialResults = results;
-    initialHasSearched = hasSearched;
-  }, [results, hasSearched]);
-
-  useEffect(() => {
-    const currentQuery = searchParams.get('query') || '';
-    setQuery(currentQuery);
-    if(currentQuery) {
-        setHasSearched(true);
-    } else if (hasSearched && !currentQuery) {
-        // This handles clearing the search box and going back to recommendations
-        setHasSearched(false); 
-    }
-  }, [searchParams, hasSearched]);
-
   // User data listener
   useEffect(() => {
-    if (authLoading) return;
-    if (!firebaseUser) {
-        setLoadingUserData(false);
-        return;
+    if (authLoading || !firebaseUser) {
+      setLoadingUserData(false);
+      return;
     }
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
@@ -146,6 +123,9 @@ export function MovieFinder() {
             preferredGenreIds.current = uniqueGenreIds.join('|');
         }
       }
+      setLoadingUserData(false);
+    }, (err) => {
+      console.error("Error fetching user data:", err);
       setLoadingUserData(false);
     });
     return () => unsubscribe();
@@ -215,12 +195,9 @@ export function MovieFinder() {
   const searchMovies = useCallback(async (searchQuery: string, currentFilters: Filters) => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
-        setHasSearched(false);
         fetchDiscoverData(currentFilters, preferredGenreIds.current);
         return;
     }
-    
-    setHasSearched(true);
     
     if (trimmedQuery.length < 2) {
       setResults([]);
@@ -257,36 +234,28 @@ export function MovieFinder() {
     }
   }, [toast, fetchDiscoverData]);
 
-  const debouncedSearch = useCallback(debounce((q: string, f: Filters) => searchMovies(q, f), 500), [searchMovies]);
-
-  // Effect for handling search query changes
-  useEffect(() => {
+  const debouncedSearch = useCallback(debounce((q: string, f: Filters) => {
     const newParams = new URLSearchParams(searchParams.toString());
-    if (query) {
-      newParams.set('query', query);
+    if (q) {
+      newParams.set('query', q);
     } else {
       newParams.delete('query');
     }
-    // Using replace to avoid polluting browser history on every keystroke
-    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false }); 
+    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
+  }, 300), [router, pathname, searchParams]);
+
+  useEffect(() => {
+    setQuery(urlQuery);
+  }, [urlQuery]);
+
+  useEffect(() => {
     debouncedSearch(query, filters);
-  }, [query, filters, router, pathname, searchParams, debouncedSearch]);
-
-  // Initial load or when query is cleared
+  }, [query, debouncedSearch, filters]);
+  
   useEffect(() => {
-    if (results.length === 0 && !hasSearched && !loadingUserData) {
-      fetchDiscoverData(filters, preferredGenreIds.current);
-    }
-  }, [results.length, hasSearched, loadingUserData, filters, fetchDiscoverData]);
+    searchMovies(urlQuery, filters);
+  }, [urlQuery, filters, searchMovies, refreshCount]);
 
-
-  // Effect for the refresh button
-  useEffect(() => {
-    if (refreshCount > 0) {
-      fetchDiscoverData(filters, preferredGenreIds.current);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshCount]);
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!firebaseUser) return;
@@ -377,7 +346,7 @@ export function MovieFinder() {
   const activeFilterCount = filters.genres.length + filters.platforms.length + (filters.mediaType !== 'all' ? 1 : 0);
   const watchedIds = new Set(watched.map(item => String(item.movieId)));
   const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
-  const dislikedIds = new Set(disliked.map(item => String(item.movieId)));
+  const dislikedIds = new Set(disliked.map(item => String(item.id)));
   
   const displayedResults = results.filter(movie => !dislikedIds.has(String(movie.id)))
                                  .filter(movie => !filters.hideWatched || !watchedIds.has(String(movie.id)));
@@ -401,7 +370,7 @@ export function MovieFinder() {
       );
     }
     
-    if (hasSearched && displayedResults.length === 0) {
+    if (urlQuery && displayedResults.length === 0) {
       return (
         <div className="pt-16 text-center text-muted-foreground flex flex-col items-center gap-4">
           <Search className="h-16 w-16 text-muted-foreground/30" />
@@ -507,7 +476,7 @@ export function MovieFinder() {
       
       <Separator />
 
-      {!hasSearched && !isLoading && (
+      {!urlQuery && !isLoading && (
         <div className="w-full text-right">
             <Button variant="outline" onClick={() => setRefreshCount(c => c + 1)} disabled={isLoading}>
                 <RefreshCw className="mr-2 h-4 w-4" />
@@ -539,3 +508,5 @@ export function MovieFinder() {
     </div>
   );
 }
+
+    
