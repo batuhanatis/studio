@@ -173,9 +173,9 @@ export function MovieFinder() {
      }
   }, []);
 
-  const fetchAiDiscoverData = useCallback(async (likedMovies: UserMovieData[]) => {
+  const fetchAiDiscoverData = useCallback(async (userLikedMovies: UserMovieData[]) => {
     try {
-        const movieTitles = likedMovies.map(m => m.title);
+        const movieTitles = userLikedMovies.map(m => m.title);
         const result = await getWatchlistRecommendations({ movieTitles });
         
         if (!result || result.recommendedTitles.length === 0) {
@@ -201,7 +201,12 @@ export function MovieFinder() {
         } else {
             items = await fetchGenericDiscoverData(currentFilters);
         }
-        setResults(items);
+
+        const currentResultIds = new Set(results.map(r => r.id));
+        const newItems = items.filter(item => !currentResultIds.has(item.id));
+        
+        setResults(newItems.length > 0 ? newItems : items);
+
     } catch (error: any) {
         console.error("Error fetching recommendations:", error);
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not load recommendations.' });
@@ -209,7 +214,7 @@ export function MovieFinder() {
     } finally {
         setIsLoading(false);
     }
-  }, [toast, fetchAiDiscoverData, fetchGenericDiscoverData]);
+  }, [toast, fetchAiDiscoverData, fetchGenericDiscoverData, results]);
 
   const searchMovies = useCallback(async (searchQuery: string, currentFilters: Filters) => {
     const trimmedQuery = searchQuery.trim();
@@ -267,8 +272,13 @@ export function MovieFinder() {
 
   useEffect(() => {
     setQuery(urlQuery);
+    // Do not run search if query is empty and results are already there
+    // This prevents re-fetching on back navigation.
+    if (urlQuery === '' && results.length > 0) {
+      return;
+    }
     searchMovies(urlQuery, filters);
-  }, [urlQuery, filters, searchMovies, refreshCount]);
+  }, [urlQuery, filters, refreshCount]); // Removed searchMovies from deps to control it better
 
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
