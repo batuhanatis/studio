@@ -76,11 +76,7 @@ export function MovieFinder() {
 
   const [query, setQuery] = useState(urlQuery);
   const [results, setResults] = useState<SearchResult[]>(() => initialResults);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(() => {
-      initialHasSearched = !!urlQuery;
-      return initialHasSearched;
-  });
+  const [hasSearched, setHasSearched] = useState(() => initialHasSearched);
   
   const [allGenres, setAllGenres] = useState<Genre[]>([]);
   const [allPlatforms, setAllPlatforms] = useState<Platform[]>([]);
@@ -102,6 +98,7 @@ export function MovieFinder() {
   const [liked, setLiked] = useState<UserMovieData[]>([]);
   const [disliked, setDisliked] = useState<UserMovieData[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const preferredGenreIds = useRef<string>('');
   
   // Update the singleton state when results change
@@ -111,11 +108,15 @@ export function MovieFinder() {
   }, [results, hasSearched]);
 
   useEffect(() => {
-    setQuery(urlQuery);
-    if(urlQuery) {
+    const currentQuery = searchParams.get('query') || '';
+    setQuery(currentQuery);
+    if(currentQuery) {
         setHasSearched(true);
+    } else if (hasSearched && !currentQuery) {
+        // This handles clearing the search box and going back to recommendations
+        setHasSearched(false); 
     }
-  }, [urlQuery]);
+  }, [searchParams, hasSearched]);
 
   // User data listener
   useEffect(() => {
@@ -266,7 +267,8 @@ export function MovieFinder() {
     } else {
       newParams.delete('query');
     }
-    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
+    // Using replace to avoid polluting browser history on every keystroke
+    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false }); 
     debouncedSearch(query, filters);
   }, [query, filters, router, pathname, searchParams, debouncedSearch]);
 
