@@ -64,6 +64,10 @@ interface Filters {
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
+let initialResults: SearchResult[] = [];
+let initialHasSearched = false;
+
+
 export function MovieFinder() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -71,9 +75,12 @@ export function MovieFinder() {
   const urlQuery = searchParams.get('query') || '';
 
   const [query, setQuery] = useState(urlQuery);
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<SearchResult[]>(() => initialResults);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(!!urlQuery);
+  const [hasSearched, setHasSearched] = useState(() => {
+      initialHasSearched = !!urlQuery;
+      return initialHasSearched;
+  });
   
   const [allGenres, setAllGenres] = useState<Genre[]>([]);
   const [allPlatforms, setAllPlatforms] = useState<Platform[]>([]);
@@ -96,13 +103,17 @@ export function MovieFinder() {
   const [disliked, setDisliked] = useState<UserMovieData[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
   const preferredGenreIds = useRef<string>('');
-  const initialLoadRef = useRef(true);
+  
+  // Update the singleton state when results change
+  useEffect(() => {
+    initialResults = results;
+    initialHasSearched = hasSearched;
+  }, [results, hasSearched]);
 
   useEffect(() => {
     setQuery(urlQuery);
     if(urlQuery) {
         setHasSearched(true);
-        initialLoadRef.current = false;
     }
   }, [urlQuery]);
 
@@ -190,7 +201,6 @@ export function MovieFinder() {
             .map((item: any) => ({ ...item, media_type: item.media_type || currentFilters.mediaType }));
         
         setResults(items);
-        initialLoadRef.current = false;
 
     } catch (error: any) {
         console.error("Error fetching recommendations:", error);
@@ -210,7 +220,6 @@ export function MovieFinder() {
     }
     
     setHasSearched(true);
-    initialLoadRef.current = false;
     
     if (trimmedQuery.length < 2) {
       setResults([]);
@@ -258,18 +267,16 @@ export function MovieFinder() {
       newParams.delete('query');
     }
     router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
-    
-    if (!initialLoadRef.current) {
-        debouncedSearch(query, filters);
-    }
+    debouncedSearch(query, filters);
   }, [query, filters, router, pathname, searchParams, debouncedSearch]);
 
   // Initial load or when query is cleared
   useEffect(() => {
-    if (initialLoadRef.current && !query && !loadingUserData) {
+    if (results.length === 0 && !hasSearched && !loadingUserData) {
       fetchDiscoverData(filters, preferredGenreIds.current);
     }
-  }, [query, filters, loadingUserData, fetchDiscoverData]);
+  }, [results.length, hasSearched, loadingUserData, filters, fetchDiscoverData]);
+
 
   // Effect for the refresh button
   useEffect(() => {
