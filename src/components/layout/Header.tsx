@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Film, Compass, User, LogIn, Menu, List } from 'lucide-react';
+import { Film, Compass, User, LogIn, Menu, List, Users } from 'lucide-react';
 import Link from 'next/link';
 import {
   Sheet,
@@ -79,6 +80,12 @@ export function Header() {
           Watchlists
         </Link>
       </Button>
+       <Button asChild variant="ghost" size="sm">
+        <Link href="/social">
+          <Users className="mr-2 h-4 w-4" />
+          Social
+        </Link>
+      </Button>
     </>
   );
 
@@ -100,6 +107,12 @@ export function Header() {
             <Link href="/watchlists" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-secondary">
                 <List className="h-5 w-5" />
                 <span className="font-medium">Watchlists</span>
+            </Link>
+        </SheetClose>
+         <SheetClose asChild>
+            <Link href="/social" className="flex items-center gap-3 rounded-md p-2 text-foreground hover:bg-secondary">
+                <Users className="h-5 w-5" />
+                <span className="font-medium">Social</span>
             </Link>
         </SheetClose>
         {mobileAuthNav}
