@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
@@ -95,7 +95,7 @@ export function MovieFinder() {
   const [liked, setLiked] = useState<UserMovieData[]>([]);
   const [disliked, setDisliked] = useState<UserMovieData[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
-  const [preferredGenreIds, setPreferredGenreIds] = useState<string>('');
+  const preferredGenreIds = useRef<string>('');
 
   useEffect(() => {
     setQuery(urlQuery);
@@ -129,7 +129,7 @@ export function MovieFinder() {
             );
             const genreIdArrays = await Promise.all(genreDetailsPromises);
             const uniqueGenreIds = [...new Set(genreIdArrays.flat())];
-            setPreferredGenreIds(uniqueGenreIds.join('|'));
+            preferredGenreIds.current = uniqueGenreIds.join('|');
         }
       }
       setLoadingUserData(false);
@@ -203,7 +203,7 @@ export function MovieFinder() {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
         setHasSearched(false);
-        fetchDiscoverData(currentFilters, preferredGenreIds, []);
+        fetchDiscoverData(currentFilters, preferredGenreIds.current, []);
         return;
     }
     
@@ -242,7 +242,7 @@ export function MovieFinder() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, fetchDiscoverData, preferredGenreIds]);
+  }, [toast, fetchDiscoverData]);
 
   const debouncedSearch = useCallback(debounce((q: string, f: Filters) => searchMovies(q, f), 500), [searchMovies]);
 
@@ -261,15 +261,15 @@ export function MovieFinder() {
 
   // Initial load or when query is cleared
   useEffect(() => {
-    if (!query && !hasSearched && !loadingUserData) {
-      fetchDiscoverData(filters, preferredGenreIds, []);
+    if (!query && !hasSearched && !loadingUserData && results.length === 0) {
+      fetchDiscoverData(filters, preferredGenreIds.current, []);
     }
-  }, [query, hasSearched, filters, preferredGenreIds, loadingUserData, fetchDiscoverData]);
+  }, [query, hasSearched, filters, loadingUserData, fetchDiscoverData, results.length]);
 
   // Effect for the refresh button
   useEffect(() => {
     if (refreshCount > 0) {
-      fetchDiscoverData(filters, preferredGenreIds, results);
+      fetchDiscoverData(filters, preferredGenreIds.current, results);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshCount]);
@@ -525,3 +525,5 @@ export function MovieFinder() {
     </div>
   );
 }
+
+    
