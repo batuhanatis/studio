@@ -131,9 +131,17 @@ export function DiscoverFeed() {
       const shuffled = uniqueAndFiltered.sort(() => 0.5 - Math.random());
       
       setMovies(prev => {
-        const newMovies = isRestart ? shuffled.slice(0, 10) : [...prev, ...shuffled.slice(0, 5)];
-        currentIndexRef.current = newMovies.length -1;
-        return newMovies;
+        if (isRestart) {
+            const newMovies = shuffled.slice(0, 10);
+            currentIndexRef.current = newMovies.length -1;
+            return newMovies;
+        } else {
+            const currentIds = new Set(prev.map(m => m.id));
+            const newUniqueMovies = shuffled.filter(m => !currentIds.has(m.id)).slice(0, 5);
+            const combined = [...prev, ...newUniqueMovies];
+            currentIndexRef.current = combined.length -1;
+            return combined;
+        }
       });
 
     } catch (e) {
@@ -328,7 +336,7 @@ export function DiscoverFeed() {
             <TinderCard
                 ref={tinderCardRefs[index]}
                 className="absolute inset-0"
-                key={movie.id}
+                key={`${movie.id}-${movie.media_type}`}
                 onSwipe={(dir) => swiped(dir as 'left' | 'right', movie)}
                 onSwipeRequirementUnfulfilled={() => { setSwipeDirection(null); setSwipeOpacity(0); }}
                 onSwipeProgress={(p, d) => isTopCard && handleSwipeProgress(p, d as any)}
