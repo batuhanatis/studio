@@ -10,7 +10,7 @@ import { Film, Heart, X as XIcon, RefreshCw } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { DiscoverCard } from './DiscoverCard';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '../ui/skeleton';
 
 interface Movie {
@@ -50,26 +50,13 @@ export function DiscoverFeed() {
   
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const currentIndexRef = useRef(currentIndex);
+  const tinderCardRef = useRef<any>(null);
 
-  const childRefs = useMemo(
-    () =>
-      Array(movies.length)
-        .fill(0)
-        .map(() => React.createRef<{ swipe: (dir: 'left' | 'right' | 'up' | 'down') => Promise<void> }>()),
-    [movies.length]
-  );
-  
-  const updateCurrentIndex = (val: number) => {
-    setCurrentIndex(val);
-    currentIndexRef.current = val;
-  }
-
-  const canSwipe = currentIndex >= 0 && currentIndex < movies.length;
+  const canSwipe = currentIndex < movies.length;
 
   const swipe = async (dir: 'left' | 'right') => {
-    if (canSwipe && childRefs[currentIndex]) {
-      await childRefs[currentIndex]?.current?.swipe(dir);
+    if (canSwipe && tinderCardRef.current) {
+      await tinderCardRef.current.swipe(dir);
     }
   }
 
@@ -94,7 +81,8 @@ export function DiscoverFeed() {
     }
     
     try {
-        const pagesToFetch = 5;
+        // Fetch fewer pages to improve performance on mobile
+        const pagesToFetch = 2;
         let allPopular: Movie[] = [];
 
         for (let page = 1; page <= pagesToFetch; page++) {
@@ -114,11 +102,12 @@ export function DiscoverFeed() {
         
         const filtered = uniqueItems.filter(item => !seenMovieIds.has(String(item.id)));
         
-        const moviesToShow = filtered.length > 20 ? filtered : uniqueItems;
-        const shuffledMovies = moviesToShow.sort(() => 0.5 - Math.random()).slice(0, 50); // Limit to 50 cards at a time
+        const moviesToShow = filtered.length > 10 ? filtered : uniqueItems;
+        // Limit to 20 cards to prevent memory issues on mobile
+        const shuffledMovies = moviesToShow.sort(() => 0.5 - Math.random()).slice(0, 20); 
         
         setMovies(shuffledMovies);
-        updateCurrentIndex(shuffledMovies.length - 1);
+        setCurrentIndex(0);
 
     } catch (error) {
         console.error("Error fetching discover feed:", error);
@@ -220,22 +209,13 @@ export function DiscoverFeed() {
     }
   };
 
-  const swiped = (direction: 'left' | 'right', movie: Movie, index: number) => {
-    updateCurrentIndex(index - 1);
+  const swiped = (direction: 'left' | 'right', movie: Movie) => {
     if (direction === 'right') {
         handleRateMovie(movie, 5);
     }
+    setCurrentIndex((prevIndex) => prevIndex + 1);
   };
   
-  const outOfFrame = (name: string, idx: number) => {
-     // This check prevents updating state on cards that have already been swiped
-     // in cases of fast succession.
-    if (currentIndexRef.current >= idx) {
-       // A new ref array is created on each render, so we can't always rely on childRefs[idx].current
-       // This logic can be simplified.
-    }
-  }
-
   const renderContent = () => {
       if (loading || authLoading) {
         return (
@@ -275,26 +255,27 @@ export function DiscoverFeed() {
         )
       }
 
+      const movie = movies[currentIndex];
+
       return (
          <div className="relative w-full max-w-sm h-[70vh] md:h-[75vh]">
-            {movies.map((movie, index) => (
-                <TinderCard
-                    ref={childRefs[index]}
-                    className="absolute w-full h-full"
-                    key={movie.id}
-                    onSwipe={(dir) => swiped(dir as 'left' | 'right', movie, index)}
-                    onCardLeftScreen={() => outOfFrame(movie.title || 'movie', index)}
-                    preventSwipe={['up', 'down']}
-                >
-                    <DiscoverCard
-                        movie={movie}
-                        rating={userRatings.find(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type)?.rating || 0}
-                        isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
-                        onRate={(rating) => handleRateMovie(movie, rating)}
-                        onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
-                    />
-                </TinderCard>
-            ))}
+            <TinderCard
+                ref={tinderCardRef}
+                className="absolute w-full h-full"
+                key={movie.id}
+                onSwipe={(dir) => swiped(dir as 'left' | 'right', movie)}
+                preventSwipe={['up', 'down']}
+                // Add this to prevent ghost cards on fast swipes
+                onCardLeftScreen={() => {}}
+            >
+                <DiscoverCard
+                    movie={movie}
+                    rating={userRatings.find(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type)?.rating || 0}
+                    isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
+                    onRate={(rating) => handleRateMovie(movie, rating)}
+                    onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
+                />
+            </TinderCard>
          </div>
       )
   }
