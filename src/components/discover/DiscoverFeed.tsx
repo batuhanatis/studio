@@ -53,17 +53,12 @@ export function DiscoverFeed() {
   const [seenMovieIds, setSeenMovieIds] = useState<Set<string>>(new Set());
   
   const canSwipe = movies.length > 0;
+  const topCardRef = useRef<any>(null);
+
 
   const swipe = async (dir: 'left' | 'right') => {
-    // This function is for programmatic swiping via buttons.
-    // We simulate a swipe on the last card in the array (which is the top one).
-    if (canSwipe) {
-      const movieToSwipe = movies[movies.length - 1];
-      if (dir === 'right') {
-        handleRateMovie(movieToSwipe, 5);
-      }
-      // Remove the swiped movie from the state
-      setMovies(prevMovies => prevMovies.slice(0, prevMovies.length - 1));
+    if (canSwipe && topCardRef.current) {
+        await topCardRef.current.swipe(dir);
     }
   };
   
@@ -85,7 +80,7 @@ export function DiscoverFeed() {
 
                 const data = await res.json();
                 const recommendedItems = (data.results || [])
-                    .map((item: any) => ({ ...item, media_type: seedMovie.mediaType, popularity: item.popularity || 0 }))
+                    .map((item: any) => ({ ...item, media_type: item.media_type || seedMovie.mediaType, popularity: item.popularity || 0 }))
                     .filter((item: any) => item.poster_path && !currentSeenIds.has(String(item.id)))
                     .sort((a: Movie, b: Movie) => (b.vote_average || 0) - (a.vote_average || 0));
                 
@@ -270,7 +265,7 @@ export function DiscoverFeed() {
     }
   };
 
-  const swiped = (direction: 'left' | 'right', movie: Movie) => {
+  const onSwipe = (direction: 'left' | 'right', movie: Movie) => {
     if (direction === 'right') {
         handleRateMovie(movie, 5);
     }
@@ -281,10 +276,10 @@ export function DiscoverFeed() {
   };
   
   useEffect(() => {
-    if (!loading && movies.length < MOVIES_PER_BATCH) {
+    if (!loading && movies.length < MOVIES_PER_BATCH && !loadingMore) {
         loadMoreMovies();
     }
-  }, [movies.length, loading, loadMoreMovies]);
+  }, [movies.length, loading, loadMoreMovies, loadingMore]);
 
 
   const renderContent = () => {
@@ -299,11 +294,12 @@ export function DiscoverFeed() {
       return (
          <div className="relative w-full max-w-sm h-[75vh]">
             {movies.length > 0 ? (
-                movies.map((movie) => (
+                movies.map((movie, index) => (
                     <TinderCard
+                        ref={index === movies.length - 1 ? topCardRef : null}
                         className="absolute w-full h-full"
                         key={movie.id}
-                        onSwipe={(dir) => swiped(dir as 'left' | 'right', movie)}
+                        onSwipe={(dir) => onSwipe(dir as 'left' | 'right', movie)}
                         preventSwipe={['up', 'down']}
                         onCardLeftScreen={() => onCardLeftScreen(movie.id)}
                     >
@@ -327,7 +323,7 @@ export function DiscoverFeed() {
                     </div>
                 </Card>
             )}
-             {loadingMore && (
+             {loadingMore && movies.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-2xl">
                     <div className="flex flex-col items-center gap-4 text-primary">
                         <Loader2 className="h-12 w-12 animate-spin" />
@@ -365,7 +361,3 @@ export function DiscoverFeed() {
     </div>
   );
 }
-
-    
-
-    
