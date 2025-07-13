@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
@@ -42,9 +43,9 @@ function SearchPageContent() {
 
 
 export default function SearchPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <SearchPageContent />
-    </Suspense>
-  );
+  // Wrapping SearchPageContent in Suspense can cause hydration errors
+  // if SearchPageContent or its children use client-side only hooks like useSearchParams.
+  // We can render it directly as it handles its own loading state.
+  return <SearchPageContent />;
 }
+
