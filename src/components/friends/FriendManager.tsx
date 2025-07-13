@@ -36,7 +36,7 @@ import { Separator } from '../ui/separator';
 
 interface UserProfile {
   uid: string;
-  username: string;
+  username?: string;
   email: string;
   friends?: string[];
   activeBlendsWith?: string[];
@@ -89,7 +89,10 @@ export function FriendManager({ userId }: FriendManagerProps) {
     defaultValues: { email: '' },
   });
   
-  const getInitials = (name: string) => name.substring(0, 2).toUpperCase();
+  const getInitials = (name: string | undefined) => {
+    if (!name) return '?';
+    return name.substring(0, 2).toUpperCase();
+  }
 
   // Listener for incoming friend requests (only for own profile)
   useEffect(() => {
@@ -279,7 +282,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
         console.error("Error processing blend invite", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to process Blend invite. Check your Firestore rules.' });
     } finally {
-        setLoading(prev => ({ ...prev, action: false }));
+        setLoading(prev => ({ ...prev, action: true }));
     }
   };
   
@@ -296,8 +299,8 @@ export function FriendManager({ userId }: FriendManagerProps) {
                 {friends.map((friend) => (
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                     <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
-                        <Avatar><AvatarFallback>{getInitials(friend.username)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{friend.username}</span>
+                        <Avatar><AvatarFallback>{getInitials(friend.username || friend.email)}</AvatarFallback></Avatar>
+                        <span className="font-medium">{friend.username || friend.email}</span>
                     </Link>
                   </li>
                 ))}
@@ -378,8 +381,8 @@ export function FriendManager({ userId }: FriendManagerProps) {
                 {friends.map((friend) => (
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                     <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
-                        <Avatar><AvatarFallback>{getInitials(friend.username)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{friend.username}</span>
+                        <Avatar><AvatarFallback>{getInitials(friend.username || friend.email)}</AvatarFallback></Avatar>
+                        <span className="font-medium">{friend.username || friend.email}</span>
                     </Link>
                     <div className="ml-auto">
                         {profileData?.activeBlendsWith?.includes(friend.uid) ? (
