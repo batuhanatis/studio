@@ -174,7 +174,8 @@ export function DiscoverFeed() {
     if (!authLoading) {
       initializeFeed();
     }
-  }, [authLoading, firebaseUser, fetchGenericMovies]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, firebaseUser]);
 
 
   // Subscribe to user's ratings and watched list
@@ -291,34 +292,16 @@ export function DiscoverFeed() {
         );
       }
 
-      return (
-         <div className="relative w-full max-w-sm h-[75vh]">
-            {movies.length > 0 ? (
-                movies.map((movie, index) => (
-                    <TinderCard
-                        ref={index === movies.length - 1 ? topCardRef : null}
-                        className="absolute w-full h-full"
-                        key={movie.id}
-                        onSwipe={(dir) => onSwipe(dir as 'left' | 'right', movie)}
-                        preventSwipe={['up', 'down']}
-                        onCardLeftScreen={() => onCardLeftScreen(movie.id)}
-                    >
-                        <DiscoverCard
-                            movie={movie}
-                            rating={userRatings.find(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type)?.rating || 0}
-                            isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
-                            onRate={(rating) => handleRateMovie(movie, rating)}
-                            onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
-                        />
-                    </TinderCard>
-                ))
-            ) : loadingMore ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-2xl">
-                    <div className="flex flex-col items-center gap-4 text-primary">
-                        <Loader2 className="h-12 w-12 animate-spin" />
-                        <p className="text-lg font-semibold text-foreground">Finding more titles...</p>
-                    </div>
+      if (movies.length === 0) {
+        return (
+          <div className="w-full max-w-sm h-[75vh] mx-auto">
+            {loadingMore ? (
+              <Card className="w-full h-full flex items-center justify-center p-8 bg-background/50 backdrop-blur-sm rounded-2xl">
+                <div className="flex flex-col items-center gap-4 text-primary">
+                    <Loader2 className="h-12 w-12 animate-spin" />
+                    <p className="text-lg font-semibold text-foreground">Finding more titles...</p>
                 </div>
+              </Card>
             ) : (
                  <Card className="w-full h-full flex items-center justify-center p-8">
                     <div className="text-center text-muted-foreground flex flex-col items-center gap-4">
@@ -330,6 +313,30 @@ export function DiscoverFeed() {
                     </div>
                 </Card>
             )}
+          </div>
+        );
+      }
+
+      return (
+         <div className="relative w-full max-w-sm h-[75vh]">
+            {movies.map((movie, index) => (
+                <TinderCard
+                    ref={index === movies.length - 1 ? topCardRef : null}
+                    className="absolute w-full h-full"
+                    key={movie.id}
+                    onSwipe={(dir) => onSwipe(dir as 'left' | 'right', movie)}
+                    preventSwipe={['up', 'down']}
+                    onCardLeftScreen={() => onCardLeftScreen(movie.id)}
+                >
+                    <DiscoverCard
+                        movie={movie}
+                        rating={userRatings.find(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type)?.rating || 0}
+                        isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
+                        onRate={(rating) => handleRateMovie(movie, rating)}
+                        onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
+                    />
+                </TinderCard>
+            ))}
          </div>
       )
   }
@@ -360,3 +367,5 @@ export function DiscoverFeed() {
     </div>
   );
 }
+
+    
