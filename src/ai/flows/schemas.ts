@@ -37,6 +37,6 @@ export const WatchlistRecommendationsInputSchema = z.object({
 export type WatchlistRecommendationsInput = z.infer<typeof WatchlistRecommendationsInputSchema>;
 
 export const WatchlistRecommendationsOutputSchema = z.object({
-    recommendedTitles: z.array(z.string()).describe('A list of 15 new movie or TV show titles based on the watchlist.'),
+    recommendedTitles: z.array(z.string()).describe('A list of 30 new movie or TV show titles based on the watchlist.'),
 });
 export type WatchlistRecommendationsOutput = z.infer<typeof WatchlistRecommendationsOutputSchema>;

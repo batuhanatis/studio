@@ -61,6 +61,7 @@ interface Filters {
 }
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
+const RESULTS_PER_PAGE = 10;
 
 export function MovieFinder() {
   const router = useRouter();
@@ -70,6 +71,7 @@ export function MovieFinder() {
 
   const [query, setQuery] = useState(urlQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [visibleResultsCount, setVisibleResultsCount] = useState(RESULTS_PER_PAGE);
   
   const [allGenres, setAllGenres] = useState<Genre[]>([]);
   const [allPlatforms, setAllPlatforms] = useState<Platform[]>([]);
@@ -90,7 +92,10 @@ export function MovieFinder() {
   const [disliked, setDisliked] = useState<UserMovieData[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   
+  const initialFetchDone = useRef(false);
+
   // User data listener
   useEffect(() => {
     if (authLoading || !firebaseUser) {
@@ -190,8 +195,9 @@ export function MovieFinder() {
     }
   }, [searchMovieByTitle, toast]);
   
-  const fetchDiscoverData = useCallback(async (currentFilters: Filters, userLikedMovies: UserMovieData[]) => {
+  const fetchDiscoverData = useCallback(async (currentFilters: Filters, userLikedMovies: UserMovieData[], existingResults: SearchResult[]) => {
     setIsLoading(true);
+    setVisibleResultsCount(RESULTS_PER_PAGE);
     try {
         let items: SearchResult[];
         if (userLikedMovies.length > 0) {
@@ -199,12 +205,11 @@ export function MovieFinder() {
         } else {
             items = await fetchGenericDiscoverData(currentFilters);
         }
-
-        setResults(prevResults => {
-          const currentResultIds = new Set(prevResults.map(r => r.id));
-          const newItems = items.filter(item => !currentResultIds.has(item.id));
-          return newItems.length > 0 ? newItems : items;
-        });
+        
+        const existingResultIds = new Set(existingResults.map(r => r.id));
+        const newItems = items.filter(item => !existingResultIds.has(item.id));
+        
+        setResults(newItems.length > 0 ? newItems : items);
 
     } catch (error: any) {
         console.error("Error fetching recommendations:", error);
@@ -218,7 +223,8 @@ export function MovieFinder() {
   const searchMovies = useCallback(async (searchQuery: string, currentFilters: Filters) => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
-        fetchDiscoverData(currentFilters, liked);
+        setHasSearched(false);
+        fetchDiscoverData(currentFilters, liked, []);
         return;
     }
     
@@ -229,6 +235,7 @@ export function MovieFinder() {
     }
 
     setIsLoading(true);
+    setHasSearched(true);
     
     const mediaTypePath = currentFilters.mediaType === 'all' ? 'multi' : currentFilters.mediaType;
 
@@ -257,7 +264,7 @@ export function MovieFinder() {
     }
   }, [toast, liked, fetchDiscoverData]);
 
-  const debouncedSearch = useCallback(debounce((q: string) => {
+  const debouncedSearch = useCallback(debounce((q: string, f: Filters) => {
     const newParams = new URLSearchParams(searchParams.toString());
     if (q) {
       newParams.set('query', q);
@@ -265,17 +272,22 @@ export function MovieFinder() {
       newParams.delete('query');
     }
     router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
-  }, 300), [router, pathname, searchParams]);
+    searchMovies(q, f);
+  }, 300), [router, pathname, searchParams, searchMovies]);
 
   useEffect(() => {
     setQuery(urlQuery);
     if (loadingUserData) return;
-
-    if (urlQuery) {
-      searchMovies(urlQuery, filters);
-    } else if (results.length === 0) {
-      fetchDiscoverData(filters, liked);
+    
+    if (!initialFetchDone.current) {
+        if (urlQuery) {
+            searchMovies(urlQuery, filters);
+        } else {
+            fetchDiscoverData(filters, liked, []);
+        }
+        initialFetchDone.current = true;
     }
+
   }, [urlQuery, filters, liked, loadingUserData, searchMovies, fetchDiscoverData]);
 
 
@@ -353,7 +365,14 @@ export function MovieFinder() {
   };
 
   const handleFilterChange = (newFilters: Partial<Filters>) => {
-    setFilters(prev => ({ ...prev, ...newFilters }));
+    const updatedFilters = { ...filters, ...newFilters };
+    setFilters(updatedFilters);
+    // Re-run search/discover with new filters
+    if (urlQuery) {
+        searchMovies(urlQuery, updatedFilters);
+    } else {
+        fetchDiscoverData(updatedFilters, liked, []);
+    }
   };
   
   const resetFilters = () => {
@@ -367,7 +386,7 @@ export function MovieFinder() {
   
   const handleRefresh = () => {
     if (!loadingUserData && !isLoading) {
-      fetchDiscoverData(filters, liked);
+      fetchDiscoverData(filters, liked, results);
     }
   }
 
@@ -376,8 +395,11 @@ export function MovieFinder() {
   const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
   const dislikedIds = new Set(disliked.map(item => String(item.movieId)));
   
-  const displayedResults = results.filter(movie => !dislikedIds.has(String(movie.id)))
+  const filteredResults = results.filter(movie => !dislikedIds.has(String(movie.id)))
                                  .filter(movie => !filters.hideWatched || !watchedIds.has(String(movie.id)));
+  
+  const visibleResults = filteredResults.slice(0, visibleResultsCount);
+
 
   const renderStatus = () => {
     if (isLoading || (authLoading && loadingUserData)) {
@@ -398,7 +420,7 @@ export function MovieFinder() {
       );
     }
     
-    if (urlQuery && displayedResults.length === 0) {
+    if (hasSearched && visibleResults.length === 0) {
       return (
         <div className="pt-16 text-center text-muted-foreground flex flex-col items-center gap-4">
           <Search className="h-16 w-16 text-muted-foreground/30" />
@@ -422,7 +444,7 @@ export function MovieFinder() {
       </div>
       
       <div className="w-full max-w-3xl space-y-4">
-        <form onSubmit={(e) => {e.preventDefault(); debouncedSearch(query);}} className="w-full">
+        <form onSubmit={(e) => {e.preventDefault(); debouncedSearch(query, filters);}} className="w-full">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
@@ -431,7 +453,7 @@ export function MovieFinder() {
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
-                debouncedSearch(e.target.value);
+                debouncedSearch(e.target.value, filters);
               }}
               className="h-14 w-full rounded-full bg-card py-3 pl-12 pr-4 text-base shadow-lg shadow-black/20"
             />
@@ -516,10 +538,10 @@ export function MovieFinder() {
         </div>
       )}
 
-      {displayedResults.length > 0 && (
+      {visibleResults.length > 0 && (
          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {displayedResults.map((item) => (
+                {visibleResults.map((item) => (
                     <MovieResultCard
                         key={`${item.id}-${item.media_type}`}
                         item={item}
@@ -534,6 +556,15 @@ export function MovieFinder() {
             </div>
          </div>
       )}
+      
+      {!hasSearched && filteredResults.length > visibleResultsCount && (
+        <div className="mt-6">
+            <Button onClick={() => setVisibleResultsCount(prev => prev + RESULTS_PER_PAGE)} disabled={isLoading}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Load More'}
+            </Button>
+        </div>
+      )}
+
 
       {renderStatus()}
     </div>
