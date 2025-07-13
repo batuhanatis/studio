@@ -28,3 +28,15 @@ const MovieRecommendationSummaryOutputSchema = z.object({
   recommendationSummary: z.string().describe('A short summary of why the movie is recommended and where to watch it.'),
 });
 export type MovieRecommendationSummaryOutput = z.infer<typeof MovieRecommendationSummaryOutputSchema>;
+
+
+// Schemas for watchlist-recommendations flow
+export const WatchlistRecommendationsInputSchema = z.object({
+    movieTitles: z.array(z.string()).describe('A list of movie titles in the watchlist.'),
+});
+export type WatchlistRecommendationsInput = z.infer<typeof WatchlistRecommendationsInputSchema>;
+
+export const WatchlistRecommendationsOutputSchema = z.object({
+    recommendedTitles: z.array(z.string()).describe('A list of 5 new movie or TV show titles based on the watchlist.'),
+});
+export type WatchlistRecommendationsOutput = z.infer<typeof WatchlistRecommendationsOutputSchema>;

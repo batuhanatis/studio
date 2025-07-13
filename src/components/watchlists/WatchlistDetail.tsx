@@ -11,6 +11,7 @@ import { Loader2, Film, Wand2, ArrowLeft, Heart, ThumbsDown } from 'lucide-react
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
+import { getWatchlistRecommendations } from '@/ai/flows/watchlist-recommendations';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -48,8 +49,10 @@ export function WatchlistDetail({ listId }: { listId: string }) {
   const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [watchlist, setWatchlist] = useState<Watchlist | null>(null);
-  const [loading, setLoading] = useState({ list: true });
+  const [loading, setLoading] = useState({ list: true, recommendations: false });
   const [error, setError] = useState<string | null>(null);
+  
+  const [recommendations, setRecommendations] = useState<MovieDetails[]>([]);
   
   const [watched, setWatched] = useState<UserMovieData[]>([]);
   const [liked, setLiked] = useState<UserMovieData[]>([]);
@@ -96,6 +99,50 @@ export function WatchlistDetail({ listId }: { listId: string }) {
     return () => unsubscribe();
   }, [firebaseUser, listId, authLoading]);
   
+  const searchMovieByTitle = useCallback(async (title: string): Promise<MovieDetails | null> => {
+     try {
+        const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(title)}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        const result = (data.results || []).find((item: any) => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path);
+        return result || null;
+     } catch {
+        return null;
+     }
+  }, []);
+
+  const handleGetRecommendations = async () => {
+    if (!watchlist || watchlist.movies.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Empty List',
+        description: 'Add some movies to your list before getting recommendations.',
+      });
+      return;
+    }
+    setLoading(prev => ({...prev, recommendations: true}));
+    try {
+      const movieTitles = watchlist.movies.map(m => m.title);
+      const result = await getWatchlistRecommendations({ movieTitles });
+      
+      if (!result || result.recommendedTitles.length === 0) {
+        toast({ title: 'No Results', description: "The AI couldn't find any recommendations right now." });
+        return;
+      }
+      
+      const moviePromises = result.recommendedTitles.map(title => searchMovieByTitle(title));
+      const movies = (await Promise.all(moviePromises)).filter((m): m is MovieDetails => m !== null);
+      
+      const uniqueMovies = Array.from(new Map(movies.map(m => [m.id, m])).values());
+      setRecommendations(uniqueMovies);
+
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not get recommendations.' });
+    } finally {
+      setLoading(prev => ({...prev, recommendations: false}));
+    }
+  };
+
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -191,8 +238,20 @@ export function WatchlistDetail({ listId }: { listId: string }) {
         <Button asChild variant="outline" size="sm" className="mb-4">
           <Link href="/watchlists"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Watchlists</Link>
         </Button>
-        <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">{watchlist.name}</h1>
-        <p className="mt-2 text-lg text-muted-foreground">{watchlist.movies.length} {watchlist.movies.length === 1 ? 'item' : 'items'}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                 <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">{watchlist.name}</h1>
+                 <p className="mt-2 text-lg text-muted-foreground">{watchlist.movies.length} {watchlist.movies.length === 1 ? 'item' : 'items'}</p>
+            </div>
+            <Button onClick={handleGetRecommendations} disabled={loading.recommendations || watchlist.movies.length === 0}>
+                {loading.recommendations ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                    <Wand2 className="mr-2 h-4 w-4" />
+                )}
+                Get AI Recommendations
+            </Button>
+        </div>
       </div>
       
       {watchlist.movies.length === 0 ? (
@@ -215,6 +274,27 @@ export function WatchlistDetail({ listId }: { listId: string }) {
               onToggleDislike={(isDisliked) => handleToggleDislike(item, isDisliked)}
             />
           ))}
+        </div>
+      )}
+
+      {recommendations.length > 0 && (
+        <div className="space-y-6 pt-8">
+            <Separator />
+            <h2 className="text-2xl font-bold font-headline">AI Recommendations for You</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {recommendations.map((item) => (
+                <MovieResultCard
+                key={`${item.id}-${item.media_type}`}
+                item={item}
+                isWatched={watchedIds.has(String(item.id))}
+                isLiked={likedIds.has(`${item.id}-${item.media_type}`)}
+                isDisliked={dislikedIds.has(String(item.id))}
+                onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
+                onToggleLike={(isLiked) => handleToggleLike(item, isLiked)}
+                onToggleDislike={(isDisliked) => handleToggleDislike(item, isDisliked)}
+                />
+            ))}
+            </div>
         </div>
       )}
     </div>
