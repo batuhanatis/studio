@@ -133,8 +133,8 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
     };
 
     return (
-      <div ref={ref} className="w-full h-full">
-        <Card className="w-full h-full overflow-y-auto shadow-2xl rounded-2xl group cursor-grab active:cursor-grabbing scrollbar-hide">
+      <div ref={ref} className="w-full h-full cursor-grab active:cursor-grabbing">
+        <Card className="w-full h-full overflow-y-auto shadow-2xl rounded-2xl group scrollbar-hide">
             <div className="relative">
                 {renderSwipeIndicator()}
                 <div className="relative w-full aspect-[2/3]">
