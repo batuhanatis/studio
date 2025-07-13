@@ -29,6 +29,8 @@ interface UserProfile {
     username: string;
     email: string;
     likedMovies: { movieId: string; mediaType: 'movie' | 'tv' }[];
+    dislikedMovies: any[];
+    watchedMovies: any[];
 }
 
 interface UserMovieData {
@@ -176,11 +178,13 @@ export function BlendFeed({ friendId }: { friendId: string }) {
     );
   }
 
+  const friendDisplayName = friendProfile?.username || friendProfile?.email || 'your friend';
+
   return (
     <div className="space-y-8">
       <div className="text-center">
         <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
-          A Blend for You & {friendProfile?.username}
+          A Blend for You & {friendDisplayName}
         </h1>
         <p className="mt-2 text-lg text-muted-foreground">
           Movies and shows you might both enjoy, based on your liked movies.
