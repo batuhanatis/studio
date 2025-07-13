@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -134,7 +135,7 @@ export function RecommendationList() {
               <Link href={href} key={item.id} className="block">
                 <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200">
                   <CardContent className="p-0 flex">
-                    <div className="relative w-28 h-40 md:w-32 md:h-48 flex-shrink-0 bg-muted">
+                    <div className="relative w-28 md:w-32 aspect-[2/3] flex-shrink-0 bg-muted">
                       <Image
                         src={posterUrl}
                         alt={title}

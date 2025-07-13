@@ -47,7 +47,7 @@ export function MovieResultCard({ item, isWatched, onToggleWatched }: MovieResul
     <Card className="shadow-md overflow-hidden hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 flex flex-col h-full bg-card group border-border/60 hover:border-primary/40">
       <Link href={href} className="block relative">
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        <div className="aspect-[2/3] w-full bg-muted overflow-hidden">
+        <div className="relative w-full aspect-[2/3] bg-muted overflow-hidden">
           <Image
             src={posterUrl}
             alt={title}

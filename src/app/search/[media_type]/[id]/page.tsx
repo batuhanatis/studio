@@ -223,7 +223,7 @@ export default function DetailPage() {
                 <div className="flex flex-col gap-8 md:flex-row md:gap-12">
                 <div className="w-full flex-shrink-0 md:w-64">
                     <Card className="overflow-hidden shadow-2xl shadow-primary/10">
-                    <div className="relative aspect-[2/3] w-full">
+                    <div className="relative w-full aspect-[2/3]">
                         <Image
                         src={posterUrl}
                         alt={`Poster for ${title}`}

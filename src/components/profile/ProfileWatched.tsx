@@ -106,7 +106,7 @@ export function ProfileWatched({ userId }: ProfileWatchedProps) {
         return (
           <Link href={href} key={`${movie.movieId}-${movie.mediaType}`}>
             <Card className="overflow-hidden group relative">
-                <div className="aspect-[2/3] w-full bg-muted">
+                <div className="relative w-full aspect-[2/3] bg-muted">
                     <Image
                         src={posterUrl}
                         alt={`Poster for ${movie.title}`}

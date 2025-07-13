@@ -111,7 +111,7 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
       <div ref={ref} className="w-full max-w-sm mx-auto">
         <Card className="relative w-full h-[75vh] overflow-hidden shadow-2xl rounded-2xl group cursor-grab active:cursor-grabbing">
             <div className="absolute inset-0 w-full h-full overflow-y-auto bg-card">
-                <div className="relative aspect-[2/3] w-full">
+                <div className="relative w-full aspect-[2/3]">
                     <Image
                       src={posterUrl}
                       alt={`Poster for ${title}`}
