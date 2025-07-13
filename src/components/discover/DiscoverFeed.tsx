@@ -1,12 +1,12 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, type RefObject } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, runTransaction, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Film, Heart, X as XIcon, Loader2 } from 'lucide-react';
+import { Film, Heart, X as XIcon, RefreshCw } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { DiscoverCard } from './DiscoverCard';
 import { Button } from '@/components/ui/button';
@@ -46,30 +46,38 @@ export function DiscoverFeed() {
   
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  const currentIndexRef = useRef(currentIndex);
+
   const childRefs = useMemo(
     () =>
       Array(movies.length)
         .fill(0)
-        .map(() => React.createRef<{ swipe: (dir: 'left' | 'right') => Promise<void> }>()),
+        .map(() => React.createRef<{ swipe: (dir: 'left' | 'right' | 'up' | 'down') => Promise<void> }>()),
     [movies.length]
   );
   
-  const canSwipe = currentIndex >= 0;
+  const updateCurrentIndex = (val: number) => {
+    setCurrentIndex(val);
+    currentIndexRef.current = val;
+  }
+
+  const canSwipe = currentIndex >= 0 && currentIndex < movies.length;
 
   const swipe = async (dir: 'left' | 'right') => {
-    if (canSwipe && currentIndex < movies.length) {
-      if (childRefs[currentIndex]?.current) {
-        await childRefs[currentIndex].current!.swipe(dir);
+    if (canSwipe) {
+      const cardRef = childRefs[currentIndex];
+      if (cardRef && cardRef.current) {
+        await cardRef.current.swipe(dir);
       }
     }
   }
 
-  const fetchDiscoverMovies = useCallback(async () => {
+  const fetchDiscoverMovies = useCallback(async (isRestart = false) => {
     if (authLoading) return;
     setLoading(true);
     
     let seenMovieIds = new Set<string>();
-    if (firebaseUser) {
+    if (firebaseUser && !isRestart) {
         try {
             const userDocRef = doc(db, 'users', firebaseUser.uid);
             const userDoc = await getDoc(userDocRef);
@@ -85,43 +93,36 @@ export function DiscoverFeed() {
     }
     
     try {
-        const movieRes = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
-        const tvRes = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=1`);
-        
-        const responses = await Promise.all([movieRes, tvRes]);
-        for (const res of responses) {
-            if (!res.ok) throw new Error("Failed to fetch popular items from TMDB.");
+        const pagesToFetch = 5;
+        let allPopular: Movie[] = [];
+
+        for (let page = 1; page <= pagesToFetch; page++) {
+          const movieRes = fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=${page}`);
+          const tvRes = fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=${page}`);
+          
+          const responses = await Promise.all([movieRes, tvRes]);
+          const [movieData, tvData] = await Promise.all(responses.map(res => res.json()));
+
+          const popularMovies = (movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' as const }));
+          const popularTv = (tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' as const }));
+          allPopular.push(...popularMovies, ...popularTv);
         }
 
-        const [movieData, tvData] = await Promise.all(responses.map(res => res.json()));
-        
-        const popularMovies = (movieData.results || []).map((m: any) => ({ ...m, media_type: 'movie' as const }));
-        const popularTv = (tvData.results || []).map((t: any) => ({ ...t, media_type: 'tv' as const }));
-        
-        const allPopular: Movie[] = [...popularMovies, ...popularTv];
         const uniqueItems = Array.from(new Map(allPopular.map(item => [item.id, item])).values())
             .filter(item => item.poster_path && item.overview);
         
         const filtered = uniqueItems.filter(item => !seenMovieIds.has(String(item.id)));
-
-        const moviesToShow = filtered.length > 0 ? filtered : uniqueItems;
-        const shuffledMovies = moviesToShow.sort(() => 0.5 - Math.random());
+        
+        const moviesToShow = filtered.length > 20 ? filtered : uniqueItems;
+        const shuffledMovies = moviesToShow.sort(() => 0.5 - Math.random()).slice(0, 50); // Limit to 50 cards at a time
         
         setMovies(shuffledMovies);
-        setCurrentIndex(shuffledMovies.length - 1);
+        updateCurrentIndex(shuffledMovies.length - 1);
+
     } catch (error) {
-        console.error("Error fetching discover feed, showing generic trending as fallback:", error);
-        toast({ variant: 'destructive', title: 'Could not load recommendations', description: 'Showing generic trending movies instead.' });
-        try {
-            const res = await fetch(`https://api.themoviedb.org/3/trending/all/week?api_key=${API_KEY}`);
-            const data = await res.json();
-            const trendingMovies = (data.results || []).filter((item: any) => item.poster_path && item.overview && (item.media_type === 'movie' || item.media_type === 'tv'));
-            setMovies(trendingMovies);
-            setCurrentIndex(trendingMovies.length - 1);
-        } catch (fallbackError) {
-            console.error("Fallback fetch also failed:", fallbackError);
-            setMovies([]);
-        }
+        console.error("Error fetching discover feed:", error);
+        toast({ variant: 'destructive', title: 'Could not load recommendations', description: 'There was an issue connecting to the movie database.' });
+        setMovies([]);
     } finally {
         setLoading(false);
     }
@@ -198,11 +199,20 @@ export function DiscoverFeed() {
   };
 
   const swiped = (direction: 'left' | 'right', movie: Movie, index: number) => {
-    setCurrentIndex(index - 1);
+    updateCurrentIndex(index - 1);
     if (direction === 'right') {
         handleRateMovie(movie.id, movie.media_type, 5);
     }
   };
+  
+  const outOfFrame = (name: string, idx: number) => {
+    // This is a safety check. If the card goes out of frame and it's the one we're tracking,
+    // we make sure our index moves past it.
+    if (currentIndexRef.current >= idx) {
+        childRefs[idx].current = null;
+        updateCurrentIndex(idx - 1);
+    }
+  }
 
   const renderContent = () => {
       if (loading || authLoading) {
@@ -215,8 +225,24 @@ export function DiscoverFeed() {
               <Film className="h-16 w-16" />
               <p className="text-lg">Could Not Load Movies</p>
               <p className="text-sm">Please check your connection and try again later.</p>
+               <Button onClick={() => fetchDiscoverMovies(true)}>
+                  <RefreshCw className="mr-2 h-4 w-4" /> Try Again
+               </Button>
             </div>
         );
+      }
+      
+      if (currentIndex < 0) {
+        return (
+            <div className="text-center text-muted-foreground flex flex-col items-center gap-4">
+              <Film className="h-16 w-16" />
+              <p className="text-lg">That's all for now!</p>
+              <p className="text-sm">You've swiped through all the available titles.</p>
+              <Button onClick={() => fetchDiscoverMovies(true)}>
+                  <RefreshCw className="mr-2 h-4 w-4" /> Load More
+              </Button>
+            </div>
+        )
       }
 
       return (
@@ -227,6 +253,7 @@ export function DiscoverFeed() {
                     className="absolute"
                     key={movie.id}
                     onSwipe={(dir) => swiped(dir as 'left' | 'right', movie, index)}
+                    onCardLeftScreen={() => outOfFrame(movie.title || 'movie', index)}
                     preventSwipe={['up', 'down']}
                 >
                     <DiscoverCard
@@ -257,7 +284,7 @@ export function DiscoverFeed() {
         {renderContent()}
       </div>
 
-      {!loading && !authLoading && movies.length > 0 && (
+      {!loading && !authLoading && movies.length > 0 && currentIndex >= 0 && (
         <div className="flex items-center gap-6 mt-4 z-10">
             <Button variant="outline" size="icon" className="w-16 h-16 rounded-full border-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => swipe('left')} disabled={!canSwipe}>
                 <XIcon className="h-8 w-8" />
