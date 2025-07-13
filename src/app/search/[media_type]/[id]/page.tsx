@@ -334,7 +334,7 @@ export default function DetailPage() {
                             <div className="mt-4 grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-5">
                             {platforms.map((p) => (
                                 <div key={p.provider_id} className="flex flex-col items-center gap-2 text-center">
-                                <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-secondary/50 shadow-sm">
+                                <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-secondary/50 shadow-sm">
                                     <Image
                                     src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
                                     alt={`${p.provider_name} logo`}
