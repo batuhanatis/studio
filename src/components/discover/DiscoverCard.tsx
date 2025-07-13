@@ -231,5 +231,3 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
 
 DiscoverCard.displayName = "DiscoverCard";
 export { DiscoverCard };
-
-    
