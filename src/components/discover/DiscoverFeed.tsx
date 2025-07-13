@@ -159,7 +159,7 @@ export function DiscoverFeed() {
   // Initial fetch and subsequent fetches
   useEffect(() => {
     fetchMovies(movies.length === 0);
-  }, [triggerFetch]);
+  }, [triggerFetch, fetchMovies]);
 
   // User data listener
   useEffect(() => {
@@ -196,25 +196,6 @@ export function DiscoverFeed() {
     }
   };
 
-  const handleDislikeMovie = async (movie: Movie) => {
-    if (!firebaseUser) return;
-    const ref = doc(db, 'users', firebaseUser.uid);
-    try {
-        const newDislike: MovieFeedbackData = {
-            movieId: String(movie.id),
-            mediaType: movie.media_type,
-            title: movie.title || movie.name || 'Untitled',
-            poster: movie.poster_path,
-        };
-        await updateDoc(ref, {
-            dislikedMovies: arrayUnion(newDislike),
-            likedMovies: arrayRemove(newDislike)
-        });
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Dislike failed', description: e.message });
-    }
-  };
-
   const handleToggleWatched = async (movie: Movie, watched: boolean) => {
     if (!firebaseUser) return;
     const ref = doc(db, 'users', firebaseUser.uid);
@@ -240,8 +221,6 @@ export function DiscoverFeed() {
     setLastSwipedMovie(movie);
     if (direction === 'right') {
       handleLikeMovie(movie);
-    } else if (direction === 'left') {
-      handleDislikeMovie(movie);
     }
 
     // This is a stable way to remove the top card
