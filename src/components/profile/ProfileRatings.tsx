@@ -54,7 +54,7 @@ export function ProfileRatings({ userId }: ProfileRatingsProps) {
       if (doc.exists()) {
         const ratings: RatedMovie[] = doc.data().ratedMovies || [];
         
-        // Fetch posters if they don't exist
+        // Fetch posters if they are missing
         const moviesWithPosters = await Promise.all(ratings.map(async (movie) => {
             if (!movie.poster) {
                 const posterPath = await fetchPoster(movie.movieId, movie.mediaType);
@@ -100,7 +100,7 @@ export function ProfileRatings({ userId }: ProfileRatingsProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
       {ratedMovies.map((movie) => {
         const posterUrl = movie.poster
           ? `https://image.tmdb.org/t/p/w500${movie.poster}`
@@ -110,24 +110,25 @@ export function ProfileRatings({ userId }: ProfileRatingsProps) {
         return (
           <Link href={href} key={`${movie.movieId}-${movie.mediaType}`}>
             <Card className="overflow-hidden group relative">
-                <div className="relative w-full aspect-[2/3] bg-muted">
-                    <Image
-                        src={posterUrl}
-                        alt={`Poster for ${movie.title}`}
-                        fill
-                        className="object-cover transition-transform group-hover:scale-105"
-                        sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                        data-ai-hint="movie poster"
-                    />
-                </div>
-                <div className="absolute top-2 right-2">
-                    <Badge variant="destructive" className="flex items-center gap-1 text-base bg-black/70 backdrop-blur-sm border-accent/50 text-accent font-bold">
-                        <Star className="h-4 w-4 fill-accent" /> {movie.rating}
-                    </Badge>
-                </div>
-                 <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/90 to-transparent p-3 flex items-end">
-                    <h3 className="text-white font-bold text-lg leading-tight line-clamp-2">{movie.title}</h3>
-                 </div>
+              <div style={{ position: 'relative', width: '100%', aspectRatio: '2 / 3' }}>
+                <Image
+                  src={posterUrl}
+                  alt={`Poster for ${movie.title}`}
+                  fill
+                  style={{ objectFit: 'cover' }}
+                  className="transition-transform group-hover:scale-105"
+                  sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  data-ai-hint="movie poster"
+                />
+              </div>
+              <div className="absolute top-2 right-2">
+                  <Badge variant="destructive" className="flex items-center gap-1 text-base bg-black/70 backdrop-blur-sm border-accent/50 text-accent font-bold">
+                      <Star className="h-4 w-4 fill-accent" /> {movie.rating}
+                  </Badge>
+              </div>
+               <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/90 to-transparent p-3 flex items-end">
+                  <h3 className="text-white font-bold text-lg leading-tight line-clamp-2">{movie.title}</h3>
+               </div>
             </Card>
           </Link>
         );

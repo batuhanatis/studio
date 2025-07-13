@@ -30,6 +30,8 @@ interface UserMovieData {
 
 interface UserRatingData extends UserMovieData {
   rating: number;
+  title: string;
+  poster: string | null;
 }
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
@@ -41,7 +43,7 @@ export function DiscoverFeed() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const [userRatings, setUserRatings] = useState<UserRatingData[]>([]);
+  const [userRatings, setUserRatings] = useState<Omit<UserRatingData, 'title' | 'poster'>[]>([]);
   const [userWatched, setUserWatched] = useState<UserMovieData[]>([]);
   
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -147,29 +149,41 @@ export function DiscoverFeed() {
     return () => unsubscribe();
   }, [firebaseUser, authLoading]);
 
-  const handleRateMovie = async (movieId: number, mediaType: 'movie' | 'tv', rating: number) => {
+  const handleRateMovie = async (movie: Movie, rating: number) => {
     if (!firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieIdStr = String(movieId);
+    const movieIdStr = String(movie.id);
+    const movieTitle = movie.title || movie.name;
+
+    if (!movieTitle) return;
+
     try {
         await runTransaction(db, async (transaction) => {
             const userDoc = await transaction.get(userDocRef);
             if (!userDoc.exists()) throw new Error("User profile not found.");
             
             const data = userDoc.data();
-            const currentRatings: any[] = data.ratedMovies ? [...data.ratedMovies] : [];
-            const ratingIndex = currentRatings.findIndex(r => r.movieId === movieIdStr && r.mediaType === mediaType);
+            const currentRatings: UserRatingData[] = data.ratedMovies ? [...data.ratedMovies] : [];
+            const ratingIndex = currentRatings.findIndex(r => r.movieId === movieIdStr && r.mediaType === movie.media_type);
+
+            const ratingData = { 
+                movieId: movieIdStr, 
+                mediaType: movie.media_type, 
+                rating,
+                title: movieTitle,
+                poster: movie.poster_path
+            };
 
             if (ratingIndex > -1) {
                 if (currentRatings[ratingIndex].rating === rating) return;
-                currentRatings[ratingIndex].rating = rating;
+                currentRatings[ratingIndex] = ratingData;
             } else {
-                currentRatings.push({ movieId: movieIdStr, mediaType, rating });
+                currentRatings.push(ratingData);
             }
             transaction.update(userDocRef, { ratedMovies: currentRatings });
         });
         if (rating === 5) {
-          toast({ title: 'Liked!', description: 'Added to your profile.' });
+          toast({ title: 'Liked!', description: `Added "${movieTitle}" to your profile.` });
         }
     } catch (error: any) {
        console.error("Failed to rate movie:", error);
@@ -181,10 +195,19 @@ export function DiscoverFeed() {
     }
   };
   
-  const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
+  const handleToggleWatched = async (movie: Movie, isWatched: boolean) => {
     if (!firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier = { movieId: String(movieId), mediaType };
+    
+    const movieTitle = movie.title || movie.name;
+    if (!movieTitle) return;
+    
+    const movieIdentifier = { 
+        movieId: String(movie.id), 
+        mediaType: movie.media_type,
+        title: movieTitle,
+        poster: movie.poster_path
+    };
 
     try {
       if (isWatched) {
@@ -201,17 +224,15 @@ export function DiscoverFeed() {
   const swiped = (direction: 'left' | 'right', movie: Movie, index: number) => {
     updateCurrentIndex(index - 1);
     if (direction === 'right') {
-        handleRateMovie(movie.id, movie.media_type, 5);
+        handleRateMovie(movie, 5);
     }
   };
   
   const outOfFrame = (name: string, idx: number) => {
-    // This is a safety check. If the card goes out of frame and it's the one we're tracking,
-    // we make sure our index moves past it.
-    if (currentIndexRef.current >= idx) {
+    if (currentIndexRef.current >= idx && childRefs[idx].current) {
         childRefs[idx].current = null;
-        updateCurrentIndex(idx - 1);
     }
+    updateCurrentIndex(prev => Math.min(prev, idx - 1));
   }
 
   const renderContent = () => {
@@ -260,8 +281,8 @@ export function DiscoverFeed() {
                         movie={movie}
                         rating={userRatings.find(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type)?.rating || 0}
                         isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
-                        onRate={(rating) => handleRateMovie(movie.id, movie.media_type, rating)}
-                        onToggleWatched={(watched) => handleToggleWatched(movie.id, movie.media_type, watched)}
+                        onRate={(rating) => handleRateMovie(movie, rating)}
+                        onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
                     />
                 </TinderCard>
             ))}
