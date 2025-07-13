@@ -20,6 +20,7 @@ import { ProfileRecommendations } from '@/components/profile/ProfileRecommendati
 import { ProfileBlends } from '@/components/profile/ProfileBlends';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProfileWatched } from '@/components/profile/ProfileWatched';
 
 interface UserProfileData {
     username?: string;
@@ -175,14 +176,18 @@ export default function ProfilePage() {
             </div>
             <div className="flex-grow w-full">
                 <Tabs defaultValue="ratings" className="w-full">
-                    <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'}`}>
+                    <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-3 md:grid-cols-5' : 'grid-cols-3'}`}>
                         <TabsTrigger value="ratings"><Star className="mr-2 h-4 w-4" />Ratings</TabsTrigger>
+                        <TabsTrigger value="watched"><Check className="mr-2 h-4 w-4" />Watched</TabsTrigger>
                         <TabsTrigger value="friends"><Users className="mr-2 h-4 w-4" />Friends</TabsTrigger>
                         {isOwnProfile && <TabsTrigger value="recommendations"><Gift className="mr-2 h-4 w-4" />For You</TabsTrigger>}
                         {isOwnProfile && <TabsTrigger value="blends"><Combine className="mr-2 h-4 w-4" />Blends</TabsTrigger>}
                     </TabsList>
                     <TabsContent value="ratings" className="mt-6">
                        <ProfileRatings userId={profileUserId} />
+                    </TabsContent>
+                    <TabsContent value="watched" className="mt-6">
+                       <ProfileWatched userId={profileUserId} />
                     </TabsContent>
                     <TabsContent value="friends" className="mt-6">
                         <ProfileFriends userId={profileUserId} />
