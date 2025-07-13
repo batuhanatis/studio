@@ -32,6 +32,7 @@ import {
   orderBy,
   getDocs
 } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // Your web app's Firebase configuration for watchme-b8338
 const firebaseConfig = {
@@ -59,13 +60,20 @@ const auth = getAuth(app);
 // Get Firestore instance - This specifically connects to the (default) Cloud Firestore database.
 const db = getFirestore(app);
 
+// Get Storage instance
+const storage = getStorage(app);
+
 // Initialize other Firebase services
 const googleProvider = new GoogleAuthProvider();
 
 export { 
   app, 
   auth, 
-  db, 
+  db,
+  storage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
   googleProvider, 
   signInAnonymously, 
   linkWithPopup, 
