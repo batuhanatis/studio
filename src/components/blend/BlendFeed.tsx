@@ -186,7 +186,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
         <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
           A Blend for You & {friendDisplayName}
         </h1>
-        <p className="mt-2 text-lg text-muted-foreground">
+        <p className="mt-2 text-md md:text-lg text-muted-foreground">
           Movies and shows you might both enjoy, based on your liked movies.
         </p>
       </div>

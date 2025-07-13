@@ -95,6 +95,8 @@ export function MovieFinder() {
   const [hasSearched, setHasSearched] = useState(false);
   
   const initialFetchDone = useRef(false);
+  const [refreshCount, setRefreshCount] = useState(0);
+
 
   // User data listener
   useEffect(() => {
@@ -197,7 +199,7 @@ export function MovieFinder() {
   
   const fetchDiscoverData = useCallback(async (currentFilters: Filters, userLikedMovies: UserMovieData[], existingResults: SearchResult[]) => {
     setIsLoading(true);
-    setVisibleResultsCount(RESULTS_PER_PAGE);
+    setVisibleResultsCount(RESULTS_PER_PAGE); // Reset visible count on new fetch
     try {
         let items: SearchResult[];
         if (userLikedMovies.length > 0) {
@@ -224,7 +226,7 @@ export function MovieFinder() {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
         setHasSearched(false);
-        fetchDiscoverData(currentFilters, liked, []);
+        fetchDiscoverData(currentFilters, liked, results);
         return;
     }
     
@@ -262,7 +264,7 @@ export function MovieFinder() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, liked, fetchDiscoverData]);
+  }, [toast, liked, results, fetchDiscoverData]);
 
   const debouncedSearch = useCallback(debounce((q: string, f: Filters) => {
     const newParams = new URLSearchParams(searchParams.toString());
@@ -279,16 +281,12 @@ export function MovieFinder() {
     setQuery(urlQuery);
     if (loadingUserData) return;
     
-    if (!initialFetchDone.current) {
-        if (urlQuery) {
-            searchMovies(urlQuery, filters);
-        } else {
-            fetchDiscoverData(filters, liked, []);
-        }
+    if (!initialFetchDone.current || (results.length === 0 && !urlQuery)) {
+        searchMovies(urlQuery, filters);
         initialFetchDone.current = true;
     }
 
-  }, [urlQuery, filters, liked, loadingUserData, searchMovies, fetchDiscoverData]);
+  }, [urlQuery, filters, loadingUserData, searchMovies, results.length]);
 
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
@@ -384,11 +382,18 @@ export function MovieFinder() {
     });
   }
   
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     if (!loadingUserData && !isLoading) {
       fetchDiscoverData(filters, liked, results);
     }
-  }
+  }, [loadingUserData, isLoading, fetchDiscoverData, filters, liked, results]);
+  
+  useEffect(() => {
+    if (refreshCount > 0) {
+        handleRefresh();
+    }
+  }, [refreshCount, handleRefresh]);
+
 
   const activeFilterCount = filters.genres.length + filters.platforms.length + (filters.mediaType !== 'all' ? 1 : 0);
   const watchedIds = new Set(watched.map(item => String(item.movieId)));
@@ -435,10 +440,10 @@ export function MovieFinder() {
   return (
     <div className="flex flex-col items-center gap-8">
       <div className="w-full text-center max-w-3xl">
-        <h1 className="text-4xl font-bold font-headline tracking-tight text-center md:text-5xl">
+        <h1 className="text-3xl font-bold font-headline tracking-tight text-center md:text-5xl">
           Find Your Next Watch
         </h1>
-        <p className="mt-4 text-lg text-muted-foreground text-center">
+        <p className="mt-4 text-md text-muted-foreground text-center md:text-lg">
           Search for titles or browse recommendations tailored to your taste.
         </p>
       </div>

@@ -58,12 +58,12 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
           style={{ opacity: swipeOpacity }}
         >
           {swipeDirection === 'right' && (
-            <div className="transform -rotate-12 rounded-lg border-4 border-green-500 bg-green-500/10 px-8 py-4 font-bold text-green-500 text-5xl tracking-widest">
+            <div className="transform -rotate-12 rounded-lg border-4 border-green-500 bg-green-500/10 px-6 py-3 font-bold text-green-500 text-4xl md:px-8 md:py-4 md:text-5xl tracking-widest">
               LIKE
             </div>
           )}
           {swipeDirection === 'left' && (
-            <div className="transform rotate-12 rounded-lg border-4 border-destructive bg-destructive/10 px-8 py-4 font-bold text-destructive text-5xl tracking-widest">
+            <div className="transform rotate-12 rounded-lg border-4 border-destructive bg-destructive/10 px-6 py-3 font-bold text-destructive text-4xl md:px-8 md:py-4 md:text-5xl tracking-widest">
               NOPE
             </div>
           )}
@@ -71,12 +71,12 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
       </div>
 
       <div className="w-full bg-card p-4 text-white">
-        <h1 className="text-3xl font-bold font-headline mb-1">{title}</h1>
+        <h1 className="text-2xl md:text-3xl font-bold font-headline mb-1">{title}</h1>
         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
             <span>{year}</span>
             <div className="flex items-center gap-1.5 text-foreground">
-                <Star className="h-5 w-5 text-accent fill-accent" />
-                <span className="font-bold text-lg">{movie.vote_average.toFixed(1)}</span>
+                <Star className="h-4 w-4 md:h-5 md:w-5 text-accent fill-accent" />
+                <span className="font-bold text-base md:text-lg">{movie.vote_average.toFixed(1)}</span>
                 <span className="text-sm text-muted-foreground">/ 10</span>
             </div>
         </div>

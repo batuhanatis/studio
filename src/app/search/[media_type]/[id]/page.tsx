@@ -269,8 +269,8 @@ export default function DetailPage() {
                     </div>
 
                     <div className="flex items-center gap-2 mt-4">
-                        <Star className="h-7 w-7 text-accent fill-accent" />
-                        <span className="text-3xl font-bold text-foreground">{details.vote_average.toFixed(1)}</span>
+                        <Star className="h-6 w-6 text-accent fill-accent md:h-7 md:w-7" />
+                        <span className="text-2xl font-bold text-foreground md:text-3xl">{details.vote_average.toFixed(1)}</span>
                         <span className="text-base text-foreground/80">/ 10</span>
                     </div>
 

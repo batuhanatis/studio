@@ -153,11 +153,11 @@ export default function ProfilePage() {
         )}
         <div className="flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-12">
             <div className="flex-shrink-0 flex flex-col items-center w-full md:w-64">
-                <Avatar className="h-32 w-32 text-5xl border-4 border-primary/20">
+                <Avatar className="h-24 w-24 md:h-32 md:w-32 text-4xl md:text-5xl border-4 border-primary/20">
                     {profileData?.photoURL && <AvatarImage src={profileData.photoURL} alt={displayName} />}
                     <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
                 </Avatar>
-                <h1 className="mt-4 text-3xl font-bold font-headline text-center">{displayName}</h1>
+                <h1 className="mt-4 text-2xl md:text-3xl font-bold font-headline text-center">{displayName}</h1>
                 <p className="text-muted-foreground text-center">@{profileData?.username}</p>
                 {profileData?.bio && <p className="mt-2 text-center text-sm text-foreground/80">{profileData.bio}</p>}
                  

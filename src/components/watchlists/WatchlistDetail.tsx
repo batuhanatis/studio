@@ -249,7 +249,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                  <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">{watchlist.name}</h1>
-                 <p className="mt-2 text-lg text-muted-foreground">{watchlist.movies.length} {watchlist.movies.length === 1 ? 'item' : 'items'}</p>
+                 <p className="mt-2 text-md md:text-lg text-muted-foreground">{watchlist.movies.length} {watchlist.movies.length === 1 ? 'item' : 'items'}</p>
             </div>
         </div>
       </div>
