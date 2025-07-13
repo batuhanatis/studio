@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import {
@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface Recommendation {
   id: string;
@@ -36,15 +37,24 @@ interface Recommendation {
   };
 }
 
+interface GroupedRecommendation {
+    senderId: string;
+    senderName: string;
+    senderPhotoURL?: string;
+    recommendations: Recommendation[];
+    lastSent: Date;
+}
+
 export function RecommendationList() {
   const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [groupedRecommendations, setGroupedRecommendations] = useState<GroupedRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const getInitials = (name?: string) => name ? name.substring(0, 2).toUpperCase() : '?';
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!firebaseUser) {
+    if (authLoading || !firebaseUser) {
       setLoading(false);
       return;
     }
@@ -60,7 +70,7 @@ export function RecommendationList() {
       async (querySnapshot) => {
         setLoading(true);
         try {
-          const recs: Recommendation[] = await Promise.all(
+          const fetchedRecs: Recommendation[] = await Promise.all(
             querySnapshot.docs.map(async (d) => {
               const data = d.data();
               const fromUserDoc = await getDoc(doc(db, 'users', data.fromUserId));
@@ -75,7 +85,30 @@ export function RecommendationList() {
               } as Recommendation;
             })
           );
-          setRecommendations(recs);
+          
+          const groups: Record<string, GroupedRecommendation> = {};
+          
+          fetchedRecs.forEach(rec => {
+              if (!groups[rec.fromUserId]) {
+                  groups[rec.fromUserId] = {
+                      senderId: rec.fromUserId,
+                      senderName: rec.fromUsername || 'A friend',
+                      senderPhotoURL: rec.fromPhotoURL,
+                      recommendations: [],
+                      lastSent: new Date(0)
+                  };
+              }
+              groups[rec.fromUserId].recommendations.push(rec);
+              const recDate = new Date(rec.createdAt.seconds * 1000);
+              if (recDate > groups[rec.fromUserId].lastSent) {
+                  groups[rec.fromUserId].lastSent = recDate;
+              }
+          });
+          
+          const sortedGroups = Object.values(groups).sort((a, b) => b.lastSent.getTime() - a.lastSent.getTime());
+
+          setGroupedRecommendations(sortedGroups);
+
         } catch (error) {
           console.error('Error processing recommendations:', error);
           toast({
@@ -83,7 +116,7 @@ export function RecommendationList() {
             title: 'Error',
             description: 'Could not load recommendations.',
           });
-          setRecommendations([]);
+          setGroupedRecommendations([]);
         } finally {
           setLoading(false);
         }
@@ -95,20 +128,18 @@ export function RecommendationList() {
           title: 'Connection Error',
           description: 'Could not load your recommendations.',
         });
-        setRecommendations([]);
+        setGroupedRecommendations([]);
         setLoading(false);
       }
     );
 
     return () => unsubscribe();
   }, [firebaseUser, toast, authLoading]);
-
-  const getInitials = (name: string) => name ? name.substring(0, 2).toUpperCase() : '?';
-
+  
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Movie Recommendations</CardTitle>
+        <CardTitle>Recommendations Inbox</CardTitle>
         <CardDescription>Movies and shows recommended to you by your friends.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -117,73 +148,75 @@ export function RecommendationList() {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p>Loading recommendations...</p>
             </div>
-          ) : recommendations.length === 0 ? (
+          ) : groupedRecommendations.length === 0 ? (
             <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
               <Inbox className="h-16 w-16" />
               <p className="text-lg">Your inbox is empty.</p>
               <p className="text-sm">Recommendations from friends will appear here.</p>
             </div>
           ) : (
-            <div className="w-full max-w-4xl space-y-4">
-              {recommendations.map((item) => {
-                const title = item.movieTitle;
-                const href = `/search/${item.mediaType}/${item.movieId}?title=${encodeURIComponent(
-                  title
-                )}&poster=${item.moviePoster}&rating=0`;
-                const posterUrl =
-                  item.moviePoster && item.moviePoster !== 'null'
-                    ? `https://image.tmdb.org/t/p/w200${item.moviePoster}`
-                    : 'https://placehold.co/200x300.png';
-                return (
-                  <Link href={href} key={item.id} className="block">
-                    <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200">
-                      <CardContent className="p-0 flex">
-                        <div className="relative w-28 md:w-32 aspect-[2/3] flex-shrink-0 bg-muted">
-                          <Image
-                            src={posterUrl}
-                            alt={title}
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 768px) 112px, 128px"
-                            data-ai-hint="movie poster"
-                          />
+            <Accordion type="multiple" className="w-full space-y-2">
+              {groupedRecommendations.map((group) => (
+                <AccordionItem value={group.senderId} key={group.senderId} className="border-b-0">
+                   <Card className="overflow-hidden">
+                    <AccordionTrigger className="p-4 hover:no-underline hover:bg-muted/50">
+                        <div className="flex items-center justify-between w-full">
+                           <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10">
+                                {group.senderPhotoURL && <AvatarImage src={group.senderPhotoURL} alt={group.senderName} />}
+                                <AvatarFallback>{getInitials(group.senderName)}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <p className="font-semibold text-left">{group.senderName}</p>
+                                    <p className="text-xs text-muted-foreground text-left">{group.recommendations.length} new recommendation{group.recommendations.length > 1 ? 's' : ''}</p>
+                                </div>
+                            </div>
+                            <span className="text-xs text-muted-foreground pr-2">{formatDistanceToNow(group.lastSent)} ago</span>
                         </div>
-                        <div className="p-4 flex flex-col justify-center gap-2">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Avatar className="h-6 w-6">
-                               {item.fromPhotoURL && <AvatarImage src={item.fromPhotoURL} alt={item.fromUsername} />}
-                               <AvatarFallback>
-                                {getInitials(item.fromUsername || 'A')}
-                               </AvatarFallback>
-                            </Avatar>
-                            <span>
-                              <span className="font-semibold text-foreground">
-                                {item.fromUsername}
-                              </span>{' '}
-                              recommended
-                            </span>
-                          </div>
-                          <h3 className="text-lg font-bold font-headline">{title}</h3>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            {item.mediaType === 'movie' ? (
-                              <Film className="h-4 w-4" />
-                            ) : (
-                              <Tv className="h-4 w-4" />
-                            )}
-                            <span>{item.mediaType === 'movie' ? 'Movie' : 'TV Show'}</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {formatDistanceToNow(new Date(item.createdAt.seconds * 1000))} ago
-                          </p>
+                    </AccordionTrigger>
+                    <AccordionContent className="p-0">
+                        <div className="border-t">
+                            {group.recommendations.map(item => {
+                                 const href = `/search/${item.mediaType}/${item.movieId}`;
+                                 const posterUrl = item.moviePoster
+                                     ? `https://image.tmdb.org/t/p/w200${item.moviePoster}`
+                                     : 'https://placehold.co/200x300.png';
+
+                                return (
+                                <Link href={href} key={item.id} className="block hover:bg-secondary/50">
+                                    <div className="flex items-center gap-4 p-3 border-b last:border-b-0">
+                                        <div className="relative w-16 aspect-[2/3] flex-shrink-0 bg-muted rounded-md overflow-hidden">
+                                        <Image
+                                            src={posterUrl}
+                                            alt={item.movieTitle}
+                                            fill
+                                            className="object-cover"
+                                            sizes="64px"
+                                            data-ai-hint="movie poster"
+                                        />
+                                        </div>
+                                        <div className="flex-grow">
+                                            <h4 className="font-semibold">{item.movieTitle}</h4>
+                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                {item.mediaType === 'movie' ? <Film className="h-4 w-4" /> : <Tv className="h-4 w-4" />}
+                                                <span>{item.mediaType === 'movie' ? 'Movie' : 'TV Show'}</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground self-start">{formatDistanceToNow(new Date(item.createdAt.seconds * 1000))} ago</p>
+                                    </div>
+                                </Link>
+                                );
+                            })}
                         </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                );
-              })}
-            </div>
+                    </AccordionContent>
+                   </Card>
+                </AccordionItem>
+              ))}
+            </Accordion>
           )}
       </CardContent>
     </Card>
   );
 }
+
+    
