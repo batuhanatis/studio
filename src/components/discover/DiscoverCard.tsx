@@ -5,21 +5,23 @@ import React, { forwardRef } from 'react';
 import Image from 'next/image';
 import { Rating } from './Rating';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Eye, Star } from 'lucide-react';
+import { Eye, Star, ListPlus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { AddToWatchlistButton } from '../watchlists/AddToWatchlistButton';
+import { Separator } from '../ui/separator';
 
 interface DiscoverCardProps {
     movie: any;
     rating?: number;
     isWatched?: boolean;
+    platforms?: any[];
     onRate: (rating: number) => void;
     onToggleWatched: (watched: boolean) => void;
     swipeDirection: 'left' | 'right' | null;
     swipeOpacity: number;
 }
 
-export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(function DiscoverCard({ movie, rating = 0, isWatched = false, onRate, onToggleWatched, swipeDirection, swipeOpacity }, ref) {
+export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(function DiscoverCard({ movie, rating = 0, isWatched = false, platforms, onRate, onToggleWatched, swipeDirection, swipeOpacity }, ref) {
 
   if (!movie) return null;
 
@@ -42,7 +44,6 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
       ref={ref}
       className="h-full w-full overflow-y-auto scrollbar-hide bg-card shadow-2xl"
     >
-      {/* Poster and Overlay */}
       <div className="relative aspect-[2/3] w-full flex-shrink-0">
         <Image
           src={posterUrl}
@@ -55,7 +56,6 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
         
-        {/* Swipe Feedback */}
         <div
           className="absolute inset-0 flex items-center justify-center transition-opacity duration-200"
           style={{ opacity: swipeOpacity }}
@@ -73,7 +73,6 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
         </div>
       </div>
 
-      {/* Details Section */}
       <div className="w-full bg-card p-4 text-white">
         <h1 className="text-3xl font-bold font-headline mb-1">{title}</h1>
         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
@@ -102,6 +101,30 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
               <AddToWatchlistButton movie={movieDetailsForButton} isIconOnly />
           </div>
         </div>
+        
+        {platforms && platforms.length > 0 && (
+            <div className="pt-6">
+                <Separator />
+                <div className="mt-4">
+                    <h2 className="text-sm font-semibold text-muted-foreground mb-3">Available on</h2>
+                    <div className="flex flex-wrap gap-3">
+                    {platforms.map((p) => (
+                        <div key={p.provider_id} className="flex flex-col items-center gap-2 text-center w-16">
+                            <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-secondary/50 shadow-sm">
+                                <Image
+                                src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                                alt={`${p.provider_name} logo`}
+                                fill
+                                className="object-contain p-1"
+                                sizes="48px"
+                                />
+                            </div>
+                        </div>
+                    ))}
+                    </div>
+                </div>
+            </div>
+        )}
       </div>
     </Card>
   );

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -24,6 +25,12 @@ interface Movie {
   first_air_date?: string;
 }
 
+interface WatchProvider {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+}
+
 interface UserMovieData {
   movieId: string;
   mediaType: 'movie' | 'tv';
@@ -46,8 +53,14 @@ export function DiscoverFeed() {
   const [userWatched, setUserWatched] = useState<UserMovieData[]>([]);
   
   const [lastSwipedMovie, setLastSwipedMovie] = useState<Movie | null>(null);
+  
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [swipeOpacity, setSwipeOpacity] = useState(0);
 
-  const tinderCardRef = useRef<any>(null);
+  const tinderCardRefs = useMemo(() => Array(movies.length).fill(0).map(() => React.createRef<any>()), [movies.length]);
+  const currentIndexRef = useRef(0);
+  
+  const [platforms, setPlatforms] = useState<WatchProvider[]>([]);
 
   const fetchMovies = useCallback(async (isRestart = false) => {
     if (authLoading) return;
@@ -89,7 +102,11 @@ export function DiscoverFeed() {
       
       const shuffled = uniqueAndFiltered.sort(() => 0.5 - Math.random());
       
-      setMovies(prev => isRestart ? shuffled.slice(0, 10) : [...prev, ...shuffled.slice(0, 5)]);
+      setMovies(prev => {
+        const newMovies = isRestart ? shuffled.slice(0, 10) : [...prev, ...shuffled.slice(0, 5)];
+        currentIndexRef.current = newMovies.length -1;
+        return newMovies;
+      });
 
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not load movies.' });
@@ -98,6 +115,41 @@ export function DiscoverFeed() {
       setLoadingMore(false);
     }
   }, [firebaseUser, toast, authLoading]);
+  
+  const fetchProviders = useCallback(async (movie: Movie | null) => {
+    if (!movie) {
+        setPlatforms([]);
+        return;
+    }
+    try {
+        const res = await fetch(`https://api.themoviedb.org/3/${movie.media_type}/${movie.id}/watch/providers?api_key=${API_KEY}`);
+        const data = await res.json();
+        const tr = data.results?.TR;
+        if (tr) {
+            const allProviders: WatchProvider[] = [
+                ...(tr.flatrate || []),
+                ...(tr.buy || []),
+                ...(tr.rent || []),
+            ];
+            const unique = allProviders.filter((v, i, a) => a.findIndex((t) => t.provider_id === v.provider_id) === i);
+            setPlatforms(unique);
+        } else {
+            setPlatforms([]);
+        }
+    } catch {
+        setPlatforms([]);
+    }
+  }, []);
+
+  // Fetch providers for the top card whenever the movie list changes
+  useEffect(() => {
+    if (movies.length > 0) {
+        const topMovie = movies[movies.length - 1];
+        fetchProviders(topMovie);
+    } else {
+        setPlatforms([]);
+    }
+  }, [movies, fetchProviders]);
 
   // Initial fetch
   useEffect(() => {
@@ -182,6 +234,10 @@ export function DiscoverFeed() {
     }
     const newMovies = movies.filter(m => m.id !== movie.id);
     setMovies(newMovies);
+    
+    // Reset swipe feedback
+    setSwipeDirection(null);
+    setSwipeOpacity(0);
 
     if (newMovies.length <= 5 && !loadingMore) {
         fetchMovies(false);
@@ -189,8 +245,8 @@ export function DiscoverFeed() {
   };
   
   const swipe = async (dir: 'left' | 'right') => {
-    if (movies.length > 0 && tinderCardRef.current) {
-      await tinderCardRef.current.swipe(dir);
+    if (movies.length > 0 && currentIndexRef.current < movies.length && tinderCardRefs[currentIndexRef.current]) {
+      await tinderCardRefs[currentIndexRef.current].current.swipe(dir);
     }
   };
   
@@ -199,6 +255,18 @@ export function DiscoverFeed() {
         setMovies(prev => [lastSwipedMovie, ...prev]);
         setLastSwipedMovie(null);
     }
+  }
+  
+  const handleSwipeProgress = (progress: number, direction: 'left' | 'right' | 'up' | 'down') => {
+      if(direction === 'left' || direction === 'right') {
+          setSwipeDirection(direction);
+          setSwipeOpacity(Math.min(progress * 2, 1));
+      }
+  };
+  
+  const handleSwipeRequirementFulfilled = () => {
+      setSwipeDirection(null);
+      setSwipeOpacity(0);
   }
 
   const renderContent = () => {
@@ -235,18 +303,23 @@ export function DiscoverFeed() {
         
         return (
             <TinderCard
-                ref={isTopCard ? tinderCardRef : null}
+                ref={tinderCardRefs[index]}
                 className="absolute inset-0"
                 key={movie.id}
                 onSwipe={(dir) => swiped(dir, movie)}
+                onSwipeRequirementUnfulfilled={() => { setSwipeDirection(null); setSwipeOpacity(0); }}
+                onSwipeProgress={(p, d) => isTopCard && handleSwipeProgress(p, d)}
                 preventSwipe={['up', 'down']}
             >
                 <DiscoverCard
                     movie={movie}
                     rating={rating}
                     isWatched={isWatched}
+                    platforms={isTopCard ? platforms : undefined}
                     onRate={(newRating) => handleRateMovie(movie, newRating)}
                     onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
+                    swipeDirection={isTopCard ? swipeDirection : null}
+                    swipeOpacity={isTopCard ? swipeOpacity : 0}
                 />
             </TinderCard>
         );
