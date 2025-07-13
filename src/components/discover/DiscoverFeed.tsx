@@ -250,7 +250,7 @@ export function DiscoverFeed() {
             {movies.map((movie, index) => (
                 <TinderCard
                     ref={childRefs[index]}
-                    className="absolute"
+                    className="absolute w-full h-full"
                     key={movie.id}
                     onSwipe={(dir) => swiped(dir as 'left' | 'right', movie, index)}
                     onCardLeftScreen={() => outOfFrame(movie.title || 'movie', index)}
