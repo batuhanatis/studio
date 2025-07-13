@@ -82,9 +82,9 @@ export default function ProfilePage() {
     }
   };
   
-  const getInitials = (email: string | null | undefined) => {
-    if (!email) return '?';
-    return email.substring(0, 2).toUpperCase();
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return '?';
+    return name.substring(0, 2).toUpperCase();
   }
   
   if (loading || profileLoading) {
@@ -152,9 +152,9 @@ export default function ProfilePage() {
             <div className="flex-shrink-0 flex flex-col items-center w-full md:w-64">
                 <Avatar className="h-32 w-32 text-5xl border-4 border-primary/20">
                     {profileData?.photoURL && <AvatarImage src={profileData.photoURL} alt={profileData.username || profileData.email} />}
-                    <AvatarFallback>{getInitials(profileData?.email)}</AvatarFallback>
+                    <AvatarFallback>{getInitials(profileData?.username || profileData?.email)}</AvatarFallback>
                 </Avatar>
-                <h1 className="mt-4 text-3xl font-bold font-headline text-center">{profileData?.username || profileData?.email}</h1>
+                <h1 className="mt-4 text-3xl font-bold font-headline text-center">{profileData?.username}</h1>
                 <p className="text-muted-foreground text-center">{profileData?.email}</p>
                  
                 <Card className="w-full mt-6 text-sm">

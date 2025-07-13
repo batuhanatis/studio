@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -35,6 +36,7 @@ interface MovieDetails {
 
 interface UserProfile {
   uid: string;
+  username: string;
   email: string;
 }
 
@@ -107,7 +109,7 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
     }
   };
   
-  const getInitials = (email: string) => email.substring(0, 2).toUpperCase();
+  const getInitials = (name: string) => name.substring(0, 2).toUpperCase();
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -144,10 +146,10 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
                       <Loader2 className="mr-3 h-5 w-5 animate-spin" />
                     ) : (
                       <Avatar className="mr-3 h-8 w-8">
-                        <AvatarFallback>{getInitials(friend.email)}</AvatarFallback>
+                        <AvatarFallback>{getInitials(friend.username)}</AvatarFallback>
                       </Avatar>
                     )}
-                    <span>{friend.email}</span>
+                    <span>{friend.username}</span>
                   </Button>
                 </li>
               ))}
@@ -158,7 +160,7 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
               <p className="font-semibold text-lg text-foreground">No friends yet!</p>
               <p>Add friends to share movies with them.</p>
               <Button asChild className="mt-4" onClick={() => setIsOpen(false)}>
-                  <Link href="/profile">
+                  <Link href={`/profile/${firebaseUser?.uid}`}>
                       <UserPlus className="mr-2 h-4 w-4" />
                       Add Friends
                   </Link>

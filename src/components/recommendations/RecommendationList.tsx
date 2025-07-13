@@ -24,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 interface Recommendation {
   id: string;
   fromUserId: string;
-  fromUserEmail?: string;
+  fromUsername?: string;
   movieId: string;
   movieTitle: string;
   moviePoster: string | null;
@@ -63,13 +63,13 @@ export function RecommendationList() {
             querySnapshot.docs.map(async (d) => {
               const data = d.data();
               const fromUserDoc = await getDoc(doc(db, 'users', data.fromUserId));
-              const fromUserEmail = fromUserDoc.exists()
-                ? fromUserDoc.data().email
+              const fromUsername = fromUserDoc.exists()
+                ? fromUserDoc.data().username
                 : 'A friend';
               return {
                 id: d.id,
                 ...data,
-                fromUserEmail,
+                fromUsername,
               } as Recommendation;
             })
           );
@@ -101,7 +101,7 @@ export function RecommendationList() {
     return () => unsubscribe();
   }, [firebaseUser, toast, authLoading]);
 
-  const getInitials = (email: string) => email.substring(0, 2).toUpperCase();
+  const getInitials = (name: string) => name.substring(0, 2).toUpperCase();
 
   return (
     <div className="space-y-8">
@@ -149,12 +149,12 @@ export function RecommendationList() {
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Avatar className="h-6 w-6">
                           <AvatarFallback>
-                            {getInitials(item.fromUserEmail || '?')}
+                            {getInitials(item.fromUsername || '?')}
                           </AvatarFallback>
                         </Avatar>
                         <span>
                           <span className="font-semibold text-foreground">
-                            {item.fromUserEmail}
+                            {item.fromUsername}
                           </span>{' '}
                           recommended
                         </span>

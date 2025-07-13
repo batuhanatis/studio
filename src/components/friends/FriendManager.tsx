@@ -36,6 +36,7 @@ import { Separator } from '../ui/separator';
 
 interface UserProfile {
   uid: string;
+  username: string;
   email: string;
   friends?: string[];
   activeBlendsWith?: string[];
@@ -44,7 +45,7 @@ interface UserProfile {
 interface FriendRequest {
   id: string;
   fromUserId: string;
-  fromUserEmail: string;
+  fromUsername: string;
   toUserId: string;
   status: 'pending' | 'accepted';
 }
@@ -52,7 +53,7 @@ interface FriendRequest {
 interface BlendRequest {
     id: string;
     fromUserId: string;
-    fromUserEmail: string;
+    fromUsername: string;
     toUserId: string;
     status: 'pending' | 'accepted';
 }
@@ -88,7 +89,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
     defaultValues: { email: '' },
   });
   
-  const getInitials = (email: string) => email.substring(0, 2).toUpperCase();
+  const getInitials = (name: string) => name.substring(0, 2).toUpperCase();
 
   // Listener for incoming friend requests (only for own profile)
   useEffect(() => {
@@ -112,15 +113,25 @@ export function FriendManager({ userId }: FriendManagerProps) {
     const unsubscribe = onSnapshot(userDocRef, async (snapshot) => {
       setLoading(p => ({ ...p, friends: true }));
       try {
-        const userData = snapshot.data() as UserProfile | undefined;
-        setProfileData(userData || null);
+        if (snapshot.exists()) {
+            const userData = snapshot.data() as UserProfile;
+            setProfileData(userData);
 
-        let finalFriends: UserProfile[] = [];
-        if (userData?.friends && userData.friends.length > 0) {
-          const friendDocs = await getDocs(query(collection(db, 'users'), where('uid', 'in', userData.friends)));
-          finalFriends = friendDocs.docs.map(d => d.data() as UserProfile);
+            let finalFriends: UserProfile[] = [];
+            if (userData?.friends && userData.friends.length > 0) {
+              // Fetch full profiles for each friend ID
+              const friendDocs = await Promise.all(
+                userData.friends.map(friendId => getDoc(doc(db, 'users', friendId)))
+              );
+              finalFriends = friendDocs
+                .filter(doc => doc.exists())
+                .map(d => d.data() as UserProfile);
+            }
+            setFriends(finalFriends);
+        } else {
+            setProfileData(null);
+            setFriends([]);
         }
-        setFriends(finalFriends);
       } catch (error) {
         console.error("Error fetching friends list:", error);
       } finally {
@@ -174,10 +185,15 @@ export function FriendManager({ userId }: FriendManagerProps) {
       
       const existingReqQuery = query(collection(db, 'friendRequests'), where('fromUserId', '==', firebaseUser.uid), where('toUserId', '==', targetUser.uid));
       if (!(await getDocs(existingReqQuery)).empty) throw new Error("You've already sent a request to this user.");
+      
+      const currentUserDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const currentUsername = currentUserDoc.exists() ? currentUserDoc.data().username : firebaseUser.email;
 
       await addDoc(collection(db, 'friendRequests'), {
-        fromUserId: firebaseUser.uid, fromUserEmail: firebaseUser.email, username: firebaseUser.displayName || firebaseUser.email,
-        toUserId: targetUser.uid, toUserEmail: targetUser.email,
+        fromUserId: firebaseUser.uid, 
+        fromUsername: currentUsername,
+        toUserId: targetUser.uid, 
+        toUsername: targetUser.username,
         status: 'pending', createdAt: serverTimestamp(),
       });
       toast({ title: 'Success', description: 'Friend request sent!' });
@@ -216,15 +232,18 @@ export function FriendManager({ userId }: FriendManagerProps) {
     if (!firebaseUser || !firebaseUser.email) return;
     setLoading(prev => ({ ...prev, action: true }));
     try {
+        const currentUserDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        const currentUsername = currentUserDoc.exists() ? currentUserDoc.data().username : firebaseUser.email;
+
         await addDoc(collection(db, 'blendRequests'), {
             fromUserId: firebaseUser.uid,
-            fromUserEmail: firebaseUser.email,
+            fromUsername: currentUsername,
             toUserId: friend.uid,
-            toUserEmail: friend.email,
+            toUsername: friend.username,
             status: 'pending',
             createdAt: serverTimestamp(),
         });
-        toast({ title: 'Sent!', description: `Blend invite sent to ${friend.email}.` });
+        toast({ title: 'Sent!', description: `Blend invite sent to ${friend.username}.` });
     } catch (error) {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not send invite.' });
     } finally {
@@ -250,7 +269,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
         
         await batch.commit();
   
-        toast({ title: 'Blend Accepted!', description: `You can now view your Blend with ${request.fromUserEmail}.` });
+        toast({ title: 'Blend Accepted!', description: `You can now view your Blend with ${request.fromUsername}.` });
         router.push(`/blend/${request.fromUserId}`);
       } else {
         await deleteDoc(requestDocRef);
@@ -277,8 +296,8 @@ export function FriendManager({ userId }: FriendManagerProps) {
                 {friends.map((friend) => (
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                     <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
-                        <Avatar><AvatarFallback>{getInitials(friend.email)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{friend.email}</span>
+                        <Avatar><AvatarFallback>{getInitials(friend.username)}</AvatarFallback></Avatar>
+                        <span className="font-medium">{friend.username}</span>
                     </Link>
                   </li>
                 ))}
@@ -330,13 +349,13 @@ export function FriendManager({ userId }: FriendManagerProps) {
                   <ul className="space-y-3">
                     {incomingRequests.map((req) => (
                       <li key={req.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
-                         <div className="flex items-center gap-3"><Avatar><AvatarFallback>{getInitials(req.fromUserEmail)}</AvatarFallback></Avatar><span className="font-medium">{req.fromUserEmail}</span><span className="text-xs text-muted-foreground">(Friend Request)</span></div>
+                         <div className="flex items-center gap-3"><Avatar><AvatarFallback>{getInitials(req.fromUsername)}</AvatarFallback></Avatar><span className="font-medium">{req.fromUsername}</span><span className="text-xs text-muted-foreground">(Friend Request)</span></div>
                          <div className="flex gap-2"><Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => handleFriendRequest(req, true)} disabled={loading.action}><Check className="h-4 w-4" /></Button><Button size="icon" variant="outline" className="h-8 w-8 bg-red-500/10 text-red-600 hover:bg-red-500/20" onClick={() => handleFriendRequest(req, false)} disabled={loading.action}><X className="h-4 w-4" /></Button></div>
                       </li>
                     ))}
                     {incomingBlendRequests.map((req) => (
                       <li key={req.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
-                         <div className="flex items-center gap-3"><Avatar><AvatarFallback>{getInitials(req.fromUserEmail)}</AvatarFallback></Avatar><span className="font-medium">{req.fromUserEmail}</span><span className="text-xs text-primary">(Blend Invite)</span></div>
+                         <div className="flex items-center gap-3"><Avatar><AvatarFallback>{getInitials(req.fromUsername)}</AvatarFallback></Avatar><span className="font-medium">{req.fromUsername}</span><span className="text-xs text-primary">(Blend Invite)</span></div>
                          <div className="flex gap-2"><Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => handleBlendRequest(req, true)} disabled={loading.action}><Check className="h-4 w-4" /></Button><Button size="icon" variant="outline" className="h-8 w-8 bg-red-500/10 text-red-600 hover:bg-red-500/20" onClick={() => handleBlendRequest(req, false)} disabled={loading.action}><X className="h-4 w-4" /></Button></div>
                       </li>
                     ))}
@@ -359,8 +378,8 @@ export function FriendManager({ userId }: FriendManagerProps) {
                 {friends.map((friend) => (
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                     <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
-                        <Avatar><AvatarFallback>{getInitials(friend.email)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{friend.email}</span>
+                        <Avatar><AvatarFallback>{getInitials(friend.username)}</AvatarFallback></Avatar>
+                        <span className="font-medium">{friend.username}</span>
                     </Link>
                     <div className="ml-auto">
                         {profileData?.activeBlendsWith?.includes(friend.uid) ? (

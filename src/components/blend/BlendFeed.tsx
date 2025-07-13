@@ -47,14 +47,19 @@ export function BlendFeed({ friendId }: { friendId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   const [watched, setWatched] = useState<UserMovieData[]>([]);
+  const [liked, setLiked] = useState<UserMovieData[]>([]);
+  const [disliked, setDisliked] = useState<UserMovieData[]>([]);
 
-  // Fetch current user's watched list
+  // Fetch current user's lists
   useEffect(() => {
     if (authLoading || !firebaseUser) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const unsubscribe = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
-            setWatched(doc.data().watchedMovies || []);
+            const data = doc.data();
+            setWatched(data.watchedMovies || []);
+            setLiked(data.likedMovies || []);
+            setDisliked(data.dislikedMovies || []);
         }
     });
     return () => unsubscribe();
@@ -148,6 +153,8 @@ export function BlendFeed({ friendId }: { friendId: string }) {
   }, [createBlend]);
   
   const watchedIds = new Set(watched.map(item => String(item.movieId)));
+  const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
+  const dislikedIds = new Set(disliked.map(item => String(item.movieId)));
   
   if (loading || authLoading) {
      return (
@@ -173,7 +180,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
     <div className="space-y-8">
       <div className="text-center">
         <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
-          A Blend for You & {friendProfile?.username || friendProfile?.email}
+          A Blend for You & {friendProfile?.username}
         </h1>
         <p className="mt-2 text-lg text-muted-foreground">
           Movies and shows you might both enjoy, based on your liked movies.
@@ -193,7 +200,11 @@ export function BlendFeed({ friendId }: { friendId: string }) {
               key={item.id}
               item={item}
               isWatched={watchedIds.has(String(item.id))}
+              isLiked={likedIds.has(`${item.id}-${item.media_type}`)}
+              isDisliked={dislikedIds.has(String(item.id))}
               onToggleWatched={() => { /* Not implemented for simplicity */ }}
+              onToggleLike={() => { /* Not implemented for simplicity */ }}
+              onToggleDislike={() => { /* Not implemented for simplicity */ }}
             />
           ))}
         </div>

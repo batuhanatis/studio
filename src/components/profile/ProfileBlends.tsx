@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -60,9 +61,9 @@ export function ProfileBlends() {
     return () => unsubscribe();
   }, [firebaseUser, authLoading]);
   
-  const getInitials = (email: string | undefined) => {
-    if (!email) return '?';
-    return email.substring(0, 2).toUpperCase();
+  const getInitials = (name: string | undefined) => {
+    if (!name) return '?';
+    return name.substring(0, 2).toUpperCase();
   }
 
   if (loading || authLoading) {
@@ -102,7 +103,7 @@ export function ProfileBlends() {
             <div className="flex items-center gap-4">
                 <Avatar className="h-12 w-12">
                     {blendPartner.photoURL && <AvatarImage src={blendPartner.photoURL} alt={blendPartner.username} />}
-                    <AvatarFallback className="text-xl">{getInitials(blendPartner.email)}</AvatarFallback>
+                    <AvatarFallback className="text-xl">{getInitials(blendPartner.username || blendPartner.email)}</AvatarFallback>
                 </Avatar>
                 <div>
                     <CardTitle className="text-lg">Blend with</CardTitle>
