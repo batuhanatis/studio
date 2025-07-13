@@ -237,7 +237,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
     setLoading(prev => ({ ...prev, action: true }));
     try {
         const currentUserDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        const currentUsername = currentUserDoc.exists() ? currentUserDoc.data().username : firebaseUser.email;
+        const currentUsername = currentUserDoc.exists() ? currentUserDoc.data().username : "A friend";
 
         await addDoc(collection(db, 'blendRequests'), {
             fromUserId: firebaseUser.uid,
@@ -301,7 +301,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                     <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
                         <Avatar><AvatarFallback>{getInitials(friend.username)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{friend.username}</span>
+                        <span className="font-medium">{friend.username || friend.email}</span>
                     </Link>
                   </li>
                 ))}
@@ -355,18 +355,24 @@ export function FriendManager({ userId }: FriendManagerProps) {
                      <p className="text-center text-sm text-muted-foreground py-4">No pending requests.</p>
                   )}
                   <ul className="space-y-3">
-                    {incomingRequests.map((req) => (
-                      <li key={req.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
-                         <div className="flex items-center gap-3"><Avatar><AvatarFallback>{getInitials(req.fromUsername)}</AvatarFallback></Avatar><span className="font-medium">{req.fromUsername}</span><span className="text-xs text-muted-foreground">(Friend Request)</span></div>
-                         <div className="flex gap-2"><Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => handleFriendRequest(req, true)} disabled={loading.action}><Check className="h-4 w-4" /></Button><Button size="icon" variant="outline" className="h-8 w-8 bg-red-500/10 text-red-600 hover:bg-red-500/20" onClick={() => handleFriendRequest(req, false)} disabled={loading.action}><X className="h-4 w-4" /></Button></div>
-                      </li>
-                    ))}
-                    {incomingBlendRequests.map((req) => (
-                      <li key={req.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
-                         <div className="flex items-center gap-3"><Avatar><AvatarFallback>{getInitials(req.fromUsername)}</AvatarFallback></Avatar><span className="font-medium">{req.fromUsername}</span><span className="text-xs text-primary">(Blend Invite)</span></div>
-                         <div className="flex gap-2"><Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => handleBlendRequest(req, true)} disabled={loading.action}><Check className="h-4 w-4" /></Button><Button size="icon" variant="outline" className="h-8 w-8 bg-red-500/10 text-red-600 hover:bg-red-500/20" onClick={() => handleBlendRequest(req, false)} disabled={loading.action}><X className="h-4 w-4" /></Button></div>
-                      </li>
-                    ))}
+                    {incomingRequests.map((req) => {
+                      const fromName = req.fromUsername || "A friend";
+                      return (
+                        <li key={req.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
+                           <div className="flex items-center gap-3"><Avatar><AvatarFallback>{getInitials(fromName)}</AvatarFallback></Avatar><span className="font-medium">{fromName}</span><span className="text-xs text-muted-foreground">(Friend Request)</span></div>
+                           <div className="flex gap-2"><Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => handleFriendRequest(req, true)} disabled={loading.action}><Check className="h-4 w-4" /></Button><Button size="icon" variant="outline" className="h-8 w-8 bg-red-500/10 text-red-600 hover:bg-red-500/20" onClick={() => handleFriendRequest(req, false)} disabled={loading.action}><X className="h-4 w-4" /></Button></div>
+                        </li>
+                      );
+                    })}
+                    {incomingBlendRequests.map((req) => {
+                       const fromName = req.fromUsername || "A friend";
+                       return (
+                        <li key={req.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
+                           <div className="flex items-center gap-3"><Avatar><AvatarFallback>{getInitials(fromName)}</AvatarFallback></Avatar><span className="font-medium">{fromName}</span><span className="text-xs text-primary">(Blend Invite)</span></div>
+                           <div className="flex gap-2"><Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => handleBlendRequest(req, true)} disabled={loading.action}><Check className="h-4 w-4" /></Button><Button size="icon" variant="outline" className="h-8 w-8 bg-red-500/10 text-red-600 hover:bg-red-500/20" onClick={() => handleBlendRequest(req, false)} disabled={loading.action}><X className="h-4 w-4" /></Button></div>
+                        </li>
+                       );
+                    })}
                   </ul>
                 </>
              )}
@@ -387,7 +393,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                     <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
                         <Avatar><AvatarFallback>{getInitials(friend.username)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{friend.username}</span>
+                        <span className="font-medium">{friend.username || friend.email}</span>
                     </Link>
                     <div className="ml-auto">
                         {profileData?.activeBlendsWith?.includes(friend.uid) ? (
