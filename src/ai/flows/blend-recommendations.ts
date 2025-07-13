@@ -5,23 +5,10 @@
  * @fileOverview Creates movie recommendations based on the tastes of two users.
  *
  * - getBlendRecommendations - A function that generates a movie blend.
- * - BlendRecommendationsInput - The input type for the function.
- * - BlendRecommendationsOutput - The return type for the function.
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
-
-export const BlendRecommendationsInputSchema = z.object({
-  currentUserMovieTitles: z.array(z.string()).describe('A list of movie titles the current user likes.'),
-  friendMovieTitles: z.array(z.string()).describe('A list of movie titles the friend likes.'),
-});
-export type BlendRecommendationsInput = z.infer<typeof BlendRecommendationsInputSchema>;
-
-export const BlendRecommendationsOutputSchema = z.object({
-  recommendedTitles: z.array(z.string()).describe('A list of 10 movie or TV show titles that both users might enjoy.'),
-});
-export type BlendRecommendationsOutput = z.infer<typeof BlendRecommendationsOutputSchema>;
+import { BlendRecommendationsInputSchema, BlendRecommendationsOutputSchema, type BlendRecommendationsInput, type BlendRecommendationsOutput } from './schemas';
 
 export async function getBlendRecommendations(input: BlendRecommendationsInput): Promise<BlendRecommendationsOutput> {
   return blendRecommendationsFlow(input);

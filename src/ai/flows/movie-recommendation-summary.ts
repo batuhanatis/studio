@@ -6,22 +6,17 @@
  * @fileOverview Fetches movie recommendations and summaries using an LLM.
  *
  * - getMovieRecommendationSummary - A function that suggests where to watch a movie and provides a summary.
- * - MovieRecommendationSummaryInput - The input type for the getMovieRecommendationSummary function.
- * - MovieRecommendationSummaryOutput - The return type for the getMovieRecommendationSummary function.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { MovieRecommendationSummaryInputSchema, type MovieRecommendationSummaryInput, type MovieRecommendationSummaryOutput } from './schemas';
+import { z } from 'zod';
 
-const MovieRecommendationSummaryInputSchema = z.object({
-  movieTitle: z.string().describe('The title of the movie to find recommendations for.'),
-});
-export type MovieRecommendationSummaryInput = z.infer<typeof MovieRecommendationSummaryInputSchema>;
-
+// The output schema is simple and only used here, so we can define it inline.
 const MovieRecommendationSummaryOutputSchema = z.object({
   recommendationSummary: z.string().describe('A short summary of why the movie is recommended and where to watch it.'),
 });
-export type MovieRecommendationSummaryOutput = z.infer<typeof MovieRecommendationSummaryOutputSchema>;
+
 
 export async function getMovieRecommendationSummary(input: MovieRecommendationSummaryInput): Promise<MovieRecommendationSummaryOutput> {
   return movieRecommendationSummaryFlow(input);
