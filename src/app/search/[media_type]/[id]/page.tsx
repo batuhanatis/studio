@@ -253,10 +253,10 @@ export default function DetailPage() {
                         ))}
                     </div>
 
-                    <div className="flex items-end gap-2 mt-4">
-                        <Star className="h-8 w-8 text-accent fill-accent" />
-                        <span className="text-4xl font-bold text-foreground">{details.vote_average.toFixed(1)}</span>
-                        <span className="text-xl text-muted-foreground">/ 10</span>
+                    <div className="flex items-center gap-2 mt-4">
+                        <Star className="h-7 w-7 text-accent fill-accent" />
+                        <span className="text-3xl font-bold text-foreground">{details.vote_average.toFixed(1)}</span>
+                        <span className="text-base text-foreground/80">/ 10</span>
                     </div>
 
                     <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{details.overview || 'No description available.'}</p>
