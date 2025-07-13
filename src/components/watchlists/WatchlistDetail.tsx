@@ -112,40 +112,42 @@ export function WatchlistDetail({ listId }: { listId: string }) {
      }
   }, []);
 
-  const handleGetRecommendations = async () => {
-    if (!watchlist || watchlist.movies.length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'Empty List',
-        description: 'Add some movies to your list before getting recommendations.',
-      });
-      return;
-    }
-    setLoading(prev => ({...prev, recommendations: true}));
-    setVisibleRecommendationsCount(5); // Reset count on new request
-    setAllRecommendations([]); // Clear old recommendations
-    try {
-      const movieTitles = watchlist.movies.map(m => m.title);
-      const result = await getWatchlistRecommendations({ movieTitles });
-      
-      if (!result || result.recommendedTitles.length === 0) {
-        toast({ title: 'No Results', description: "The AI couldn't find any recommendations right now." });
-        setLoading(prev => ({...prev, recommendations: false}));
-        return;
-      }
-      
-      const moviePromises = result.recommendedTitles.map(title => searchMovieByTitle(title));
-      const movies = (await Promise.all(moviePromises)).filter((m): m is MovieDetails => m !== null);
-      
-      const uniqueMovies = Array.from(new Map(movies.map(m => [m.id, m])).values());
-      setAllRecommendations(uniqueMovies);
+  // Automatically fetch recommendations when watchlist is loaded
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+        if (!watchlist || watchlist.movies.length === 0) {
+            return;
+        }
+        setLoading(prev => ({...prev, recommendations: true}));
+        setVisibleRecommendationsCount(5); 
+        setAllRecommendations([]);
+        try {
+            const movieTitles = watchlist.movies.map(m => m.title);
+            const result = await getWatchlistRecommendations({ movieTitles });
+            
+            if (!result || result.recommendedTitles.length === 0) {
+                // Don't show a toast, just load nothing.
+                setLoading(prev => ({...prev, recommendations: false}));
+                return;
+            }
+            
+            const moviePromises = result.recommendedTitles.map(title => searchMovieByTitle(title));
+            const movies = (await Promise.all(moviePromises)).filter((m): m is MovieDetails => m !== null);
+            
+            const uniqueMovies = Array.from(new Map(movies.map(m => [m.id, m])).values());
+            setAllRecommendations(uniqueMovies);
 
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not get recommendations.' });
-    } finally {
-      setLoading(prev => ({...prev, recommendations: false}));
-    }
-  };
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'AI Error', description: err.message || 'Could not get recommendations.' });
+        } finally {
+            setLoading(prev => ({...prev, recommendations: false}));
+        }
+    };
+    
+    fetchRecommendations();
+
+  }, [watchlist, searchMovieByTitle, toast]);
+
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!firebaseUser) return;
@@ -249,14 +251,6 @@ export function WatchlistDetail({ listId }: { listId: string }) {
                  <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">{watchlist.name}</h1>
                  <p className="mt-2 text-lg text-muted-foreground">{watchlist.movies.length} {watchlist.movies.length === 1 ? 'item' : 'items'}</p>
             </div>
-            <Button onClick={handleGetRecommendations} disabled={loading.recommendations || watchlist.movies.length === 0}>
-                {loading.recommendations ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                    <Wand2 className="mr-2 h-4 w-4" />
-                )}
-                Get AI Recommendations
-            </Button>
         </div>
       </div>
       
@@ -283,7 +277,9 @@ export function WatchlistDetail({ listId }: { listId: string }) {
         </div>
       )}
 
-      {allRecommendations.length > 0 && (
+      {loading.recommendations ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
+      ) : allRecommendations.length > 0 && (
         <div className="space-y-6 pt-8">
             <Separator />
             <h2 className="text-2xl font-bold font-headline">AI Recommendations for You</h2>
@@ -302,7 +298,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
             ))}
             </div>
             {visibleRecommendationsCount < allRecommendations.length && (
-                <div className="text-center">
+                <div className="text-center mt-6">
                     <Button
                         variant="secondary"
                         onClick={() => setVisibleRecommendationsCount(prev => prev + 5)}
