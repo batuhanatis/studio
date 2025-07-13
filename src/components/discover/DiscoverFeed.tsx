@@ -8,6 +8,7 @@ import { doc, getDoc, runTransaction, updateDoc, arrayUnion, arrayRemove, onSnap
 import { useToast } from '@/hooks/use-toast';
 import { Film, Heart, X as XIcon, RefreshCw, Loader2 } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
+import type { SwipeRequirement } from 'react-tinder-card';
 import { DiscoverCard } from './DiscoverCard';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -51,7 +52,10 @@ export function DiscoverFeed() {
   const [userRatings, setUserRatings] = useState<Omit<UserRatingData, 'title' | 'poster'>[]>([]);
   const [userWatched, setUserWatched] = useState<UserMovieData[]>([]);
   const [seenMovieIds, setSeenMovieIds] = useState<Set<string>>(new Set());
-  
+
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | 'up' | 'down' | null>(null);
+  const [swipeOpacity, setSwipeOpacity] = useState(0);
+
   const canSwipe = movies.length > 0;
   const topCardRef = useRef<any>(null);
 
@@ -270,6 +274,17 @@ export function DiscoverFeed() {
     if (direction === 'right') {
         handleRateMovie(movie, 5);
     }
+    setSwipeDirection(null);
+    setSwipeOpacity(0);
+  };
+
+  const onSwipeRequirementFulfilled = (dir: 'left' | 'right' | 'up' | 'down') => {
+    setSwipeDirection(dir);
+    return true;
+  };
+
+  const onSwipeProgress = (progress: number) => {
+    setSwipeOpacity(progress);
   };
   
   const onCardLeftScreen = (myIdentifier: number) => {
@@ -317,16 +332,23 @@ export function DiscoverFeed() {
         );
       }
 
+      const swipeRequirement: SwipeRequirement = {
+        absolute: 20
+      };
+
       return (
          <div className="relative w-full max-w-sm h-[75vh]">
             {movies.map((movie, index) => (
                 <TinderCard
                     ref={index === movies.length - 1 ? topCardRef : null}
-                    className="absolute w-full h-full"
+                    className="absolute inset-0"
                     key={movie.id}
+                    onSwipeRequirementFulfilled={onSwipeRequirementFulfilled}
+                    onSwipeProgress={onSwipeProgress}
                     onSwipe={(dir) => onSwipe(dir as 'left' | 'right', movie)}
                     preventSwipe={['up', 'down']}
                     onCardLeftScreen={() => onCardLeftScreen(movie.id)}
+                    swipeRequirement={swipeRequirement}
                 >
                     <DiscoverCard
                         movie={movie}
@@ -334,6 +356,8 @@ export function DiscoverFeed() {
                         isWatched={userWatched.some(m => m.movieId === String(movie.id) && m.mediaType === movie.media_type)}
                         onRate={(rating) => handleRateMovie(movie, rating)}
                         onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
+                        swipeDirection={index === movies.length - 1 ? swipeDirection : null}
+                        swipeOpacity={index === movies.length - 1 ? swipeOpacity : 0}
                     />
                 </TinderCard>
             ))}
@@ -342,7 +366,7 @@ export function DiscoverFeed() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full">
+    <div className="flex flex-col items-center justify-center w-full h-full flex-grow">
       <div className="text-center mb-4">
         <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
             Discover New Titles

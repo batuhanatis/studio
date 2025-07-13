@@ -7,11 +7,13 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Rating } from './Rating';
-import { Eye, Star } from 'lucide-react';
+import { Eye, Star, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { AddToWatchlistButton } from '../watchlists/AddToWatchlistButton';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
+
 
 interface Movie {
   id: number;
@@ -37,12 +39,14 @@ interface DiscoverCardProps {
   isWatched?: boolean;
   onRate: (rating: number) => void;
   onToggleWatched: (watched: boolean) => void;
+  swipeDirection?: 'left' | 'right' | 'up' | 'down' | null;
+  swipeOpacity?: number;
 }
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
 const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
-  ({ movie, rating = 0, isWatched = false, onRate, onToggleWatched }, ref) => {
+  ({ movie, rating = 0, isWatched = false, onRate, onToggleWatched, swipeDirection, swipeOpacity = 0 }, ref) => {
     const [platforms, setPlatforms] = useState<WatchProvider[] | null>(null);
     const [loadingProviders, setLoadingProviders] = useState(true);
 
@@ -84,8 +88,8 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
     
     if (!movie) {
       return (
-        <div ref={ref}>
-          <Card className="w-full max-w-sm h-[75vh] mx-auto overflow-hidden shadow-2xl animate-pulse rounded-2xl">
+        <div ref={ref} className="w-full h-full">
+          <Card className="w-full h-full overflow-hidden shadow-2xl animate-pulse rounded-2xl">
               <Skeleton className="w-full h-full" />
           </Card>
         </div>
@@ -95,7 +99,7 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
     const title = movie.title || movie.name || 'Untitled';
     const posterUrl = movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'https://placehold.co/500x750.png';
     const releaseYear = movie.release_date?.substring(0, 4) || movie.first_air_date?.substring(0, 4);
-    const href = `/search/${movie.media_type}/${movie.id}?title=${encodeURIComponent(title)}&poster=${movie.poster_path}&rating=${movie.vote_average}&year=${releaseYear || ''}`;
+    const href = `/search/${movie.media_type}/${movie.id}`;
     
     const movieDetails = {
       id: movie.id,
@@ -106,28 +110,48 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
       release_date: movie.release_date,
       first_air_date: movie.first_air_date,
     };
+    
+    const renderSwipeIndicator = () => {
+        if (!swipeDirection) return null;
+
+        const isLike = swipeDirection === 'right';
+        const rotation = isLike ? '-rotate-15' : 'rotate-15';
+        const text = isLike ? 'LIKE' : 'NOPE';
+        const color = isLike ? 'text-green-400 border-green-400' : 'text-red-400 border-red-400';
+        const Icon = isLike ? ThumbsUp : ThumbsDown;
+
+        return (
+            <div
+                style={{ opacity: swipeOpacity }}
+                className={cn("absolute top-12 z-20 transition-opacity", isLike ? 'left-8' : 'right-8')}>
+                <div className={cn("text-3xl font-bold border-4 rounded-lg px-4 py-2 flex items-center gap-2", rotation, color)}>
+                    <Icon className="h-8 w-8" />
+                    {text}
+                </div>
+            </div>
+        );
+    };
 
     return (
-      <div ref={ref} className="w-full max-w-sm mx-auto">
-        <Card className="w-full h-[75vh] overflow-y-auto shadow-2xl rounded-2xl group cursor-grab active:cursor-grabbing snap-y snap-mandatory scrollbar-hide">
-            {/* Poster Section */}
-            <div className="h-full w-full flex-shrink-0 snap-start">
-              <div className="relative w-full aspect-[2/3]">
-                  <Image
-                    src={posterUrl}
-                    alt={`Poster for ${title}`}
-                    fill
-                    style={{ objectFit: "cover" }}
-                    sizes="(max-width: 640px) 100vw, 384px"
-                    priority
-                    data-ai-hint="movie poster"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-              </div>
+      <div ref={ref} className="w-full h-full">
+        <Card className="w-full h-full overflow-y-auto shadow-2xl rounded-2xl group cursor-grab active:cursor-grabbing scrollbar-hide">
+            <div className="relative">
+                {renderSwipeIndicator()}
+                <div className="relative w-full aspect-[2/3]">
+                    <Image
+                      src={posterUrl}
+                      alt={`Poster for ${title}`}
+                      fill
+                      style={{ objectFit: "cover" }}
+                      sizes="(max-width: 640px) 100vw, 384px"
+                      priority
+                      data-ai-hint="movie poster"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                </div>
             </div>
 
-            {/* Content Section */}
-            <div className="bg-card w-full p-4 snap-start">
+            <div className="bg-card w-full p-4">
                 <CardHeader className="p-0">
                     <Link href={href}><CardTitle className="text-2xl font-bold font-headline tracking-tight hover:underline">{title}</CardTitle></Link>
                     <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
@@ -207,3 +231,5 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
 
 DiscoverCard.displayName = "DiscoverCard";
 export { DiscoverCard };
+
+    
