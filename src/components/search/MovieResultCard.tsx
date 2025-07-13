@@ -3,11 +3,13 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Film, Tv, Star } from 'lucide-react';
+import { Film, Tv, Star, Heart } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '../ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AddToWatchlistButton } from '../watchlists/AddToWatchlistButton';
+import { Button } from '../ui/button';
+import { cn } from '@/lib/utils';
 
 interface SearchResult {
   id: number;
@@ -24,10 +26,12 @@ interface SearchResult {
 interface MovieResultCardProps {
   item: SearchResult;
   isWatched: boolean;
+  isLiked: boolean;
   onToggleWatched: (watched: boolean) => void;
+  onToggleLike: (liked: boolean) => void;
 }
 
-export function MovieResultCard({ item, isWatched, onToggleWatched }: MovieResultCardProps) {
+export function MovieResultCard({ item, isWatched, isLiked, onToggleWatched, onToggleLike }: MovieResultCardProps) {
   const title = item.title || item.name || 'Untitled';
   const releaseYear = item.release_date?.substring(0, 4) || item.first_air_date?.substring(0, 4);
   const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://placehold.co/500x750.png';
@@ -76,6 +80,17 @@ export function MovieResultCard({ item, isWatched, onToggleWatched }: MovieResul
           
             <div className="flex items-center justify-between mt-2 border-t border-border/60 pt-2">
                 <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleLike(!isLiked);
+                      }}
+                    >
+                      <Heart className={cn("h-4 w-4", isLiked ? 'text-red-500 fill-current' : 'text-muted-foreground')} />
+                    </Button>
                     <Checkbox
                         id={`watched-card-${item.id}`}
                         checked={isWatched}
@@ -96,3 +111,5 @@ export function MovieResultCard({ item, isWatched, onToggleWatched }: MovieResul
     </Card>
   );
 }
+
+    

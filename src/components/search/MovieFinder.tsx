@@ -92,9 +92,9 @@ export function MovieFinder() {
   const { firebaseUser, loading: authLoading } = useAuth();
 
   const [watched, setWatched] = useState<UserMovieData[]>([]);
-  const [loadingWatched, setLoadingWatched] = useState(true);
+  const [liked, setLiked] = useState<UserMovieData[]>([]);
+  const [loadingUserData, setLoadingUserData] = useState(true);
   const [preferredGenreIds, setPreferredGenreIds] = useState<string>('');
-  const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
     setQuery(urlQuery);
@@ -107,8 +107,7 @@ export function MovieFinder() {
   useEffect(() => {
     if (authLoading) return;
     if (!firebaseUser) {
-        setLoadingWatched(false);
-        setLoadingProfile(false);
+        setLoadingUserData(false);
         return;
     }
     const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -116,6 +115,7 @@ export function MovieFinder() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setWatched(data.watchedMovies || []);
+        setLiked(data.likedMovies || []);
         
         const likedMovies: LikedMovieData[] = data.likedMovies || [];
         
@@ -130,8 +130,7 @@ export function MovieFinder() {
             setPreferredGenreIds(uniqueGenreIds.join('|'));
         }
       }
-      setLoadingWatched(false);
-      setLoadingProfile(false);
+      setLoadingUserData(false);
     });
     return () => unsubscribe();
   }, [firebaseUser, authLoading]);
@@ -164,7 +163,7 @@ export function MovieFinder() {
     fetchFilterOptions();
   }, [toast]);
   
-  const fetchDiscoverData = useCallback(async (currentFilters: Filters, genrePrefs: string, currentResults: SearchResult[] = []) => {
+  const fetchDiscoverData = useCallback(async (currentFilters: Filters, genrePrefs: string, existingResults: SearchResult[]) => {
     setIsLoading(true);
     try {
         const genreQuery = currentFilters.genres.length > 0 
@@ -182,9 +181,9 @@ export function MovieFinder() {
         if (!res.ok) throw new Error('Failed to fetch from TMDB');
         const data = await res.json();
         
-        const currentResultIds = new Set(currentResults.map(r => r.id));
+        const existingIds = new Set(existingResults.map(r => r.id));
         const items = (data.results || [])
-            .filter((item: any) => item.poster_path && !currentResultIds.has(item.id))
+            .filter((item: any) => item.poster_path && !existingIds.has(item.id))
             .map((item: any) => ({ ...item, media_type: item.media_type || currentFilters.mediaType }));
         
         setResults(items); 
@@ -258,19 +257,20 @@ export function MovieFinder() {
     debouncedSearch(query, filters);
   }, [query, filters, router, pathname, searchParams, debouncedSearch]);
 
-  // Effect for initial load of recommendations when search is empty
+  // Initial load or when query is cleared
   useEffect(() => {
-    if (!query && !hasSearched && !loadingProfile) {
+    if (!query && !hasSearched && !loadingUserData) {
       fetchDiscoverData(filters, preferredGenreIds, []);
     }
-  }, [query, hasSearched, filters, preferredGenreIds, fetchDiscoverData, loadingProfile]);
-  
+  }, [query, hasSearched, filters, preferredGenreIds, loadingUserData, fetchDiscoverData]);
+
   // Effect for the refresh button
   useEffect(() => {
     if (refreshCount > 0) {
       fetchDiscoverData(filters, preferredGenreIds, results);
     }
-  }, [refreshCount, fetchDiscoverData, filters, preferredGenreIds, results]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshCount]);
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!firebaseUser) return;
@@ -296,6 +296,28 @@ export function MovieFinder() {
     }
   };
 
+  const handleToggleLike = async (item: SearchResult, isLiked: boolean) => {
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const movieIdentifier = {
+      movieId: String(item.id),
+      mediaType: item.media_type,
+      title: item.title || item.name,
+      poster: item.poster_path,
+    };
+  
+    try {
+      if (isLiked) {
+        await updateDoc(userDocRef, { likedMovies: arrayUnion(movieIdentifier) });
+        toast({ title: 'Liked!', description: `Added "${movieIdentifier.title}" to your likes.`});
+      } else {
+        await updateDoc(userDocRef, { likedMovies: arrayRemove(movieIdentifier) });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update like status.' });
+    }
+  };
+
   const handleFilterChange = (newFilters: Partial<Filters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
   };
@@ -311,13 +333,14 @@ export function MovieFinder() {
 
   const activeFilterCount = filters.genres.length + filters.platforms.length + (filters.mediaType !== 'all' ? 1 : 0);
   const watchedIds = new Set(watched.map(item => String(item.movieId)));
+  const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
   
   const displayedResults = filters.hideWatched
     ? results.filter(movie => !watchedIds.has(String(movie.id)))
     : results;
 
   const renderStatus = () => {
-    if (isLoading) {
+    if (isLoading || (authLoading && loadingUserData)) {
       return (
         <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -458,7 +481,9 @@ export function MovieFinder() {
                         key={`${item.id}-${item.media_type}`}
                         item={item}
                         isWatched={watchedIds.has(String(item.id))}
+                        isLiked={likedIds.has(`${item.id}-${item.media_type}`)}
                         onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
+                        onToggleLike={(isLiked) => handleToggleLike(item, isLiked)}
                     />
                 ))}
             </div>
@@ -469,3 +494,5 @@ export function MovieFinder() {
     </div>
   );
 }
+
+    

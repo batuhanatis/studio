@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Star, Eye } from 'lucide-react';
+import { ArrowLeft, Star, Eye, Heart } from 'lucide-react';
 import Image from 'next/image';
 import { AddToWatchlistButton } from '@/components/watchlists/AddToWatchlistButton';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { SendRecommendationButton } from '@/components/search/SendRecommendationButton';
+import { cn } from '@/lib/utils';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -46,6 +47,7 @@ export default function DetailPage() {
   const [loading, setLoading] = useState(true);
   
   const [isWatched, setIsWatched] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
   const [loadingUserData, setLoadingUserData] = useState(true);
 
   useEffect(() => {
@@ -85,9 +87,7 @@ export default function DetailPage() {
   }, [id, media_type, toast]);
   
   useEffect(() => {
-    if (authLoading) return;
-
-    if (!firebaseUser || !id) {
+    if (authLoading || !firebaseUser || !id) {
         setLoadingUserData(false);
         return;
     }
@@ -100,12 +100,14 @@ export default function DetailPage() {
             const data = docSnap.data();
             const movieIdentifier = `${id}-${media_type}`;
             const watchedMovie = (data.watchedMovies || []).some((m: any) => `${m.movieId}-${m.mediaType}` === movieIdentifier);
+            const likedMovie = (data.likedMovies || []).some((m: any) => `${m.movieId}-${m.mediaType}` === movieIdentifier);
             setIsWatched(watchedMovie);
+            setIsLiked(likedMovie);
         }
         setLoadingUserData(false);
     }, (error) => {
         console.error("Error fetching user data snapshot:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your watched status.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your user data.' });
         setLoadingUserData(false);
     });
 
@@ -133,6 +135,29 @@ export default function DetailPage() {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
     }
   };
+
+  const handleToggleLike = async () => {
+    if (!firebaseUser || !details) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const movieIdentifier = {
+      movieId: id,
+      mediaType: media_type,
+      title: details.title || details.name,
+      poster: details.poster_path,
+    };
+  
+    try {
+      if (!isLiked) {
+        await updateDoc(userDocRef, { likedMovies: arrayUnion(movieIdentifier) });
+        toast({ title: 'Liked!', description: `Added "${movieIdentifier.title}" to your likes.`});
+      } else {
+        await updateDoc(userDocRef, { likedMovies: arrayRemove(movieIdentifier) });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update like status.' });
+    }
+  };
+
 
   const title = details?.title || details?.name || 'Loading...';
   const releaseYear = details?.release_date?.substring(0, 4) || details?.first_air_date?.substring(0, 4);
@@ -222,6 +247,15 @@ export default function DetailPage() {
                     
                     <div className="mt-6 space-y-4">
                     <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={handleToggleLike}
+                            disabled={loadingUserData}
+                            aria-label="Like or unlike"
+                        >
+                            <Heart className={cn("h-5 w-5", isLiked ? 'text-red-500 fill-current' : 'text-muted-foreground')} />
+                        </Button>
                         {movieDetailsForButton && <AddToWatchlistButton movie={movieDetailsForButton} />}
                         {movieDetailsForButton && <SendRecommendationButton movie={{...movieDetailsForButton, id: String(id)}} />}
                     </div>
@@ -283,3 +317,5 @@ export default function DetailPage() {
     </div>
   );
 }
+
+    
