@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Rating } from './Rating';
 import { Eye, Star } from 'lucide-react';
@@ -71,7 +71,7 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
           ];
           const unique = allProviders.filter((v, i, a) => a.findIndex((t) => t.provider_id === v.provider_id) === i);
           setPlatforms(unique);
-        } catch (error) {
+        } catch {
           if (!isCancelled) setPlatforms([]);
         } finally {
           if (!isCancelled) setLoadingProviders(false);
@@ -109,65 +109,64 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
 
     return (
       <div ref={ref} className="w-full max-w-sm mx-auto">
-        <Card className="relative w-full h-[75vh] overflow-hidden shadow-2xl rounded-2xl group cursor-grab active:cursor-grabbing">
-            <div className="absolute inset-0 w-full h-full overflow-y-auto bg-card">
-                <div className="relative w-full aspect-[2/3]">
-                    <Image
-                      src={posterUrl}
-                      alt={`Poster for ${title}`}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 100vw, 384px"
-                      data-ai-hint="movie poster"
-                    />
-                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                </div>
+        <Card className="w-full h-[75vh] flex flex-col overflow-hidden shadow-2xl rounded-2xl group cursor-grab active:cursor-grabbing">
+            {/* Poster */}
+            <div className="relative w-full h-[60%] flex-shrink-0">
+                <Image
+                  src={posterUrl}
+                  alt={`Poster for ${title}`}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 640px) 100vw, 384px"
+                  data-ai-hint="movie poster"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+            </div>
 
-                <div className="p-4">
-                    <CardHeader className="p-0">
-                        <Link href={href}><CardTitle className="text-2xl font-bold font-headline tracking-tight hover:underline">{title}</CardTitle></Link>
-                        <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Star className="h-4 w-4 text-amber-400" />
-                              <span className="font-semibold text-foreground">{movie.vote_average.toFixed(1)}</span>
-                              <span>/ 10</span>
-                            </div>
-                            {releaseYear && <span className="text-sm">·</span>}
-                            {releaseYear && <span>{releaseYear}</span>}
+            <div className="flex-grow p-4 overflow-y-auto bg-card">
+                <CardHeader className="p-0">
+                    <Link href={href}><CardTitle className="text-2xl font-bold font-headline tracking-tight hover:underline">{title}</CardTitle></Link>
+                    <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Star className="h-4 w-4 text-amber-400" />
+                          <span className="font-semibold text-foreground">{movie.vote_average.toFixed(1)}</span>
+                          <span>/ 10</span>
                         </div>
-                        <CardDescription className="pt-2 text-base text-card-foreground/90">
-                            {movie.overview}
-                        </CardDescription>
-                    </CardHeader>
+                        {releaseYear && <span className="text-sm">·</span>}
+                        {releaseYear && <span>{releaseYear}</span>}
+                    </div>
+                    <CardDescription className="pt-2 text-base text-card-foreground/90 line-clamp-3">
+                        {movie.overview}
+                    </CardDescription>
+                </CardHeader>
+                
+                <Separator className="my-4" />
+
+                <CardContent className="p-0 space-y-4">
+                    <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Rate this {movie.media_type === 'movie' ? 'movie' : 'show'}</h3>
+                        <Rating rating={rating} onRatingChange={onRate} />
+                    </div>
                     
-                    <Separator className="my-4" />
-
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <h3 className="text-sm font-semibold text-muted-foreground">Rate this {movie.media_type === 'movie' ? 'movie' : 'show'}</h3>
-                            <Rating rating={rating} onRatingChange={onRate} />
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id={`watched-${movie.id}`}
+                                checked={isWatched}
+                                onCheckedChange={onToggleWatched}
+                            />
+                            <label
+                                htmlFor={`watched-${movie.id}`}
+                                className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer"
+                            >
+                                <Eye className="h-4 w-4" />
+                                Mark as Watched
+                            </label>
                         </div>
-                        
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                    id={`watched-${movie.id}`}
-                                    checked={isWatched}
-                                    onCheckedChange={onToggleWatched}
-                                />
-                                <label
-                                    htmlFor={`watched-${movie.id}`}
-                                    className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer"
-                                >
-                                    <Eye className="h-4 w-4" />
-                                    Mark as Watched
-                                </label>
-                            </div>
-                            <AddToWatchlistButton movie={movieDetails} isIconOnly={true} />
-                        </div>
+                        <AddToWatchlistButton movie={movieDetails} isIconOnly={true} />
                     </div>
 
-                     <Separator className="my-4" />
+                    <Separator className="my-4" />
 
                     <div>
                         <h3 className="text-sm font-semibold text-muted-foreground mb-2">Watch in Türkiye</h3>
@@ -194,7 +193,7 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
                             <p className="text-sm text-muted-foreground">No streaming platforms found.</p>
                         )}
                     </div>
-                </div>
+                </CardContent>
             </div>
         </Card>
       </div>
