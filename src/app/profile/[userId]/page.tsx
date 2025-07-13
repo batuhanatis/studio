@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader2, User, LogOut, Star, Users, Gift, Combine, ArrowLeft, Tv, Clapperboard, Check, Heart } from 'lucide-react';
+import { Loader2, User, LogOut, Star, Users, Gift, Combine, ArrowLeft, Tv, Clapperboard, Check, Heart, Settings } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,8 @@ interface UserProfileData {
     username?: string;
     email?: string;
     photoURL?: string;
+    bio?: string;
+    displayName?: string;
     likedMovies?: any[];
     watchedMovies?: any[];
     friends?: string[];
@@ -136,6 +138,7 @@ export default function ProfilePage() {
 
   const likedCount = profileData?.likedMovies?.length || 0;
   const watchedCount = profileData?.watchedMovies?.length || 0;
+  const displayName = profileData?.displayName || profileData?.username;
 
   return (
     <div className="min-h-screen w-full bg-background">
@@ -151,11 +154,12 @@ export default function ProfilePage() {
         <div className="flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-12">
             <div className="flex-shrink-0 flex flex-col items-center w-full md:w-64">
                 <Avatar className="h-32 w-32 text-5xl border-4 border-primary/20">
-                    {profileData?.photoURL && <AvatarImage src={profileData.photoURL} alt={profileData.username || profileData.email} />}
-                    <AvatarFallback>{getInitials(profileData?.username || profileData?.email)}</AvatarFallback>
+                    {profileData?.photoURL && <AvatarImage src={profileData.photoURL} alt={displayName} />}
+                    <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
                 </Avatar>
-                <h1 className="mt-4 text-3xl font-bold font-headline text-center">{profileData?.username}</h1>
-                <p className="text-muted-foreground text-center">{profileData?.email}</p>
+                <h1 className="mt-4 text-3xl font-bold font-headline text-center">{displayName}</h1>
+                <p className="text-muted-foreground text-center">@{profileData?.username}</p>
+                {profileData?.bio && <p className="mt-2 text-center text-sm text-foreground/80">{profileData.bio}</p>}
                  
                 <Card className="w-full mt-6 text-sm">
                   <CardContent className="p-4 space-y-3">
@@ -166,10 +170,15 @@ export default function ProfilePage() {
                 </Card>
 
                 {isOwnProfile && (
-                    <Button variant="outline" onClick={handleLogout} className="mt-6 w-full">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Logout
-                    </Button>
+                    <>
+                        <Button variant="outline" asChild className="mt-6 w-full">
+                           <Link href="/profile/edit"><Settings className="mr-2 h-4 w-4"/> Edit Profile</Link>
+                        </Button>
+                        <Button variant="outline" onClick={handleLogout} className="mt-2 w-full">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Logout
+                        </Button>
+                    </>
                 )}
             </div>
             <div className="flex-grow w-full">
