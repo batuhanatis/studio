@@ -82,8 +82,6 @@ export function MovieFinder() {
     mediaType: 'all',
   });
   
-  const [refreshCount, setRefreshCount] = useState(0);
-
   const { toast } = useToast();
   const { firebaseUser, loading: authLoading } = useAuth();
 
@@ -202,10 +200,11 @@ export function MovieFinder() {
             items = await fetchGenericDiscoverData(currentFilters);
         }
 
-        const currentResultIds = new Set(results.map(r => r.id));
-        const newItems = items.filter(item => !currentResultIds.has(item.id));
-        
-        setResults(newItems.length > 0 ? newItems : items);
+        setResults(prevResults => {
+          const currentResultIds = new Set(prevResults.map(r => r.id));
+          const newItems = items.filter(item => !currentResultIds.has(item.id));
+          return newItems.length > 0 ? newItems : items;
+        });
 
     } catch (error: any) {
         console.error("Error fetching recommendations:", error);
@@ -214,12 +213,12 @@ export function MovieFinder() {
     } finally {
         setIsLoading(false);
     }
-  }, [toast, fetchAiDiscoverData, fetchGenericDiscoverData, results]);
+  }, [toast, fetchAiDiscoverData, fetchGenericDiscoverData]);
 
   const searchMovies = useCallback(async (searchQuery: string, currentFilters: Filters) => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
-        // This case is handled by the main useEffect
+        fetchDiscoverData(currentFilters, liked);
         return;
     }
     
@@ -256,7 +255,7 @@ export function MovieFinder() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, filters.genres, filters.mediaType]);
+  }, [toast, liked, fetchDiscoverData]);
 
   const debouncedSearch = useCallback(debounce((q: string) => {
     const newParams = new URLSearchParams(searchParams.toString());
@@ -274,13 +273,10 @@ export function MovieFinder() {
 
     if (urlQuery) {
       searchMovies(urlQuery, filters);
-    } else {
-      // Load initial recommendations or when refresh is clicked
-      if (results.length === 0 || refreshCount > 0) {
-        fetchDiscoverData(filters, liked);
-      }
+    } else if (results.length === 0) {
+      fetchDiscoverData(filters, liked);
     }
-  }, [urlQuery, filters, liked, loadingUserData, refreshCount, fetchDiscoverData, searchMovies]);
+  }, [urlQuery, filters, liked, loadingUserData, searchMovies, fetchDiscoverData]);
 
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
@@ -367,6 +363,12 @@ export function MovieFinder() {
         year: [1980, new Date().getFullYear()],
         mediaType: 'all'
     });
+  }
+  
+  const handleRefresh = () => {
+    if (!loadingUserData && !isLoading) {
+      fetchDiscoverData(filters, liked);
+    }
   }
 
   const activeFilterCount = filters.genres.length + filters.platforms.length + (filters.mediaType !== 'all' ? 1 : 0);
@@ -507,7 +509,7 @@ export function MovieFinder() {
 
       {!urlQuery && (
         <div className="w-full text-right">
-            <Button variant="outline" onClick={() => setRefreshCount(c => c + 1)} disabled={isLoading}>
+            <Button variant="outline" onClick={handleRefresh} disabled={isLoading}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Refresh Recommendations
             </Button>
