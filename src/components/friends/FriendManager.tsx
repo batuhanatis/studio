@@ -405,13 +405,13 @@ export function FriendManager({ userId }: FriendManagerProps) {
                 <div className="space-y-2 pt-2">
                     {searchResults.map(user => (
                         <div key={user.uid} className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
-                            <div className="flex items-center gap-3">
+                            <Link href={`/profile/${user.uid}`} className="flex items-center gap-3 hover:underline">
                                 <Avatar>
                                     <AvatarImage src={user.photoURL} alt={user.username} />
                                     <AvatarFallback>{getInitials(user.username)}</AvatarFallback>
                                 </Avatar>
                                 <span className="font-medium">{user.username}</span>
-                            </div>
+                            </Link>
                             {isFriend(user.uid) ? (
                                 <Button variant="outline" size="sm" disabled>Friend</Button>
                             ) : hasSentFriendRequestTo(user.uid) ? (
