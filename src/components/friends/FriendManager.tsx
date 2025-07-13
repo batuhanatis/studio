@@ -29,7 +29,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '@/components/ui/form';
 import { Loader2, UserPlus, Check, X, Users, Mail, Combine } from 'lucide-react';
 import { Avatar, AvatarFallback } from '../ui/avatar';
 import { Separator } from '../ui/separator';
@@ -59,7 +59,7 @@ interface BlendRequest {
 }
 
 const addFriendSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email.' }),
+  username: z.string().min(3, { message: 'Username must be at least 3 characters.' }),
 });
 
 type AddFriendFormValues = z.infer<typeof addFriendSchema>;
@@ -86,7 +86,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
 
   const form = useForm<AddFriendFormValues>({
     resolver: zodResolver(addFriendSchema),
-    defaultValues: { email: '' },
+    defaultValues: { username: '' },
   });
   
   const getInitials = (name: string | undefined) => {
@@ -171,14 +171,18 @@ export function FriendManager({ userId }: FriendManagerProps) {
   }, [firebaseUser, isOwnProfile]);
 
   const handleAddFriend = async (values: AddFriendFormValues) => {
-    if (!firebaseUser || !firebaseUser.email || values.email === firebaseUser.email) {
-        toast({ variant: 'destructive', title: 'Error', description: "You can't add yourself as a friend." });
-        return;
-    }
+    if (!firebaseUser) return;
     setLoading(prev => ({...prev, action: true}));
 
     try {
-      const q = query(collection(db, 'users'), where('email', '==', values.email));
+      const currentUserDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const currentUsername = currentUserDoc.exists() ? currentUserDoc.data().username : firebaseUser.email;
+      
+      if (values.username === currentUsername) {
+        throw new Error("You can't add yourself as a friend.");
+      }
+    
+      const q = query(collection(db, 'users'), where('username', '==', values.username));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) throw new Error('User not found.');
@@ -189,9 +193,6 @@ export function FriendManager({ userId }: FriendManagerProps) {
       const existingReqQuery = query(collection(db, 'friendRequests'), where('fromUserId', '==', firebaseUser.uid), where('toUserId', '==', targetUser.uid));
       if (!(await getDocs(existingReqQuery)).empty) throw new Error("You've already sent a request to this user.");
       
-      const currentUserDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      const currentUsername = currentUserDoc.exists() ? currentUserDoc.data().username : firebaseUser.email;
-
       await addDoc(collection(db, 'friendRequests'), {
         fromUserId: firebaseUser.uid, 
         fromUsername: currentUsername,
@@ -282,7 +283,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
         console.error("Error processing blend invite", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to process Blend invite. Check your Firestore rules.' });
     } finally {
-        setLoading(prev => ({ ...prev, action: true }));
+        setLoading(prev => ({ ...prev, action: false }));
     }
   };
   
@@ -299,8 +300,8 @@ export function FriendManager({ userId }: FriendManagerProps) {
                 {friends.map((friend) => (
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                     <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
-                        <Avatar><AvatarFallback>{getInitials(friend.username || friend.email)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{friend.username || friend.email}</span>
+                        <Avatar><AvatarFallback>{getInitials(friend.username)}</AvatarFallback></Avatar>
+                        <span className="font-medium">{friend.username}</span>
                     </Link>
                   </li>
                 ))}
@@ -319,13 +320,17 @@ export function FriendManager({ userId }: FriendManagerProps) {
       <Card>
         <CardHeader>
           <CardTitle>Add Friend</CardTitle>
-          <CardDescription>Send a friend request by entering their email.</CardDescription>
+          <CardDescription>Send a friend request by entering their username.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleAddFriend)} className="flex items-start gap-4">
-              <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem className="flex-grow"><FormControl><Input placeholder="friend@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormField control={form.control} name="username" render={({ field }) => (
+                  <FormItem className="flex-grow">
+                    <FormLabel className="sr-only">Username</FormLabel>
+                    <FormControl><Input placeholder="friend_username" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
               )}/>
               <Button type="submit" disabled={loading.action || authLoading}>
                 {loading.action ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Send
@@ -381,8 +386,8 @@ export function FriendManager({ userId }: FriendManagerProps) {
                 {friends.map((friend) => (
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                     <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
-                        <Avatar><AvatarFallback>{getInitials(friend.username || friend.email)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{friend.username || friend.email}</span>
+                        <Avatar><AvatarFallback>{getInitials(friend.username)}</AvatarFallback></Avatar>
+                        <span className="font-medium">{friend.username}</span>
                     </Link>
                     <div className="ml-auto">
                         {profileData?.activeBlendsWith?.includes(friend.uid) ? (
