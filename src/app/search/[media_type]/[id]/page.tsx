@@ -236,28 +236,29 @@ export default function DetailPage() {
                     </Card>
                 </div>
                 <div className="flex-grow">
-                    <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">{title}</h1>
-                    <div className="mt-2 flex items-center gap-4 text-muted-foreground">
-                    {media_type === 'movie' ? 'Movie' : 'TV Show'}
-                    {releaseYear && (
-                        <>
-                        <span className="text-sm">·</span>
-                        <span>{releaseYear}</span>
-                        </>
-                    )}
-                    <span className="text-sm">·</span>
-                    <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-accent" />
-                        <span className="font-semibold text-foreground">{details.vote_average.toFixed(1)}</span>
-                        <span className="text-sm">/ 10</span>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>{media_type === 'movie' ? 'Movie' : 'TV Show'}</span>
+                        {releaseYear && (
+                            <>
+                                <span>·</span>
+                                <span>{releaseYear}</span>
+                            </>
+                        )}
                     </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl mt-1">{title}</h1>
+                    
+                    <div className="mt-4 flex flex-wrap items-center gap-4">
                         {details.genres.map((genre: Genre) => (
                             <Badge key={genre.id} variant="secondary">{genre.name}</Badge>
                         ))}
                     </div>
+
+                    <div className="flex items-end gap-2 mt-4">
+                        <Star className="h-8 w-8 text-accent fill-accent" />
+                        <span className="text-4xl font-bold text-foreground">{details.vote_average.toFixed(1)}</span>
+                        <span className="text-xl text-muted-foreground">/ 10</span>
+                    </div>
+
                     <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{details.overview || 'No description available.'}</p>
                     
                     <div className="mt-6 space-y-4">
@@ -308,7 +309,7 @@ export default function DetailPage() {
                     {platforms && platforms.length > 0 && (
                         <div className="mt-8">
                             <h2 className="text-xl font-bold font-headline">Watch in Türkiye</h2>
-                            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                            <div className="mt-4 grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-5">
                             {platforms.map((p) => (
                                 <div key={p.provider_id} className="flex flex-col items-center gap-2 text-center">
                                 <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-secondary/50 shadow-sm">
