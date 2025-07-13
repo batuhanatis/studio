@@ -18,26 +18,28 @@ import {
   addDoc,
   serverTimestamp,
   deleteDoc,
+  limit,
+  orderBy,
+  startAt,
+  endAt,
 } from 'firebase/firestore';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { debounce } from 'lodash';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '@/components/ui/form';
-import { Loader2, UserPlus, Check, X, Users, Mail, Combine } from 'lucide-react';
-import { Avatar, AvatarFallback } from '../ui/avatar';
+import { Loader2, UserPlus, Check, X, Users, Mail, Combine, Search } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Separator } from '../ui/separator';
 
 interface UserProfile {
   uid: string;
-  username?: string;
+  username: string;
   email: string;
+  photoURL?: string;
   friends?: string[];
   activeBlendsWith?: string[];
 }
@@ -45,7 +47,8 @@ interface UserProfile {
 interface RequestWithSenderProfile {
     id: string;
     fromUserId: string;
-    fromUsername: string; // This is the fetched, up-to-date username
+    fromUsername: string;
+    fromPhotoURL?: string;
     type: 'friend' | 'blend';
     originalRequest: FriendRequest | BlendRequest;
 }
@@ -54,7 +57,6 @@ interface RequestWithSenderProfile {
 interface FriendRequest {
   id: string;
   fromUserId: string;
-  fromUsername: string;
   toUserId: string;
   status: 'pending' | 'accepted';
 }
@@ -62,16 +64,9 @@ interface FriendRequest {
 interface BlendRequest {
     id: string;
     fromUserId: string;
-    fromUsername: string;
     toUserId: string;
     status: 'pending' | 'accepted';
 }
-
-const addFriendSchema = z.object({
-  username: z.string().min(3, { message: 'Username must be at least 3 characters.' }),
-});
-
-type AddFriendFormValues = z.infer<typeof addFriendSchema>;
 
 interface FriendManagerProps {
     userId: string;
@@ -87,19 +82,61 @@ export function FriendManager({ userId }: FriendManagerProps) {
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [incomingRequests, setIncomingRequests] = useState<RequestWithSenderProfile[]>([]);
   const [friends, setFriends] = useState<UserProfile[]>([]);
+  const [sentFriendRequests, setSentFriendRequests] = useState<string[]>([]);
   const [sentBlendRequests, setSentBlendRequests] = useState<BlendRequest[]>([]);
   
   const [loading, setLoading] = useState({ requests: true, friends: true, action: false, blendRequests: true });
 
-  const form = useForm<AddFriendFormValues>({
-    resolver: zodResolver(addFriendSchema),
-    defaultValues: { username: '' },
-  });
+  // States for the new friend search functionality
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
   
   const getInitials = (name: string | undefined) => {
     if (!name) return '?';
     return name.substring(0, 2).toUpperCase();
   }
+
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce(async (query: string) => {
+      if (query.trim().length < 2) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+      setIsSearching(true);
+      try {
+        const usersRef = collection(db, 'users');
+        // The `\uf8ff` is a trick to create a range for "starts with" queries in Firestore
+        const q = query(
+          usersRef,
+          orderBy('username'),
+          startAt(query.toLowerCase()),
+          endAt(query.toLowerCase() + '\uf8ff'),
+          limit(10)
+        );
+        const querySnapshot = await getDocs(q);
+        const users = querySnapshot.docs
+          .map(doc => doc.data() as UserProfile)
+          .filter(user => user.uid !== firebaseUser?.uid); // Exclude self
+        setSearchResults(users);
+      } catch (error) {
+        console.error("Error searching users:", error);
+        toast({ variant: 'destructive', title: 'Search Error', description: 'Could not perform user search.' });
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500),
+    [firebaseUser]
+  );
+
+  useEffect(() => {
+    debouncedSearch(searchQuery);
+    // Cleanup debounce on unmount
+    return () => debouncedSearch.cancel();
+  }, [searchQuery, debouncedSearch]);
 
   // Listener for incoming friend and blend requests (only for own profile)
   useEffect(() => {
@@ -113,12 +150,13 @@ export function FriendManager({ userId }: FriendManagerProps) {
             snapshot.docs.map(async (d: any) => {
                 const requestData = { ...d.data(), id: d.id };
                 const fromUserDoc = await getDoc(doc(db, 'users', requestData.fromUserId));
-                const fromUsername = fromUserDoc.exists() ? fromUserDoc.data().username : 'A friend';
+                const fromUserData = fromUserDoc.exists() ? fromUserDoc.data() : { username: 'A friend', photoURL: '' };
 
                 return {
                     id: d.id,
                     fromUserId: requestData.fromUserId,
-                    fromUsername: fromUsername,
+                    fromUsername: fromUserData.username,
+                    fromPhotoURL: fromUserData.photoURL,
                     type: type,
                     originalRequest: requestData,
                 };
@@ -129,6 +167,8 @@ export function FriendManager({ userId }: FriendManagerProps) {
 
     const friendQuery = query(collection(db, 'friendRequests'), where('toUserId', '==', firebaseUser.uid), where('status', '==', 'pending'));
     const blendQuery = query(collection(db, 'blendRequests'), where('toUserId', '==', firebaseUser.uid), where('status', '==', 'pending'));
+    const sentFriendQuery = query(collection(db, 'friendRequests'), where('fromUserId', '==', firebaseUser.uid), where('status', '==', 'pending'));
+
 
     const unsubFriends = onSnapshot(friendQuery, async (snapshot) => {
         const friendReqs = await processRequests(snapshot, 'friend');
@@ -142,9 +182,13 @@ export function FriendManager({ userId }: FriendManagerProps) {
         setLoading(p => ({ ...p, blendRequests: false }));
     });
     
+    // Listener for user's sent friend requests to disable buttons
+    const unsubSentFriends = onSnapshot(sentFriendQuery, (snap) => {
+        setSentFriendRequests(snap.docs.map(d => d.data().toUserId));
+    });
+
     // Listener for user's sent blend requests to disable buttons
-    const sentBlendQuery = query(collection(db, 'blendRequests'), where('fromUserId', '==', firebaseUser.uid));
-    const unsubSentBlends = onSnapshot(sentBlendQuery, (snap) => {
+    const unsubSentBlends = onSnapshot(query(collection(db, 'blendRequests'), where('fromUserId', '==', firebaseUser.uid)), (snap) => {
         setSentBlendRequests(snap.docs.map(d => ({...d.data(), id: d.id } as BlendRequest)));
     });
 
@@ -152,6 +196,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
     return () => {
         unsubFriends();
         unsubBlends();
+        unsubSentFriends();
         unsubSentBlends();
     };
   }, [firebaseUser, isOwnProfile]);
@@ -191,7 +236,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
   }, [userId]);
   
 
-  const handleAddFriend = async (values: AddFriendFormValues) => {
+  const handleAddFriend = async (targetUser: UserProfile) => {
     if (!firebaseUser) return;
     setLoading(prev => ({...prev, action: true}));
 
@@ -199,30 +244,14 @@ export function FriendManager({ userId }: FriendManagerProps) {
       const currentUserDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       const currentUsername = currentUserDoc.exists() ? currentUserDoc.data().username : "A Friend";
       
-      if (values.username === currentUsername) {
-        throw new Error("You can't add yourself as a friend.");
-      }
-    
-      const q = query(collection(db, 'users'), where('username', '==', values.username));
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) throw new Error('User not found.');
-      const targetUser = querySnapshot.docs[0].data() as UserProfile;
-      if (friends.some(f => f.uid === targetUser.uid)) throw new Error("You are already friends.");
-      if (incomingRequests.some(r => r.fromUserId === targetUser.uid)) throw new Error("This user has already sent you a request. Check your incoming requests.");
-      
-      const existingReqQuery = query(collection(db, 'friendRequests'), where('fromUserId', '==', firebaseUser.uid), where('toUserId', '==', targetUser.uid));
-      if (!(await getDocs(existingReqQuery)).empty) throw new Error("You've already sent a request to this user.");
-      
       await addDoc(collection(db, 'friendRequests'), {
-        fromUserId: firebaseUser.uid, 
+        fromUserId: firebaseUser.uid,
         fromUsername: currentUsername,
-        toUserId: targetUser.uid, 
+        toUserId: targetUser.uid,
         toUsername: targetUser.username,
         status: 'pending', createdAt: serverTimestamp(),
       });
       toast({ title: 'Success', description: 'Friend request sent!' });
-      form.reset();
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     } finally {
@@ -318,6 +347,9 @@ export function FriendManager({ userId }: FriendManagerProps) {
   
   const hasActiveBlendWith = (friendId: string) => profileData?.activeBlendsWith?.includes(friendId);
   const hasPendingBlendInviteTo = (friendId: string) => sentBlendRequests.some(r => r.toUserId === friendId && r.status === 'pending');
+  const hasSentFriendRequestTo = (friendId: string) => sentFriendRequests.includes(friendId);
+  const isFriend = (friendId: string) => friends.some(f => f.uid === friendId);
+
 
   if (!isOwnProfile) {
      return (
@@ -329,8 +361,11 @@ export function FriendManager({ userId }: FriendManagerProps) {
                 {friends.map((friend) => (
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                     <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
-                        <Avatar><AvatarFallback>{getInitials(friend.username)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{friend.username || friend.email}</span>
+                        <Avatar>
+                            {friend.photoURL && <AvatarImage src={friend.photoURL} alt={friend.username} />}
+                            <AvatarFallback>{getInitials(friend.username)}</AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{friend.username}</span>
                     </Link>
                   </li>
                 ))}
@@ -349,23 +384,48 @@ export function FriendManager({ userId }: FriendManagerProps) {
       <Card>
         <CardHeader>
           <CardTitle>Add Friend</CardTitle>
-          <CardDescription>Send a friend request by entering their username.</CardDescription>
+          <CardDescription>Search for users by their username to send a friend request.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleAddFriend)} className="flex items-start gap-4">
-              <FormField control={form.control} name="username" render={({ field }) => (
-                  <FormItem className="flex-grow">
-                    <FormLabel className="sr-only">Username</FormLabel>
-                    <FormControl><Input placeholder="friend_username" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-              )}/>
-              <Button type="submit" disabled={loading.action || authLoading}>
-                {loading.action ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Send
-              </Button>
-            </form>
-          </Form>
+        <CardContent className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search for a username..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          {isSearching ? (
+             <div className="flex justify-center items-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+             </div>
+          ) : (
+            searchResults.length > 0 && (
+                <div className="space-y-2 pt-2">
+                    {searchResults.map(user => (
+                        <div key={user.uid} className="flex items-center justify-between p-2 rounded-md hover:bg-secondary">
+                            <div className="flex items-center gap-3">
+                                <Avatar>
+                                    <AvatarImage src={user.photoURL} alt={user.username} />
+                                    <AvatarFallback>{getInitials(user.username)}</AvatarFallback>
+                                </Avatar>
+                                <span className="font-medium">{user.username}</span>
+                            </div>
+                            {isFriend(user.uid) ? (
+                                <Button variant="outline" size="sm" disabled>Friend</Button>
+                            ) : hasSentFriendRequestTo(user.uid) ? (
+                                <Button variant="outline" size="sm" disabled>Request Sent</Button>
+                            ) : (
+                                <Button size="sm" onClick={() => handleAddFriend(user)} disabled={loading.action}>
+                                    <UserPlus className="mr-2 h-4 w-4" /> Add
+                                </Button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )
+          )}
         </CardContent>
       </Card>
       
@@ -387,11 +447,16 @@ export function FriendManager({ userId }: FriendManagerProps) {
                         {incomingRequests.map((req) => (
                             <li key={req.id} className="flex items-center justify-between rounded-lg bg-secondary p-3">
                             <div className="flex items-center gap-3">
-                                <Avatar><AvatarFallback>{getInitials(req.fromUsername)}</AvatarFallback></Avatar>
-                                <span className="font-medium">{req.fromUsername}</span>
-                                <span className={`text-xs ${req.type === 'blend' ? 'text-primary' : 'text-muted-foreground'}`}>
-                                    ({req.type === 'friend' ? 'Friend Request' : 'Blend Invite'})
-                                </span>
+                                <Avatar>
+                                    {req.fromPhotoURL && <AvatarImage src={req.fromPhotoURL} alt={req.fromUsername} />}
+                                    <AvatarFallback>{getInitials(req.fromUsername)}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <span className="font-medium">{req.fromUsername}</span>
+                                    <div className={`text-xs ${req.type === 'blend' ? 'text-primary' : 'text-muted-foreground'}`}>
+                                        {req.type === 'friend' ? 'Friend Request' : 'Blend Invite'}
+                                    </div>
+                                </div>
                             </div>
                             <div className="flex gap-2">
                                 <Button size="icon" variant="outline" className="h-8 w-8 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => handleRequest(req, true)} disabled={loading.action}><Check className="h-4 w-4" /></Button>
@@ -419,8 +484,11 @@ export function FriendManager({ userId }: FriendManagerProps) {
                 {friends.map((friend) => (
                   <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
                     <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
-                        <Avatar><AvatarFallback>{getInitials(friend.username)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{friend.username || friend.email}</span>
+                        <Avatar>
+                            {friend.photoURL && <AvatarImage src={friend.photoURL} alt={friend.username} />}
+                            <AvatarFallback>{getInitials(friend.username)}</AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{friend.username}</span>
                     </Link>
                     <div className="ml-auto">
                         {hasActiveBlendWith(friend.uid) ? (
