@@ -234,7 +234,7 @@ export function MovieFinder() {
     }
   }, [toast, fetchDiscoverData]);
 
-  const debouncedSearch = useCallback(debounce((q: string, f: Filters) => {
+  const debouncedSearch = useCallback(debounce((q: string) => {
     const newParams = new URLSearchParams(searchParams.toString());
     if (q) {
       newParams.set('query', q);
@@ -246,13 +246,6 @@ export function MovieFinder() {
 
   useEffect(() => {
     setQuery(urlQuery);
-  }, [urlQuery]);
-
-  useEffect(() => {
-    debouncedSearch(query, filters);
-  }, [query, debouncedSearch, filters]);
-  
-  useEffect(() => {
     searchMovies(urlQuery, filters);
   }, [urlQuery, filters, searchMovies, refreshCount]);
 
@@ -394,14 +387,17 @@ export function MovieFinder() {
       </div>
       
       <div className="w-full max-w-3xl space-y-4">
-        <form onSubmit={(e) => {e.preventDefault(); searchMovies(query, filters)}} className="w-full">
+        <form onSubmit={(e) => {e.preventDefault(); debouncedSearch(query);}} className="w-full">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Search titles like 'Inception' or browse recommendations below..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                debouncedSearch(e.target.value);
+              }}
               className="h-14 w-full rounded-full bg-card py-3 pl-12 pr-4 text-base shadow-lg shadow-black/20"
             />
           </div>
