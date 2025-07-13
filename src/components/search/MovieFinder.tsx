@@ -39,8 +39,9 @@ interface UserMovieData {
   mediaType: 'movie' | 'tv';
 }
 
-interface UserRatingData extends UserMovieData {
-  rating: number;
+interface LikedMovieData extends UserMovieData {
+  title: string;
+  poster: string | null;
 }
 
 interface Genre {
@@ -116,12 +117,10 @@ export function MovieFinder() {
         const data = docSnap.data();
         setWatched(data.watchedMovies || []);
         
-        const ratings: UserRatingData[] = data.ratedMovies || [];
-        const highlyRated = ratings.filter(r => r.rating >= 4)
-                                   .sort((a, b) => b.rating - a.rating)
-                                   .slice(0, 5);
-        if (highlyRated.length > 0) {
-            const genreDetailsPromises = highlyRated.map(m => 
+        const likedMovies: LikedMovieData[] = data.likedMovies || [];
+        
+        if (likedMovies.length > 0) {
+            const genreDetailsPromises = likedMovies.slice(0, 5).map(m => 
                 fetch(`https://api.themoviedb.org/3/${m.mediaType}/${m.movieId}?api_key=${API_KEY}`)
                     .then(res => res.ok ? res.json() : Promise.resolve({ genres: [] }))
                     .then(details => details.genres?.map((g: Genre) => g.id) || [])
@@ -261,17 +260,17 @@ export function MovieFinder() {
 
   // Effect for initial load of recommendations when search is empty
   useEffect(() => {
-    if (!query && !hasSearched) {
+    if (!query && !hasSearched && !loadingProfile) {
       fetchDiscoverData(filters, preferredGenreIds, []);
     }
-  }, [query, hasSearched, filters, preferredGenreIds, fetchDiscoverData]);
+  }, [query, hasSearched, filters, preferredGenreIds, fetchDiscoverData, loadingProfile]);
   
   // Effect for the refresh button
   useEffect(() => {
     if (refreshCount > 0) {
       fetchDiscoverData(filters, preferredGenreIds, results);
     }
-  }, [refreshCount]);
+  }, [refreshCount, fetchDiscoverData, filters, preferredGenreIds, results]);
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
     if (!firebaseUser) return;

@@ -36,8 +36,7 @@ interface UserMovieData {
   mediaType: 'movie' | 'tv';
 }
 
-interface UserRatingData extends UserMovieData {
-  rating: number;
+interface LikedMovieData extends UserMovieData {
   title: string;
   poster: string | null;
 }
@@ -49,7 +48,6 @@ export function DiscoverFeed() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [userRatings, setUserRatings] = useState<UserRatingData[]>([]);
   const [userWatched, setUserWatched] = useState<UserMovieData[]>([]);
   
   const [lastSwipedMovie, setLastSwipedMovie] = useState<Movie | null>(null);
@@ -61,6 +59,8 @@ export function DiscoverFeed() {
   const currentIndexRef = useRef(0);
   
   const [platforms, setPlatforms] = useState<WatchProvider[]>([]);
+
+  const [triggerFetch, setTriggerFetch] = useState(0);
 
   const fetchMovies = useCallback(async (isRestart = false) => {
     if (authLoading) return;
@@ -76,9 +76,9 @@ export function DiscoverFeed() {
             const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data();
-                const rated = data.ratedMovies || [];
+                const liked = data.likedMovies || [];
                 const watched = data.watchedMovies || [];
-                seenMovieIds = new Set([...rated.map((m: any) => m.movieId), ...watched.map((m: any) => m.movieId)]);
+                seenMovieIds = new Set([...liked.map((m: any) => m.movieId), ...watched.map((m: any) => m.movieId)]);
             }
         } catch {}
     }
@@ -151,10 +151,10 @@ export function DiscoverFeed() {
     }
   }, [movies, fetchProviders]);
 
-  // Initial fetch
+  // Initial fetch and subsequent fetches
   useEffect(() => {
-    fetchMovies(true);
-  }, []);
+    fetchMovies(movies.length === 0);
+  }, [triggerFetch]);
 
   // User data listener
   useEffect(() => {
@@ -163,45 +163,27 @@ export function DiscoverFeed() {
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        setUserRatings(data.ratedMovies || []);
         setUserWatched(data.watchedMovies || []);
       }
     });
     return () => unsub();
   }, [firebaseUser]);
 
-  const handleRateMovie = async (movie: Movie, rating: number) => {
+  const handleLikeMovie = async (movie: Movie) => {
     if (!firebaseUser) return;
     const ref = doc(db, 'users', firebaseUser.uid);
     try {
-      const newRating: UserRatingData = {
+      const newLike: LikedMovieData = {
         movieId: String(movie.id),
         mediaType: movie.media_type,
-        rating: rating,
         title: movie.title || movie.name || 'Untitled',
-        poster: movie.poster_path
+        poster: movie.poster_path,
       };
       
-      await runTransaction(db, async tx => {
-        const snap = await tx.get(ref);
-        if (!snap.exists()) {
-          tx.set(ref, { ratedMovies: [newRating] }, { merge: true });
-          return;
-        }
+      await updateDoc(ref, { likedMovies: arrayUnion(newLike) });
 
-        const data = snap.data();
-        const existingRatings: UserRatingData[] = data.ratedMovies || [];
-        const idx = existingRatings.findIndex(r => r.movieId === String(movie.id) && r.mediaType === movie.media_type);
-        
-        if (idx > -1) {
-          existingRatings[idx].rating = rating;
-        } else {
-          existingRatings.push(newRating);
-        }
-        tx.update(ref, { ratedMovies: existingRatings });
-      });
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Rating failed', description: e.message });
+      toast({ variant: 'destructive', title: 'Like failed', description: e.message });
     }
   };
 
@@ -229,21 +211,25 @@ export function DiscoverFeed() {
   const swiped = (direction: string, movie: Movie) => {
     setLastSwipedMovie(movie);
     if (direction === 'right') {
-      handleRateMovie(movie, 5);
-      toast({ title: 'Liked!', description: `You rated "${movie.title || movie.name}" 5 stars.`});
+      handleLikeMovie(movie);
+      toast({ title: 'Liked!', description: `Added "${movie.title || movie.name}" to your likes.`});
     }
-    const newMovies = movies.filter(m => m.id !== movie.id);
-    setMovies(newMovies);
+
+    // This is a stable way to remove the top card
+    setMovies((prevMovies) => prevMovies.slice(0, prevMovies.length - 1));
     
     // Reset swipe feedback
     setSwipeDirection(null);
     setSwipeOpacity(0);
-
-    if (newMovies.length <= 5 && !loadingMore) {
-        fetchMovies(false);
-    }
   };
   
+  // Fetch more movies when the stack runs low
+  useEffect(() => {
+    if (movies.length <= 4 && !loadingMore && !loading) {
+      setTriggerFetch(c => c + 1);
+    }
+  }, [movies.length, loadingMore, loading]);
+
   const swipe = async (dir: 'left' | 'right') => {
     if (movies.length > 0 && currentIndexRef.current < movies.length && tinderCardRefs[currentIndexRef.current]) {
       await tinderCardRefs[currentIndexRef.current].current.swipe(dir);
@@ -252,7 +238,8 @@ export function DiscoverFeed() {
   
   const restoreCard = async () => {
     if(lastSwipedMovie) {
-        setMovies(prev => [lastSwipedMovie, ...prev]);
+        // This is a more stable way to add the card back
+        setMovies(prev => [...prev, lastSwipedMovie]);
         setLastSwipedMovie(null);
     }
   }
@@ -291,14 +278,13 @@ export function DiscoverFeed() {
         return (
             <div className="flex flex-col items-center justify-center text-center h-full">
                 <p className="text-lg text-muted-foreground">You've seen everything for now!</p>
-                <Button onClick={() => fetchMovies(true)} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reload</Button>
+                <Button onClick={() => setTriggerFetch(c => c + 1)} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reload</Button>
             </div>
         );
     }
 
     return movies.map((movie, index) => {
         const isTopCard = index === movies.length - 1;
-        const rating = userRatings.find(r => r.movieId === String(movie.id))?.rating;
         const isWatched = userWatched.some(w => w.movieId === String(movie.id));
         
         return (
@@ -313,17 +299,15 @@ export function DiscoverFeed() {
             >
                 <DiscoverCard
                     movie={movie}
-                    rating={rating}
                     isWatched={isWatched}
                     platforms={isTopCard ? platforms : undefined}
-                    onRate={(newRating) => handleRateMovie(movie, newRating)}
                     onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
                     swipeDirection={isTopCard ? swipeDirection : null}
                     swipeOpacity={isTopCard ? swipeOpacity : 0}
                 />
             </TinderCard>
         );
-    });
+    }).reverse(); // Reverse to get the stack effect correct with the new removal logic
   }
 
   return (

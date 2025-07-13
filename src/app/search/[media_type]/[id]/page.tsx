@@ -8,10 +8,9 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Star, Eye } from 'lucide-react';
 import Image from 'next/image';
 import { AddToWatchlistButton } from '@/components/watchlists/AddToWatchlistButton';
-import { Rating } from '@/components/discover/Rating';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, runTransaction, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,7 +45,6 @@ export default function DetailPage() {
   const [platforms, setPlatforms] = useState<WatchProvider[] | null>(null);
   const [loading, setLoading] = useState(true);
   
-  const [userRating, setUserRating] = useState(0);
   const [isWatched, setIsWatched] = useState(false);
   const [loadingUserData, setLoadingUserData] = useState(true);
 
@@ -101,57 +99,18 @@ export default function DetailPage() {
         if (docSnap.exists()) {
             const data = docSnap.data();
             const movieIdentifier = `${id}-${media_type}`;
-            const ratedMovie = (data.ratedMovies || []).find((m: any) => `${m.movieId}-${m.mediaType}` === movieIdentifier);
             const watchedMovie = (data.watchedMovies || []).some((m: any) => `${m.movieId}-${m.mediaType}` === movieIdentifier);
-            setUserRating(ratedMovie?.rating || 0);
             setIsWatched(watchedMovie);
         }
         setLoadingUserData(false);
     }, (error) => {
         console.error("Error fetching user data snapshot:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your rating.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your watched status.' });
         setLoadingUserData(false);
     });
 
     return () => unsubscribe();
   }, [firebaseUser, id, media_type, toast, authLoading]);
-
-  const handleRateMovie = async (rating: number) => {
-    if (!firebaseUser || !details) return;
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-
-    try {
-      await runTransaction(db, async (transaction) => {
-        const userDoc = await transaction.get(userDocRef);
-        if (!userDoc.exists()) throw new Error("User profile not found.");
-        
-        const data = userDoc.data();
-        const currentRatings: any[] = data.ratedMovies ? [...data.ratedMovies] : [];
-        const ratingIndex = currentRatings.findIndex(r => r.movieId === id && r.mediaType === media_type);
-
-        const ratingData = {
-          movieId: id,
-          mediaType: media_type,
-          rating: rating,
-          title: details.title || details.name,
-          poster: details.poster_path
-        };
-
-        if (ratingIndex > -1) {
-          if(currentRatings[ratingIndex].rating !== rating) {
-            currentRatings[ratingIndex] = ratingData;
-          }
-        } else {
-          currentRatings.push(ratingData);
-        }
-        
-        transaction.update(userDocRef, { ratedMovies: currentRatings });
-      });
-      toast({ title: 'Rating saved!', description: `You rated "${details.title || details.name}" ${rating} stars.` });
-    } catch (error: any) {
-       toast({ variant: 'destructive', title: 'Error Saving Rating', description: error.message || 'Could not save your rating.' });
-    }
-  };
   
   const handleToggleWatched = async (watched: boolean) => {
     if (!firebaseUser || !details) return;
@@ -270,22 +229,11 @@ export default function DetailPage() {
                     <Card>
                         <CardContent className="space-y-4 p-4">
                         {authLoading || loadingUserData ? (
-                            <div className="flex justify-center items-center h-24">
+                            <div className="flex justify-center items-center h-10">
                                 <Loader2 className="animate-spin text-primary" />
                             </div>
                         ) : (
                             <>
-                            <div className="space-y-2">
-                                <p className="text-sm font-semibold text-muted-foreground">
-                                Your Rating
-                                </p>
-                                <Rating
-                                rating={userRating}
-                                onRatingChange={handleRateMovie}
-                                starSize={24}
-                                />
-                            </div>
-                            <Separator />
                             <div className="flex items-center space-x-2">
                                 <Checkbox
                                 id={`watched-detail-${id}`}

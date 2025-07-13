@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -27,7 +28,7 @@ interface UserProfile {
     uid: string;
     username: string;
     email: string;
-    ratedMovies: { movieId: string; mediaType: 'movie' | 'tv'; rating: number }[];
+    likedMovies: { movieId: string; mediaType: 'movie' | 'tv' }[];
 }
 
 interface UserMovieData {
@@ -100,21 +101,21 @@ export function BlendFeed({ friendId }: { friendId: string }) {
       if (!currentUserDoc.exists()) throw new Error("Could not find your profile.");
       const currentUserData = currentUserDoc.data() as UserProfile;
 
-      const currentUserHighRatings = (currentUserData.ratedMovies || []).filter((m: any) => m.rating >= 4);
-      const friendHighRatings = (friendData.ratedMovies || []).filter((m: any) => m.rating >= 4);
+      const currentUserLiked = currentUserData.likedMovies || [];
+      const friendLiked = friendData.likedMovies || [];
 
-      if (currentUserHighRatings.length === 0 || friendHighRatings.length === 0) {
-        throw new Error("You both need to rate at least one movie with 4+ stars to create a Blend.");
+      if (currentUserLiked.length === 0 || friendLiked.length === 0) {
+        throw new Error("You both need to like at least one movie to create a Blend.");
       }
 
       // 2. Get movie titles for high ratings
       setLoadingMessage('Comparing your favorite movies...');
       const currentUserMovieTitles = (await Promise.all(
-        currentUserHighRatings.map(m => fetchMovieDetails(m.movieId, m.mediaType))
+        currentUserLiked.map(m => fetchMovieDetails(m.movieId, m.mediaType))
       )).filter((t): t is string => t !== null);
       
       const friendMovieTitles = (await Promise.all(
-        friendHighRatings.map(m => fetchMovieDetails(m.movieId, m.mediaType))
+        friendLiked.map(m => fetchMovieDetails(m.movieId, m.mediaType))
       )).filter((t): t is string => t !== null);
 
       // 3. Call AI Flow
@@ -122,7 +123,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
       const blendResult = await getBlendRecommendations({ currentUserMovieTitles, friendMovieTitles });
 
       if (!blendResult || blendResult.recommendedTitles.length === 0) {
-        throw new Error("The AI couldn't find any common ground. Try rating more movies!");
+        throw new Error("The AI couldn't find any common ground. Try liking more movies!");
       }
 
       // 4. Fetch full movie details for recommendations
@@ -175,7 +176,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
           A Blend for You & {friendProfile?.username || friendProfile?.email}
         </h1>
         <p className="mt-2 text-lg text-muted-foreground">
-          Movies and shows you might both enjoy, based on your ratings.
+          Movies and shows you might both enjoy, based on your liked movies.
         </p>
       </div>
 
@@ -183,7 +184,7 @@ export function BlendFeed({ friendId }: { friendId: string }) {
         <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
             <Film className="h-16 w-16" />
             <p className="text-lg">No Recommendations Found</p>
-            <p className="text-sm">The AI couldn't find a good match. Try rating more movies!</p>
+            <p className="text-sm">The AI couldn't find a good match. Try liking more movies!</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">

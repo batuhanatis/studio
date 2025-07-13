@@ -57,7 +57,7 @@ const createUserProfileDocument = async (firebaseUser: User) => {
           watchlists: [], 
           friends: [],
           activeBlendsWith: [],
-          ratedMovies: [],
+          likedMovies: [],
           watchedMovies: [],
           createdAt: serverTimestamp(),
         });

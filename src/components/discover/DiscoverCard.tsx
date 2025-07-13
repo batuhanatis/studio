@@ -3,7 +3,6 @@
 
 import React, { forwardRef } from 'react';
 import Image from 'next/image';
-import { Rating } from './Rating';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, Star, ListPlus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -12,16 +11,14 @@ import { Separator } from '../ui/separator';
 
 interface DiscoverCardProps {
     movie: any;
-    rating?: number;
     isWatched?: boolean;
     platforms?: any[];
-    onRate: (rating: number) => void;
     onToggleWatched: (watched: boolean) => void;
     swipeDirection: 'left' | 'right' | null;
     swipeOpacity: number;
 }
 
-export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(function DiscoverCard({ movie, rating = 0, isWatched = false, platforms, onRate, onToggleWatched, swipeDirection, swipeOpacity }, ref) {
+export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(function DiscoverCard({ movie, isWatched = false, platforms, onToggleWatched, swipeDirection, swipeOpacity }, ref) {
 
   if (!movie) return null;
 
@@ -87,10 +84,6 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
         <p className="text-base leading-relaxed line-clamp-4 text-foreground/80">{movie.overview}</p>
 
         <div className="space-y-4 pt-6">
-          <div>
-            <p className="text-sm font-semibold text-muted-foreground mb-2">Your Rating</p>
-            <Rating rating={rating} onRatingChange={onRate} />
-          </div>
           <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Checkbox id={`watched-${movie.id}`} checked={isWatched} onCheckedChange={onToggleWatched} />

@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader2, User, LogOut, Star, Users, Gift, Combine, ArrowLeft, Tv, Clapperboard, Check } from 'lucide-react';
+import { Loader2, User, LogOut, Star, Users, Gift, Combine, ArrowLeft, Tv, Clapperboard, Check, Heart } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ProfileRatings } from '@/components/profile/ProfileRatings';
+import { ProfileLikes } from '@/components/profile/ProfileLikes';
 import { ProfileFriends } from '@/components/profile/ProfileFriends';
 import { ProfileRecommendations } from '@/components/profile/ProfileRecommendations';
 import { ProfileBlends } from '@/components/profile/ProfileBlends';
@@ -26,7 +26,7 @@ interface UserProfileData {
     username?: string;
     email?: string;
     photoURL?: string;
-    ratedMovies?: any[];
+    likedMovies?: any[];
     watchedMovies?: any[];
     friends?: string[];
     activeBlendsWith?: string[];
@@ -123,7 +123,7 @@ export default function ProfilePage() {
                 </div>
                 <CardTitle className="text-2xl font-bold font-headline">You are browsing as a guest</CardTitle>
                 <CardDescription className="mt-2 text-lg text-muted-foreground">
-                    Create a free account to get a profile, save your watchlists, ratings, and recommendations permanently.
+                    Create a free account to get a profile, save your watchlists, likes, and recommendations permanently.
                 </CardDescription>
                 <Button asChild size="lg" className="mt-6">
                     <Link href="/register">Create Account</Link>
@@ -134,8 +134,7 @@ export default function ProfilePage() {
       );
   }
 
-  const ratedMovieCount = profileData?.ratedMovies?.filter(m => m.mediaType === 'movie').length || 0;
-  const ratedTvCount = profileData?.ratedMovies?.filter(m => m.mediaType === 'tv').length || 0;
+  const likedCount = profileData?.likedMovies?.length || 0;
   const watchedCount = profileData?.watchedMovies?.length || 0;
 
   return (
@@ -160,9 +159,8 @@ export default function ProfilePage() {
                  
                 <Card className="w-full mt-6 text-sm">
                   <CardContent className="p-4 space-y-3">
-                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Clapperboard /> Movies Rated</span> <Badge variant="secondary">{ratedMovieCount}</Badge></div>
-                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Tv /> TV Shows Rated</span> <Badge variant="secondary">{ratedTvCount}</Badge></div>
-                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Check /> Items Watched</span> <Badge variant="secondary">{watchedCount}</Badge></div>
+                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Heart /> Liked</span> <Badge variant="secondary">{likedCount}</Badge></div>
+                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Check /> Watched</span> <Badge variant="secondary">{watchedCount}</Badge></div>
                     <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Users /> Friends</span> <Badge variant="secondary">{profileData?.friends?.length || 0}</Badge></div>
                   </CardContent>
                 </Card>
@@ -175,16 +173,16 @@ export default function ProfilePage() {
                 )}
             </div>
             <div className="flex-grow w-full">
-                <Tabs defaultValue="ratings" className="w-full">
+                <Tabs defaultValue="likes" className="w-full">
                     <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-3 md:grid-cols-5' : 'grid-cols-3'}`}>
-                        <TabsTrigger value="ratings"><Star className="mr-2 h-4 w-4" />Ratings</TabsTrigger>
+                        <TabsTrigger value="likes"><Heart className="mr-2 h-4 w-4" />Likes</TabsTrigger>
                         <TabsTrigger value="watched"><Check className="mr-2 h-4 w-4" />Watched</TabsTrigger>
                         <TabsTrigger value="friends"><Users className="mr-2 h-4 w-4" />Friends</TabsTrigger>
                         {isOwnProfile && <TabsTrigger value="recommendations"><Gift className="mr-2 h-4 w-4" />For You</TabsTrigger>}
                         {isOwnProfile && <TabsTrigger value="blends"><Combine className="mr-2 h-4 w-4" />Blends</TabsTrigger>}
                     </TabsList>
-                    <TabsContent value="ratings" className="mt-6">
-                       <ProfileRatings userId={profileUserId} />
+                    <TabsContent value="likes" className="mt-6">
+                       <ProfileLikes userId={profileUserId} />
                     </TabsContent>
                     <TabsContent value="watched" className="mt-6">
                        <ProfileWatched userId={profileUserId} />

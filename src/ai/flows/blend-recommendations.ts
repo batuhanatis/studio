@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -36,12 +37,12 @@ You will be given two lists of movies that each person likes. Your task is to an
 
 Do not recommend movies that are already in their lists. Provide a diverse list of recommendations, including both popular and less-known titles if possible.
 
-User 1's favorite movies:
+User 1's liked movies:
 {{#each currentUserMovieTitles}}
 - {{{this}}}
 {{/each}}
 
-User 2's favorite movies:
+User 2's liked movies:
 {{#each friendMovieTitles}}
 - {{{this}}}
 {{/each}}
