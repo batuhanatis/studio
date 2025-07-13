@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { SendRecommendationButton } from '@/components/search/SendRecommendationButton';
+import { SendRecommendationButton } from '@/components/recommendations/SendRecommendationButton';
 import { cn } from '@/lib/utils';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
@@ -198,13 +198,10 @@ export default function DetailPage() {
     : 'https://placehold.co/500x750.png';
 
   const movieDetailsForButton = details ? {
-    id: Number(id),
+    id: String(id),
     media_type: media_type,
     title: title,
     poster: details.poster_path,
-    vote_average: details.vote_average,
-    release_date: details.release_date,
-    first_air_date: details.first_air_date,
   } : null;
 
   return (
@@ -296,7 +293,7 @@ export default function DetailPage() {
                         >
                             <ThumbsDown className={cn("h-5 w-5", isDisliked ? 'text-blue-500 fill-current' : 'text-muted-foreground')} />
                         </Button>
-                        {movieDetailsForButton && <AddToWatchlistButton movie={movieDetailsForButton} />}
+                        {movieDetailsForButton && <AddToWatchlistButton movie={{...movieDetailsForButton, id: Number(id), release_date: details.release_date, first_air_date: details.first_air_date, vote_average: details.vote_average}} />}
                         {movieDetailsForButton && <SendRecommendationButton movie={{...movieDetailsForButton, id: String(id)}} />}
                     </div>
 

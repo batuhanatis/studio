@@ -123,7 +123,7 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
       await addDoc(messagesRef, recommendationMessage);
       await updateDoc(chatDocRef, {
           lastMessage: {
-              text: `Sent you a movie: ${movie.title}`,
+              text: `Sent a movie recommendation.`,
               senderId: firebaseUser.uid,
               createdAt: serverTimestamp(),
               readBy: [firebaseUser.uid]

@@ -13,7 +13,8 @@ import {
   addDoc,
   serverTimestamp,
   updateDoc,
-  arrayUnion
+  arrayUnion,
+  getDoc
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -74,24 +75,26 @@ export function ChatInterface({ chatId, recipientId }: ChatInterfaceProps) {
     const messagesRef = collection(db, 'chats', chatId, 'messages');
     const q = query(messagesRef, orderBy('createdAt', 'asc'));
 
-    const unsubscribeMessages = onSnapshot(q, (snapshot) => {
+    const unsubscribeMessages = onSnapshot(q, async (snapshot) => {
       const newMessages = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Message));
       setMessages(newMessages);
+
+       if(firebaseUser) {
+            const chatDocRef = doc(db, 'chats', chatId);
+            const chatDoc = await getDoc(chatDocRef);
+            if(chatDoc.exists()) {
+                const chatData = chatDoc.data();
+                if (chatData.lastMessage && (!chatData.lastMessage.readBy || !chatData.lastMessage.readBy.includes(firebaseUser.uid))) {
+                    await updateDoc(chatDocRef, {
+                        'lastMessage.readBy': arrayUnion(firebaseUser.uid)
+                    });
+                }
+            }
+        }
+
       setLoading(false);
     });
     
-    // Mark chat as read
-    const markAsRead = async () => {
-        if(firebaseUser) {
-            const chatDocRef = doc(db, 'chats', chatId);
-            await updateDoc(chatDocRef, {
-                'lastMessage.readBy': arrayUnion(firebaseUser.uid)
-            });
-        }
-    };
-    markAsRead();
-
-
     return () => {
       unsubscribeUser();
       unsubscribeMessages();
@@ -178,13 +181,16 @@ export function ChatInterface({ chatId, recipientId }: ChatInterfaceProps) {
              const posterUrl = movie.poster ? `https://image.tmdb.org/t/p/w200${movie.poster}` : 'https://placehold.co/200x300.png';
              return (
                  <div key={msg.id} className={cn('flex items-end gap-2 my-2', isSender ? 'justify-end' : 'justify-start')}>
-                     <Card className="max-w-xs p-2">
-                        <Link href={href} className="group">
-                             <h4 className="font-semibold text-sm mb-2">{movie.title}</h4>
-                             <div className="relative w-40 aspect-[2/3] bg-muted rounded-md overflow-hidden">
-                                <Image src={posterUrl} alt={movie.title} fill className="object-cover" sizes="160px" />
+                     <Card className="max-w-xs p-2 bg-secondary">
+                        <p className="text-sm text-muted-foreground px-1 pb-2">{isSender ? "You recommended:" : `${recipient?.username} recommended:`}</p>
+                        <Link href={href} className="group flex items-start gap-3">
+                             <div className="relative w-20 aspect-[2/3] bg-muted rounded-md overflow-hidden flex-shrink-0">
+                                <Image src={posterUrl} alt={movie.title} fill className="object-cover" sizes="80px" />
                              </div>
-                             <p className="text-xs text-muted-foreground mt-2 group-hover:underline">View Details</p>
+                             <div>
+                                <h4 className="font-semibold text-sm mb-1 group-hover:underline">{movie.title}</h4>
+                                <p className="text-xs text-muted-foreground">{movie.mediaType === 'movie' ? 'Movie' : 'TV Show'}</p>
+                             </div>
                         </Link>
                      </Card>
                  </div>
