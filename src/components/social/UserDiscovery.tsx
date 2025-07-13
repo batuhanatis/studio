@@ -27,7 +27,7 @@ import { debounce } from 'lodash';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Loader2, UserPlus, Search, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
@@ -107,8 +107,8 @@ export function UserDiscovery() {
   }, [firebaseUser, friends, searchQuery, fetchSuggestions]);
 
   const debouncedSearch = useCallback(
-    debounce(async (query: string) => {
-      if (query.trim().length < 2) {
+    debounce(async (searchQuery: string) => {
+      if (searchQuery.trim().length < 2) {
         setSearchResults([]);
         setIsSearching(false);
         return;
@@ -119,8 +119,8 @@ export function UserDiscovery() {
         const q = query(
           usersRef,
           orderBy('username'),
-          startAt(query.toLowerCase()),
-          endAt(query.toLowerCase() + '\uf8ff'),
+          startAt(searchQuery.toLowerCase()),
+          endAt(searchQuery.toLowerCase() + '\uf8ff'),
           limit(10)
         );
         const querySnapshot = await getDocs(q);
