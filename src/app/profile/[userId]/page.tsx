@@ -162,7 +162,7 @@ export default function ProfilePage() {
                     <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Clapperboard /> Movies Rated</span> <Badge variant="secondary">{ratedMovieCount}</Badge></div>
                     <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Tv /> TV Shows Rated</span> <Badge variant="secondary">{ratedTvCount}</Badge></div>
                     <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Check /> Items Watched</span> <Badge variant="secondary">{watchedCount}</Badge></div>
-                    {isOwnProfile && <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Users /> Friends</span> <Badge variant="secondary">{profileData?.friends?.length || 0}</Badge></div>}
+                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Users /> Friends</span> <Badge variant="secondary">{profileData?.friends?.length || 0}</Badge></div>
                   </CardContent>
                 </Card>
 
@@ -175,20 +175,20 @@ export default function ProfilePage() {
             </div>
             <div className="flex-grow w-full">
                 <Tabs defaultValue="ratings" className="w-full">
-                    <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1'}`}>
+                    <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'}`}>
                         <TabsTrigger value="ratings"><Star className="mr-2 h-4 w-4" />Ratings</TabsTrigger>
-                        {isOwnProfile && <TabsTrigger value="friends"><Users className="mr-2 h-4 w-4" />Friends</TabsTrigger>}
+                        <TabsTrigger value="friends"><Users className="mr-2 h-4 w-4" />Friends</TabsTrigger>
                         {isOwnProfile && <TabsTrigger value="recommendations"><Gift className="mr-2 h-4 w-4" />For You</TabsTrigger>}
                         {isOwnProfile && <TabsTrigger value="blends"><Combine className="mr-2 h-4 w-4" />Blends</TabsTrigger>}
                     </TabsList>
                     <TabsContent value="ratings" className="mt-6">
                        <ProfileRatings userId={profileUserId} />
                     </TabsContent>
+                    <TabsContent value="friends" className="mt-6">
+                        <ProfileFriends userId={profileUserId} />
+                    </TabsContent>
                      {isOwnProfile && (
                         <>
-                            <TabsContent value="friends" className="mt-6">
-                                <ProfileFriends />
-                            </TabsContent>
                             <TabsContent value="recommendations" className="mt-6">
                                 <ProfileRecommendations />
                             </TabsContent>

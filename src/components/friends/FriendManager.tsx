@@ -38,7 +38,7 @@ interface UserProfile {
   uid: string;
   email: string;
   friends?: string[];
-  activeBlendsWith?: string[]; // UID of users they have an active blend with
+  activeBlendsWith?: string[];
 }
 
 interface FriendRequest {
@@ -63,12 +63,18 @@ const addFriendSchema = z.object({
 
 type AddFriendFormValues = z.infer<typeof addFriendSchema>;
 
-export function FriendManager() {
+interface FriendManagerProps {
+    userId: string;
+}
+
+export function FriendManager({ userId }: FriendManagerProps) {
   const { firebaseUser, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  
+  const isOwnProfile = firebaseUser?.uid === userId;
 
-  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
+  const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<UserProfile[]>([]);
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
@@ -84,9 +90,12 @@ export function FriendManager() {
   
   const getInitials = (email: string) => email.substring(0, 2).toUpperCase();
 
-  // Listener for incoming friend requests
+  // Listener for incoming friend requests (only for own profile)
   useEffect(() => {
-    if (authLoading || !firebaseUser) return;
+    if (!isOwnProfile || !firebaseUser) {
+        setLoading(p => ({ ...p, requests: false }));
+        return;
+    };
     const q = query(collection(db, 'friendRequests'), where('toUserId', '==', firebaseUser.uid), where('status', '==', 'pending'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const requests = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FriendRequest));
@@ -94,17 +103,17 @@ export function FriendManager() {
       setLoading(p => ({ ...p, requests: false }));
     });
     return () => unsubscribe();
-  }, [firebaseUser, authLoading]);
+  }, [firebaseUser, isOwnProfile]);
   
-  // Listener for user's own profile data (friends, active blends, etc.)
+  // Listener for user's profile data (friends, active blends, etc.) for the viewed profile
   useEffect(() => {
-    if (authLoading || !firebaseUser) return;
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    if (!userId) return;
+    const userDocRef = doc(db, 'users', userId);
     const unsubscribe = onSnapshot(userDocRef, async (snapshot) => {
       setLoading(p => ({ ...p, friends: true }));
       try {
         const userData = snapshot.data() as UserProfile | undefined;
-        setCurrentUserProfile(userData || null);
+        setProfileData(userData || null);
 
         let finalFriends: UserProfile[] = [];
         if (userData?.friends && userData.friends.length > 0) {
@@ -119,11 +128,14 @@ export function FriendManager() {
       }
     });
     return () => unsubscribe();
-  }, [firebaseUser, authLoading]);
+  }, [userId]);
 
-  // Listener for blend requests (sent and received)
+  // Listener for blend requests (sent and received) (only for own profile)
   useEffect(() => {
-    if (authLoading || !firebaseUser) return;
+    if (!isOwnProfile || !firebaseUser) {
+        setLoading(p => ({ ...p, blendRequests: false }));
+        return;
+    }
     setLoading(p => ({ ...p, blendRequests: true }));
     
     const incomingQuery = query(collection(db, 'blendRequests'), where('toUserId', '==', firebaseUser.uid), where('status', '==', 'pending'));
@@ -142,7 +154,7 @@ export function FriendManager() {
         unsubIncoming();
         unsubSent();
     };
-  }, [firebaseUser, authLoading]);
+  }, [firebaseUser, isOwnProfile]);
 
   const handleAddFriend = async (values: AddFriendFormValues) => {
     if (!firebaseUser || !firebaseUser.email || values.email === firebaseUser.email) {
@@ -164,7 +176,7 @@ export function FriendManager() {
       if (!(await getDocs(existingReqQuery)).empty) throw new Error("You've already sent a request to this user.");
 
       await addDoc(collection(db, 'friendRequests'), {
-        fromUserId: firebaseUser.uid, fromUserEmail: firebaseUser.email,
+        fromUserId: firebaseUser.uid, fromUserEmail: firebaseUser.email, username: firebaseUser.displayName || firebaseUser.email,
         toUserId: targetUser.uid, toUserEmail: targetUser.email,
         status: 'pending', createdAt: serverTimestamp(),
       });
@@ -252,8 +264,33 @@ export function FriendManager() {
     }
   };
   
-  const hasActiveBlendWith = (friendId: string) => currentUserProfile?.activeBlendsWith?.includes(friendId);
+  const hasActiveBlendWith = (friendId: string) => profileData?.activeBlendsWith?.includes(friendId);
   const hasPendingBlendInviteTo = (friendId: string) => sentBlendRequests.some(r => r.toUserId === friendId && r.status === 'pending');
+
+  if (!isOwnProfile) {
+     return (
+        <div>
+             {loading.friends || authLoading ? (
+              <div className="flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
+            ) : friends.length > 0 ? (
+              <ul className="space-y-3">
+                {friends.map((friend) => (
+                  <li key={friend.uid} className="flex items-center gap-3 rounded-lg bg-secondary p-3">
+                    <Link href={`/profile/${friend.uid}`} className="flex items-center gap-3 hover:underline">
+                        <Avatar><AvatarFallback>{getInitials(friend.email)}</AvatarFallback></Avatar>
+                        <span className="font-medium">{friend.email}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-3 py-8 text-center text-muted-foreground">
+                <Users className="h-12 w-12" /><p className="font-semibold text-base text-card-foreground">No friends yet.</p>
+              </div>
+            )}
+        </div>
+     )
+  }
 
   return (
     <div className="space-y-8">
@@ -326,7 +363,7 @@ export function FriendManager() {
                         <span className="font-medium">{friend.email}</span>
                     </Link>
                     <div className="ml-auto">
-                        {hasActiveBlendWith(friend.uid) ? (
+                        {profileData?.activeBlendsWith?.includes(friend.uid) ? (
                              <Button asChild size="sm">
                                 <Link href={`/blend/${friend.uid}`}><Combine className="mr-2 h-4 w-4" /> View Blend</Link>
                              </Button>

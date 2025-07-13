@@ -4,6 +4,10 @@
 // The FriendManager component contains all the logic for adding/managing friends and blends.
 import { FriendManager } from '@/components/friends/FriendManager';
 
-export function ProfileFriends() {
-  return <FriendManager />;
+interface ProfileFriendsProps {
+    userId: string;
+}
+
+export function ProfileFriends({ userId }: ProfileFriendsProps) {
+  return <FriendManager userId={userId} />;
 }
