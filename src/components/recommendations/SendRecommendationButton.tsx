@@ -7,9 +7,11 @@ import { db } from '@/lib/firebase';
 import {
   doc,
   getDoc,
+  setDoc,
   collection,
   addDoc,
   serverTimestamp,
+  updateDoc
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -26,6 +28,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2, Send, Users, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { useRouter } from 'next/navigation';
 
 interface MovieDetails {
   id: string;
@@ -43,6 +46,7 @@ interface UserProfile {
 
 export function SendRecommendationButton({ movie, isIconOnly = false }: { movie: MovieDetails, isIconOnly?: boolean }) {
   const { firebaseUser } = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [friends, setFriends] = useState<UserProfile[]>([]);
@@ -90,19 +94,45 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
     if (!firebaseUser) return;
     setSending(friendId);
 
+    const chatId = [firebaseUser.uid, friendId].sort().join('_');
+    const chatDocRef = doc(db, 'chats', chatId);
+    const messagesRef = collection(chatDocRef, 'messages');
+
     try {
-      await addDoc(collection(db, 'recommendations'), {
-        fromUserId: firebaseUser.uid,
-        toUserId: friendId,
-        movieId: movie.id,
-        mediaType: movie.media_type,
-        movieTitle: movie.title,
-        moviePoster: movie.poster,
+        const chatDoc = await getDoc(chatDocRef);
+        if (!chatDoc.exists()) {
+             await setDoc(chatDocRef, {
+                users: [firebaseUser.uid, friendId],
+                createdAt: serverTimestamp(),
+            });
+        }
+        
+      const recommendationMessage = {
+        text: `Recommended: ${movie.title}`,
+        senderId: firebaseUser.uid,
         createdAt: serverTimestamp(),
-        status: 'sent',
+        type: 'recommendation',
+        movie: {
+          id: movie.id,
+          title: movie.title,
+          poster: movie.poster,
+          mediaType: movie.media_type
+        },
+      };
+
+      await addDoc(messagesRef, recommendationMessage);
+      await updateDoc(chatDocRef, {
+          lastMessage: {
+              text: `Sent you a movie: ${movie.title}`,
+              senderId: firebaseUser.uid,
+              createdAt: serverTimestamp(),
+              readBy: [firebaseUser.uid]
+          }
       });
+
       toast({ title: 'Success!', description: `Recommendation sent to your friend.` });
       setIsOpen(false);
+      router.push(`/chat/${chatId}`);
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not send recommendation.' });
     } finally {
@@ -162,7 +192,7 @@ export function SendRecommendationButton({ movie, isIconOnly = false }: { movie:
               <p className="font-semibold text-lg text-foreground">No friends yet!</p>
               <p>Add friends to share movies with them.</p>
               <Button asChild className="mt-4" onClick={() => setIsOpen(false)}>
-                  <Link href={`/social`}>
+                  <Link href={`/chat`}>
                       <UserPlus className="mr-2 h-4 w-4" />
                       Find Friends
                   </Link>

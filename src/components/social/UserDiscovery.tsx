@@ -7,12 +7,9 @@ import { db } from '@/lib/firebase';
 import {
   doc,
   getDoc,
-  updateDoc,
-  arrayUnion,
   query,
   collection,
   where,
-  getDocs,
   onSnapshot,
   addDoc,
   serverTimestamp,
@@ -20,6 +17,7 @@ import {
   orderBy,
   startAt,
   endAt,
+  getDocs,
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -28,7 +26,7 @@ import { debounce } from 'lodash';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Loader2, UserPlus, Search, Users } from 'lucide-react';
+import { Loader2, UserPlus, Search } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 interface UserProfile {
@@ -40,7 +38,7 @@ interface UserProfile {
 }
 
 export function UserDiscovery() {
-  const { firebaseUser, loading: authLoading } = useAuth();
+  const { firebaseUser } = useAuth();
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,8 +77,6 @@ export function UserDiscovery() {
     setLoadingSuggestions(true);
     try {
         const usersRef = collection(db, 'users');
-        // Fetch a small number of random users. Firestore doesn't have a native "random" query.
-        // A more scalable solution might involve a backend function. For now, we fetch and randomize on the client.
         const q = query(usersRef, limit(20));
         const userDocs = await getDocs(q);
         const allUsers = userDocs.docs.map(d => d.data() as UserProfile);
@@ -88,8 +84,8 @@ export function UserDiscovery() {
         const friendIds = new Set(friends);
         const suggestedUsers = allUsers
             .filter(u => u.uid !== firebaseUser.uid && !friendIds.has(u.uid))
-            .sort(() => 0.5 - Math.random()) // Shuffle
-            .slice(0, 8); // Take 8
+            .sort(() => 0.5 - Math.random()) 
+            .slice(0, 8); 
 
         setSuggestions(suggestedUsers);
 
@@ -196,7 +192,7 @@ export function UserDiscovery() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
        <Card>
         <CardHeader>
           <CardTitle>Find New Friends</CardTitle>

@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import {
   doc,
   getDoc,
+  setDoc,
   updateDoc,
   arrayUnion,
   query,
@@ -25,9 +26,8 @@ import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Check, X, Users, Mail, Combine } from 'lucide-react';
+import { Loader2, Check, X, Users, Mail, Combine, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { RecommendationList } from '../recommendations/RecommendationList';
 
 interface UserProfile {
   uid: string;
@@ -199,6 +199,33 @@ export function FriendManager({ userId }: FriendManagerProps) {
     }
   };
 
+  const handleGoToChat = async (friendId: string) => {
+    if (!firebaseUser) return;
+    // Create a consistent chat ID by sorting user UIDs
+    const chatId = [firebaseUser.uid, friendId].sort().join('_');
+    const chatDocRef = doc(db, 'chats', chatId);
+
+    try {
+        const chatDoc = await getDoc(chatDocRef);
+        if (!chatDoc.exists()) {
+            // Create the chat document if it doesn't exist
+            await setDoc(chatDocRef, {
+                users: [firebaseUser.uid, friendId],
+                createdAt: serverTimestamp(),
+                lastMessage: {
+                    text: 'Chat created',
+                    senderId: firebaseUser.uid,
+                    createdAt: serverTimestamp(),
+                    readBy: [firebaseUser.uid]
+                }
+            });
+        }
+        router.push(`/chat/${chatId}`);
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not open chat.' });
+    }
+  };
+
   const handleSendBlendInvite = async (friend: UserProfile) => {
     if (!firebaseUser || !firebaseUser.email) return;
     setLoading(prev => ({ ...prev, action: true }));
@@ -340,7 +367,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Your Friends</CardTitle>
-            <CardDescription>Create a Blend to get shared recommendations.</CardDescription>
+            <CardDescription>Start a chat or create a Blend.</CardDescription>
           </CardHeader>
           <CardContent>
             {loading.friends || authLoading ? (
@@ -356,16 +383,19 @@ export function FriendManager({ userId }: FriendManagerProps) {
                         </Avatar>
                         <span className="font-medium">{friend.username}</span>
                     </Link>
-                    <div className="ml-auto">
+                    <div className="ml-auto flex items-center gap-2">
+                         <Button variant="outline" size="sm" onClick={() => handleGoToChat(friend.uid)}>
+                            <MessageSquare className="mr-2 h-4 w-4" /> Chat
+                         </Button>
                         {hasActiveBlendWith(friend.uid) ? (
                              <Button asChild size="sm">
-                                <Link href={`/blend/${friend.uid}`}><Combine className="mr-2 h-4 w-4" /> View Blend</Link>
+                                <Link href={`/blend/${friend.uid}`}><Combine className="mr-2 h-4 w-4" /> Blend</Link>
                              </Button>
                         ) : hasPendingBlendInviteTo(friend.uid) ? (
                             <Button variant="outline" size="sm" disabled>Invite Sent</Button>
                         ) : (
                             <Button variant="outline" size="sm" onClick={() => handleSendBlendInvite(friend)} disabled={loading.action}>
-                                {loading.action ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Combine className="mr-2 h-4 w-4" /> Invite to Blend</>}
+                                {loading.action ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Combine className="mr-2 h-4 w-4" /> Invite</>}
                             </Button>
                         )}
                     </div>
@@ -374,16 +404,15 @@ export function FriendManager({ userId }: FriendManagerProps) {
               </ul>
             ) : (
               <div className="flex flex-col items-center justify-center gap-3 py-8 text-center text-muted-foreground">
-                <Users className="h-12 w-12" /><p className="font-semibold text-base text-card-foreground">No friends yet.</p><p className="text-sm">Find friends on the Social page.</p>
+                <Users className="h-12 w-12" /><p className="font-semibold text-base text-card-foreground">No friends yet.</p><p className="text-sm">Find friends on the Discover page.</p>
                  <Button asChild variant="default" size="sm" className="mt-2">
-                    <Link href="/social">Find Friends</Link>
+                    <Link href="/chat">Find Friends</Link>
                 </Button>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
-      <RecommendationList />
     </div>
   );
 }

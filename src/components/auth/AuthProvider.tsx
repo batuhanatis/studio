@@ -19,7 +19,8 @@ import {
   type User,
   deleteDoc,
   deleteUser,
-  getDocs
+  getDocs,
+  writeBatch
 } from '@/lib/firebase';
 
 import { createContext, useEffect, useState, type ReactNode, useRef } from 'react';
@@ -169,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setNotificationCount(0);
       return;
     }
-
+    
     let unsubscribers: Unsubscribe[] = [];
     
     const friendRequestQuery = query(
@@ -182,19 +183,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       where('toUserId', '==', firebaseUser.uid),
       where('status', '==', 'pending')
     );
-    const recommendationQuery = query(
-        collection(db, 'recommendations'),
-        where('toUserId', '==', firebaseUser.uid),
-        where('status', '==', 'sent')
+    // New query to check for unread messages in chats
+    const chatsQuery = query(
+      collection(db, 'chats'),
+      where('users', 'array-contains', firebaseUser.uid),
+      where('lastMessage.readBy', 'array-contains-any', [firebaseUser.uid, 'read-by-no-one'])
     );
-
 
     let friendRequestCount = 0;
     let blendRequestCount = 0;
-    let recommendationCount = 0;
+    let unreadChatsCount = 0;
 
     const updateTotal = () => {
-        setNotificationCount(friendRequestCount + blendRequestCount + recommendationCount);
+        setNotificationCount(friendRequestCount + blendRequestCount + unreadChatsCount);
     }
 
     const friendUnsub = onSnapshot(friendRequestQuery, (snapshot) => {
@@ -208,24 +209,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateTotal();
     });
     unsubscribers.push(blendUnsub);
-    
-    const recsUnsub = onSnapshot(recommendationQuery, (snapshot) => {
-        recommendationCount = snapshot.size;
+
+    const chatsUnsub = onSnapshot(chatsQuery, (snapshot) => {
+        // We only count chats where the last message was NOT sent by the current user.
+        unreadChatsCount = snapshot.docs.filter(d => d.data().lastMessage?.senderId !== firebaseUser.uid).length;
         updateTotal();
     });
-    unsubscribers.push(recsUnsub);
-    
-    // Mark recommendations as read when the user visits the social page
-    if (window.location.pathname.includes('/social')) {
-      getDocs(recommendationQuery).then(snapshot => {
-        const batch = writeBatch(db);
-        snapshot.docs.forEach(doc => {
-            batch.update(doc.ref, { status: 'read' });
-        });
-        batch.commit().catch(err => console.error("Failed to mark recommendations as read:", err));
-      });
-    }
-
+    unsubscribers.push(chatsUnsub);
 
     return () => {
         unsubscribers.forEach(unsub => unsub());

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import {
@@ -13,7 +13,7 @@ import {
   doc,
   getDoc,
 } from 'firebase/firestore';
-import { Loader2, Film, Tv, Inbox } from 'lucide-react';
+import { Loader2, Inbox, Tv, Film } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -218,5 +218,3 @@ export function RecommendationList() {
     </Card>
   );
 }
-
-    
