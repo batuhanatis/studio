@@ -1,233 +1,93 @@
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState, forwardRef } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Rating } from './Rating';
-import { Eye, Star, ThumbsDown, ThumbsUp } from 'lucide-react';
-import { Skeleton } from '../ui/skeleton';
-import { AddToWatchlistButton } from '../watchlists/AddToWatchlistButton';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
-
-
-interface Movie {
-  id: number;
-  title?: string;
-  name?: string;
-  poster_path: string | null;
-  media_type: 'movie' | 'tv';
-  overview: string;
-  vote_average: number;
-  release_date?: string;
-  first_air_date?: string;
-}
-
-interface WatchProvider {
-  provider_id: number;
-  provider_name: string;
-  logo_path: string;
-}
-
-interface DiscoverCardProps {
-  movie?: Movie;
-  rating?: number;
-  isWatched?: boolean;
-  onRate: (rating: number) => void;
-  onToggleWatched: (watched: boolean) => void;
-  swipeDirection?: 'left' | 'right' | 'up' | 'down' | null;
-  swipeOpacity?: number;
-}
+import { Checkbox } from '@/components/ui/checkbox';
+import { Eye } from 'lucide-react';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
-const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
-  ({ movie, rating = 0, isWatched = false, onRate, onToggleWatched, swipeDirection, swipeOpacity = 0 }, ref) => {
-    const [platforms, setPlatforms] = useState<WatchProvider[] | null>(null);
-    const [loadingProviders, setLoadingProviders] = useState(true);
+interface DiscoverCardProps {
+    movie: any;
+    rating?: number;
+    isWatched?: boolean;
+    onRate: (rating: number) => void;
+    onToggleWatched: (watched: boolean) => void;
+}
 
-    useEffect(() => {
-      if (!movie) return;
-      setLoadingProviders(true);
-      let isCancelled = false;
-      
-      async function getWatchProviders(id: number, type: 'movie' | 'tv') {
-        try {
-          const res = await fetch(`https://api.themoviedb.org/3/${type}/${id}/watch/providers?api_key=${API_KEY}`);
-          if (isCancelled || !res.ok) return;
-          const json = await res.json();
-          if (isCancelled) return;
-          
-          const tr = json.results?.TR;
-          if (!tr) {
-              setPlatforms([]);
-              return;
-          }
+export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(function DiscoverCard({ movie, rating = 0, isWatched = false, onRate, onToggleWatched }, ref) {
+  const [platforms, setPlatforms] = useState<any[]>([]);
 
-          const allProviders: WatchProvider[] = [
-            ...(tr.flatrate || []),
-            ...(tr.buy || []),
-            ...(tr.rent || []),
-          ];
-          const unique = allProviders.filter((v, i, a) => a.findIndex((t) => t.provider_id === v.provider_id) === i);
-          setPlatforms(unique);
-        } catch {
-          if (!isCancelled) setPlatforms([]);
-        } finally {
-          if (!isCancelled) setLoadingProviders(false);
+  useEffect(() => {
+    if (!movie) return;
+    async function fetchProviders() {
+      try {
+        const res = await fetch(`https://api.themoviedb.org/3/${movie.media_type}/${movie.id}/watch/providers?api_key=${API_KEY}`);
+        const data = await res.json();
+        const tr = data.results?.TR;
+        if (tr) {
+            const all = [...(tr.flatrate || []), ...(tr.rent || []), ...(tr.buy || [])];
+            const unique = all.filter((v, i, a) => a.findIndex(t => t.provider_id === v.provider_id) === i);
+            setPlatforms(unique);
+        } else {
+            setPlatforms([]);
         }
+      } catch {
+        setPlatforms([]);
       }
-      getWatchProviders(movie.id, movie.media_type);
-
-      return () => { isCancelled = true; }
-    }, [movie]);
-    
-    if (!movie) {
-      return (
-        <div ref={ref} className="w-full h-full">
-          <Card className="w-full h-full overflow-hidden shadow-2xl animate-pulse rounded-2xl">
-              <Skeleton className="w-full h-full" />
-          </Card>
-        </div>
-      )
     }
+    fetchProviders();
+  }, [movie]);
 
-    const title = movie.title || movie.name || 'Untitled';
-    const posterUrl = movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'https://placehold.co/500x750.png';
-    const releaseYear = movie.release_date?.substring(0, 4) || movie.first_air_date?.substring(0, 4);
-    const href = `/search/${movie.media_type}/${movie.id}`;
-    
-    const movieDetails = {
-      id: movie.id,
-      media_type: movie.media_type,
-      title: title,
-      poster: movie.poster_path,
-      vote_average: movie.vote_average,
-      release_date: movie.release_date,
-      first_air_date: movie.first_air_date,
-    };
-    
-    const renderSwipeIndicator = () => {
-        if (!swipeDirection) return null;
+  if (!movie) return null;
 
-        const isLike = swipeDirection === 'right';
-        const rotation = isLike ? '-rotate-15' : 'rotate-15';
-        const text = isLike ? 'LIKE' : 'NOPE';
-        const color = isLike ? 'text-green-400 border-green-400' : 'text-red-400 border-red-400';
-        const Icon = isLike ? ThumbsUp : ThumbsDown;
+  const title = movie.title || movie.name || 'Untitled';
+  const year = movie.release_date?.slice(0, 4) || movie.first_air_date?.slice(0, 4);
+  const posterUrl = movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'https://placehold.co/500x750.png';
 
-        return (
-            <div
-                style={{ opacity: swipeOpacity }}
-                className={cn("absolute top-12 z-20 transition-opacity", isLike ? 'left-8' : 'right-8')}>
-                <div className={cn("text-3xl font-bold border-4 rounded-lg px-4 py-2 flex items-center gap-2", rotation, color)}>
-                    <Icon className="h-8 w-8" />
-                    {text}
+  return (
+    <div ref={ref} className="relative w-full h-full rounded-lg overflow-hidden shadow-2xl bg-card">
+      <Image
+        src={posterUrl}
+        alt={title}
+        fill
+        className="object-cover"
+        sizes="100vw"
+        data-ai-hint="movie poster"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
+
+      <div className="absolute bottom-0 w-full text-white p-4 space-y-3">
+        <h1 className="text-3xl font-bold font-headline mb-1">{title}</h1>
+        <p className="text-sm text-muted-foreground mb-2">{year} · {movie.vote_average.toFixed(1)} / 10</p>
+        <p className="text-base leading-relaxed line-clamp-3">{movie.overview}</p>
+
+        <div className="space-y-4 pt-2">
+          <div>
+            <Rating rating={rating} onRatingChange={onRate} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox id={`watched-${movie.id}`} checked={isWatched} onCheckedChange={onToggleWatched} />
+            <label htmlFor={`watched-${movie.id}`} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+              <Eye className="w-4 h-4" /> Mark as Watched
+            </label>
+          </div>
+        </div>
+
+        {platforms.length > 0 && (
+          <div className="mt-4">
+            <h3 className="text-sm font-semibold mb-2">Available in Türkiye:</h3>
+            <div className="flex flex-wrap gap-2">
+              {platforms.slice(0, 5).map(p => (
+                <div key={p.provider_id} className="relative w-10 h-10 rounded-md bg-white/80 overflow-hidden">
+                  <Image src={`https://image.tmdb.org/t/p/original${p.logo_path}`} alt={p.provider_name} fill className="object-contain p-1" />
                 </div>
+              ))}
             </div>
-        );
-    };
-
-    return (
-      <div ref={ref} className="w-full h-full cursor-grab active:cursor-grabbing">
-        <Card className="w-full h-full overflow-y-auto shadow-2xl rounded-2xl group scrollbar-hide">
-            <div className="relative">
-                {renderSwipeIndicator()}
-                <div className="relative w-full aspect-[2/3]">
-                    <Image
-                      src={posterUrl}
-                      alt={`Poster for ${title}`}
-                      fill
-                      style={{ objectFit: "cover" }}
-                      sizes="(max-width: 640px) 100vw, 384px"
-                      priority
-                      data-ai-hint="movie poster"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                </div>
-            </div>
-
-            <div className="bg-card w-full p-4">
-                <CardHeader className="p-0">
-                    <Link href={href}><CardTitle className="text-2xl font-bold font-headline tracking-tight hover:underline">{title}</CardTitle></Link>
-                    <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Star className="h-4 w-4 text-amber-400" />
-                          <span className="font-semibold text-foreground">{movie.vote_average.toFixed(1)}</span>
-                          <span>/ 10</span>
-                        </div>
-                        {releaseYear && <span className="text-sm">·</span>}
-                        {releaseYear && <span>{releaseYear}</span>}
-                    </div>
-                    <CardDescription className="pt-2 text-base text-card-foreground/90">
-                        {movie.overview}
-                    </CardDescription>
-                </CardHeader>
-                
-                <Separator className="my-4" />
-
-                <CardContent className="p-0 space-y-4">
-                    <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-muted-foreground">Rate this {movie.media_type === 'movie' ? 'movie' : 'show'}</h3>
-                        <Rating rating={rating} onRatingChange={onRate} />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                            <Checkbox
-                                id={`watched-${movie.id}`}
-                                checked={isWatched}
-                                onCheckedChange={onToggleWatched}
-                            />
-                            <label
-                                htmlFor={`watched-${movie.id}`}
-                                className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer"
-                            >
-                                <Eye className="h-4 w-4" />
-                                Mark as Watched
-                            </label>
-                        </div>
-                        <AddToWatchlistButton movie={movieDetails} isIconOnly={true} />
-                    </div>
-
-                    <Separator className="my-4" />
-
-                    <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-2">Watch in Türkiye</h3>
-                        {loadingProviders ? (
-                            <div className="flex gap-2">
-                                <Skeleton className="h-10 w-10 rounded-md" />
-                                <Skeleton className="h-10 w-10 rounded-md" />
-                            </div>
-                        ) : platforms && platforms.length > 0 ? (
-                            <div className="flex items-center gap-2 flex-wrap">
-                                {platforms.slice(0, 5).map((p) => (
-                                <div key={p.provider_id} className="relative h-10 w-10 overflow-hidden rounded-md bg-white/90 shadow-sm" title={p.provider_name}>
-                                    <Image
-                                      src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
-                                      alt={`${p.provider_name} logo`}
-                                      fill
-                                      className="object-contain p-1"
-                                      sizes="40px"
-                                    />
-                                </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">No streaming platforms found.</p>
-                        )}
-                    </div>
-                </CardContent>
-            </div>
-        </Card>
+          </div>
+        )}
       </div>
-    );
-  }
-);
-
-DiscoverCard.displayName = "DiscoverCard";
-export { DiscoverCard };
+    </div>
+  );
+});
