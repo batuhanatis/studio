@@ -96,11 +96,13 @@ export function MovieFinder() {
   const [disliked, setDisliked] = useState<UserMovieData[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
   const preferredGenreIds = useRef<string>('');
+  const initialLoadRef = useRef(true);
 
   useEffect(() => {
     setQuery(urlQuery);
     if(urlQuery) {
         setHasSearched(true);
+        initialLoadRef.current = false;
     }
   }, [urlQuery]);
 
@@ -165,7 +167,7 @@ export function MovieFinder() {
     fetchFilterOptions();
   }, [toast]);
   
-  const fetchDiscoverData = useCallback(async (currentFilters: Filters, genrePrefs: string, existingResults: SearchResult[]) => {
+  const fetchDiscoverData = useCallback(async (currentFilters: Filters, genrePrefs: string) => {
     setIsLoading(true);
     try {
         const genreQuery = currentFilters.genres.length > 0 
@@ -183,12 +185,12 @@ export function MovieFinder() {
         if (!res.ok) throw new Error('Failed to fetch from TMDB');
         const data = await res.json();
         
-        const existingIds = new Set(existingResults.map(r => r.id));
         const items = (data.results || [])
-            .filter((item: any) => item.poster_path && !existingIds.has(item.id))
+            .filter((item: any) => item.poster_path)
             .map((item: any) => ({ ...item, media_type: item.media_type || currentFilters.mediaType }));
         
-        setResults(items); 
+        setResults(items);
+        initialLoadRef.current = false;
 
     } catch (error: any) {
         console.error("Error fetching recommendations:", error);
@@ -203,11 +205,12 @@ export function MovieFinder() {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
         setHasSearched(false);
-        fetchDiscoverData(currentFilters, preferredGenreIds.current, []);
+        fetchDiscoverData(currentFilters, preferredGenreIds.current);
         return;
     }
     
     setHasSearched(true);
+    initialLoadRef.current = false;
     
     if (trimmedQuery.length < 2) {
       setResults([]);
@@ -256,20 +259,22 @@ export function MovieFinder() {
     }
     router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
     
-    debouncedSearch(query, filters);
+    if (!initialLoadRef.current) {
+        debouncedSearch(query, filters);
+    }
   }, [query, filters, router, pathname, searchParams, debouncedSearch]);
 
   // Initial load or when query is cleared
   useEffect(() => {
-    if (!query && !hasSearched && !loadingUserData && results.length === 0) {
-      fetchDiscoverData(filters, preferredGenreIds.current, []);
+    if (initialLoadRef.current && !query && !loadingUserData) {
+      fetchDiscoverData(filters, preferredGenreIds.current);
     }
-  }, [query, hasSearched, filters, loadingUserData, fetchDiscoverData, results.length]);
+  }, [query, filters, loadingUserData, fetchDiscoverData]);
 
   // Effect for the refresh button
   useEffect(() => {
     if (refreshCount > 0) {
-      fetchDiscoverData(filters, preferredGenreIds.current, results);
+      fetchDiscoverData(filters, preferredGenreIds.current);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshCount]);
@@ -525,5 +530,3 @@ export function MovieFinder() {
     </div>
   );
 }
-
-    
