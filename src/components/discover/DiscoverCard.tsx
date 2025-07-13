@@ -109,21 +109,25 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
 
     return (
       <div ref={ref} className="w-full max-w-sm mx-auto">
-        <Card className="w-full h-[75vh] flex flex-col overflow-hidden shadow-2xl rounded-2xl group cursor-grab active:cursor-grabbing">
-            {/* Poster */}
-            <div className="relative w-full h-[60%] flex-shrink-0">
-                <Image
-                  src={posterUrl}
-                  alt={`Poster for ${title}`}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 640px) 100vw, 384px"
-                  data-ai-hint="movie poster"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+        <Card className="w-full h-[75vh] overflow-y-auto shadow-2xl rounded-2xl group cursor-grab active:cursor-grabbing snap-y snap-mandatory">
+            {/* Poster Section */}
+            <div className="h-full w-full flex-shrink-0 snap-start">
+              <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                  <Image
+                    src={posterUrl}
+                    alt={`Poster for ${title}`}
+                    fill
+                    style={{ objectFit: "cover" }}
+                    sizes="(max-width: 640px) 100vw, 384px"
+                    priority
+                    data-ai-hint="movie poster"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+              </div>
             </div>
 
-            <div className="flex-grow p-4 overflow-y-auto bg-card">
+            {/* Content Section */}
+            <div className="bg-card w-full p-4 snap-start">
                 <CardHeader className="p-0">
                     <Link href={href}><CardTitle className="text-2xl font-bold font-headline tracking-tight hover:underline">{title}</CardTitle></Link>
                     <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
@@ -135,7 +139,7 @@ const DiscoverCard = React.forwardRef<HTMLDivElement, DiscoverCardProps>(
                         {releaseYear && <span className="text-sm">·</span>}
                         {releaseYear && <span>{releaseYear}</span>}
                     </div>
-                    <CardDescription className="pt-2 text-base text-card-foreground/90 line-clamp-3">
+                    <CardDescription className="pt-2 text-base text-card-foreground/90">
                         {movie.overview}
                     </CardDescription>
                 </CardHeader>
