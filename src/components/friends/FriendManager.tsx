@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Check, X, Users, Mail, Combine } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { RecommendationList } from '../recommendations/RecommendationList';
 
 interface UserProfile {
   uid: string;
@@ -382,6 +383,7 @@ export function FriendManager({ userId }: FriendManagerProps) {
           </CardContent>
         </Card>
       </div>
+      <RecommendationList />
     </div>
   );
 }

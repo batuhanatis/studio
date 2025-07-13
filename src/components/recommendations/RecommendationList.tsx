@@ -16,8 +16,8 @@ import {
 import { Loader2, Film, Tv, Inbox } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,6 +25,7 @@ interface Recommendation {
   id: string;
   fromUserId: string;
   fromUsername?: string;
+  fromPhotoURL?: string;
   movieId: string;
   movieTitle: string;
   moviePoster: string | null;
@@ -63,13 +64,14 @@ export function RecommendationList() {
             querySnapshot.docs.map(async (d) => {
               const data = d.data();
               const fromUserDoc = await getDoc(doc(db, 'users', data.fromUserId));
-              const fromUsername = fromUserDoc.exists()
-                ? fromUserDoc.data().username
-                : 'A friend';
+              const fromUserData = fromUserDoc.exists()
+                ? fromUserDoc.data()
+                : { username: 'A friend', photoURL: '' };
               return {
                 id: d.id,
                 ...data,
-                fromUsername,
+                fromUsername: fromUserData.username,
+                fromPhotoURL: fromUserData.photoURL,
               } as Recommendation;
             })
           );
@@ -101,84 +103,87 @@ export function RecommendationList() {
     return () => unsubscribe();
   }, [firebaseUser, toast, authLoading]);
 
-  const getInitials = (name: string) => name.substring(0, 2).toUpperCase();
+  const getInitials = (name: string) => name ? name.substring(0, 2).toUpperCase() : '?';
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
-        From Your Friends
-      </h1>
-
-      {loading || authLoading ? (
-        <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p>Loading recommendations...</p>
-        </div>
-      ) : recommendations.length === 0 ? (
-        <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-          <Inbox className="h-16 w-16" />
-          <p className="text-lg">Your inbox is empty.</p>
-          <p className="text-sm">Recommendations from friends will appear here.</p>
-        </div>
-      ) : (
-        <div className="w-full max-w-4xl space-y-4">
-          {recommendations.map((item) => {
-            const title = item.movieTitle;
-            const href = `/search/${item.mediaType}/${item.movieId}?title=${encodeURIComponent(
-              title
-            )}&poster=${item.moviePoster}&rating=0`;
-            const posterUrl =
-              item.moviePoster && item.moviePoster !== 'null'
-                ? `https://image.tmdb.org/t/p/w200${item.moviePoster}`
-                : 'https://placehold.co/200x300.png';
-            return (
-              <Link href={href} key={item.id} className="block">
-                <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200">
-                  <CardContent className="p-0 flex">
-                    <div className="relative w-28 md:w-32 aspect-[2/3] flex-shrink-0 bg-muted">
-                      <Image
-                        src={posterUrl}
-                        alt={title}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 112px, 128px"
-                        data-ai-hint="movie poster"
-                      />
-                    </div>
-                    <div className="p-4 flex flex-col justify-center gap-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback>
-                            {getInitials(item.fromUsername || '?')}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>
-                          <span className="font-semibold text-foreground">
-                            {item.fromUsername}
-                          </span>{' '}
-                          recommended
-                        </span>
-                      </div>
-                      <h3 className="text-lg font-bold font-headline">{title}</h3>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        {item.mediaType === 'movie' ? (
-                          <Film className="h-4 w-4" />
-                        ) : (
-                          <Tv className="h-4 w-4" />
-                        )}
-                        <span>{item.mediaType === 'movie' ? 'Movie' : 'TV Show'}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {formatDistanceToNow(new Date(item.createdAt.seconds * 1000))} ago
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Movie Recommendations</CardTitle>
+        <CardDescription>Movies and shows recommended to you by your friends.</CardDescription>
+      </CardHeader>
+      <CardContent>
+          {loading || authLoading ? (
+            <div className="flex flex-col items-center gap-2 pt-8 text-muted-foreground">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p>Loading recommendations...</p>
+            </div>
+          ) : recommendations.length === 0 ? (
+            <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
+              <Inbox className="h-16 w-16" />
+              <p className="text-lg">Your inbox is empty.</p>
+              <p className="text-sm">Recommendations from friends will appear here.</p>
+            </div>
+          ) : (
+            <div className="w-full max-w-4xl space-y-4">
+              {recommendations.map((item) => {
+                const title = item.movieTitle;
+                const href = `/search/${item.mediaType}/${item.movieId}?title=${encodeURIComponent(
+                  title
+                )}&poster=${item.moviePoster}&rating=0`;
+                const posterUrl =
+                  item.moviePoster && item.moviePoster !== 'null'
+                    ? `https://image.tmdb.org/t/p/w200${item.moviePoster}`
+                    : 'https://placehold.co/200x300.png';
+                return (
+                  <Link href={href} key={item.id} className="block">
+                    <Card className="shadow-md overflow-hidden hover:shadow-lg hover:border-primary/50 transition-all duration-200">
+                      <CardContent className="p-0 flex">
+                        <div className="relative w-28 md:w-32 aspect-[2/3] flex-shrink-0 bg-muted">
+                          <Image
+                            src={posterUrl}
+                            alt={title}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 112px, 128px"
+                            data-ai-hint="movie poster"
+                          />
+                        </div>
+                        <div className="p-4 flex flex-col justify-center gap-2">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Avatar className="h-6 w-6">
+                               {item.fromPhotoURL && <AvatarImage src={item.fromPhotoURL} alt={item.fromUsername} />}
+                               <AvatarFallback>
+                                {getInitials(item.fromUsername || 'A')}
+                               </AvatarFallback>
+                            </Avatar>
+                            <span>
+                              <span className="font-semibold text-foreground">
+                                {item.fromUsername}
+                              </span>{' '}
+                              recommended
+                            </span>
+                          </div>
+                          <h3 className="text-lg font-bold font-headline">{title}</h3>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            {item.mediaType === 'movie' ? (
+                              <Film className="h-4 w-4" />
+                            ) : (
+                              <Tv className="h-4 w-4" />
+                            )}
+                            <span>{item.mediaType === 'movie' ? 'Movie' : 'TV Show'}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {formatDistanceToNow(new Date(item.createdAt.seconds * 1000))} ago
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+      </CardContent>
+    </Card>
   );
 }

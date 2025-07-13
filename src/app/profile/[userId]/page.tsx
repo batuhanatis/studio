@@ -4,7 +4,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader2, User, LogOut, Star, Users, Gift, Combine, ArrowLeft, Tv, Clapperboard, Check, Heart, Settings } from 'lucide-react';
+import { Loader2, User, LogOut, Star, Users, Gift, Combine, ArrowLeft, Tv, Clapperboard, Check, Heart, Settings, Inbox } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -16,11 +16,11 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProfileLikes } from '@/components/profile/ProfileLikes';
 import { ProfileFriends } from '@/components/profile/ProfileFriends';
-import { ProfileRecommendations } from '@/components/profile/ProfileRecommendations';
 import { ProfileBlends } from '@/components/profile/ProfileBlends';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileWatched } from '@/components/profile/ProfileWatched';
+import { RecommendationList } from '@/components/recommendations/RecommendationList';
 
 interface UserProfileData {
     username?: string;
@@ -183,11 +183,10 @@ export default function ProfilePage() {
             </div>
             <div className="flex-grow w-full">
                 <Tabs defaultValue="likes" className="w-full">
-                    <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-3 md:grid-cols-5' : 'grid-cols-3'}`}>
+                    <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-3 md:grid-cols-4' : 'grid-cols-3'}`}>
                         <TabsTrigger value="likes"><Heart className="mr-2 h-4 w-4" />Likes</TabsTrigger>
                         <TabsTrigger value="watched"><Check className="mr-2 h-4 w-4" />Watched</TabsTrigger>
                         <TabsTrigger value="friends"><Users className="mr-2 h-4 w-4" />Friends</TabsTrigger>
-                        {isOwnProfile && <TabsTrigger value="recommendations"><Gift className="mr-2 h-4 w-4" />For You</TabsTrigger>}
                         {isOwnProfile && <TabsTrigger value="blends"><Combine className="mr-2 h-4 w-4" />Blends</TabsTrigger>}
                     </TabsList>
                     <TabsContent value="likes" className="mt-6">
@@ -201,9 +200,6 @@ export default function ProfilePage() {
                     </TabsContent>
                      {isOwnProfile && (
                         <>
-                            <TabsContent value="recommendations" className="mt-6">
-                                <ProfileRecommendations />
-                            </TabsContent>
                             <TabsContent value="blends" className="mt-6">
                                 <ProfileBlends />
                             </TabsContent>

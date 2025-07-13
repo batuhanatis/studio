@@ -18,7 +18,8 @@ import {
   type Unsubscribe,
   type User,
   deleteDoc,
-  deleteUser
+  deleteUser,
+  getDocs
 } from '@/lib/firebase';
 
 import { createContext, useEffect, useState, type ReactNode, useRef } from 'react';
@@ -181,12 +182,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       where('toUserId', '==', firebaseUser.uid),
       where('status', '==', 'pending')
     );
+    const recommendationQuery = query(
+        collection(db, 'recommendations'),
+        where('toUserId', '==', firebaseUser.uid),
+        where('status', '==', 'sent')
+    );
+
 
     let friendRequestCount = 0;
     let blendRequestCount = 0;
+    let recommendationCount = 0;
 
     const updateTotal = () => {
-        setNotificationCount(friendRequestCount + blendRequestCount);
+        setNotificationCount(friendRequestCount + blendRequestCount + recommendationCount);
     }
 
     const friendUnsub = onSnapshot(friendRequestQuery, (snapshot) => {
@@ -200,6 +208,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateTotal();
     });
     unsubscribers.push(blendUnsub);
+    
+    const recsUnsub = onSnapshot(recommendationQuery, (snapshot) => {
+        recommendationCount = snapshot.size;
+        updateTotal();
+    });
+    unsubscribers.push(recsUnsub);
+    
+    // Mark recommendations as read when the user visits the social page
+    if (window.location.pathname.includes('/social')) {
+      getDocs(recommendationQuery).then(snapshot => {
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(doc => {
+            batch.update(doc.ref, { status: 'read' });
+        });
+        batch.commit().catch(err => console.error("Failed to mark recommendations as read:", err));
+      });
+    }
+
 
     return () => {
         unsubscribers.forEach(unsub => unsub());
