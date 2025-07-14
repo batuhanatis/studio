@@ -106,7 +106,7 @@ export function EditProfileForm() {
       console.error(error);
       let description = 'Could not upload image. Please try again.';
       if (error.code === 'storage/unauthorized') {
-        description = 'You do not have permission to upload. Please check storage rules in your Firebase project.'
+        description = 'You do not have permission to upload. Please check your Storage Rules in the Firebase Console.'
       }
       toast({ variant: 'destructive', title: 'Upload Failed', description });
     } finally {
