@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -63,7 +62,6 @@ const createUserProfileDocument = async (firebaseUser: User) => {
           activeBlendsWith: [],
           likedMovies: [],
           dislikedMovies: [],
-          watchedMovies: [],
           createdAt: serverTimestamp(),
         });
       } else {

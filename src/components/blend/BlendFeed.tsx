@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { getBlendRecommendations } from '@/ai/flows/blend-recommendations';
 import { MovieResultCard } from '@/components/search/MovieResultCard';
@@ -30,7 +29,6 @@ interface UserProfile {
     email: string;
     likedMovies: { movieId: string; mediaType: 'movie' | 'tv' }[];
     dislikedMovies: any[];
-    watchedMovies: any[];
 }
 
 interface UserMovieData {
@@ -48,7 +46,6 @@ export function BlendFeed({ friendId }: { friendId: string }) {
   const [loadingMessage, setLoadingMessage] = useState('Finding your friend...');
   const [error, setError] = useState<string | null>(null);
 
-  const [watched, setWatched] = useState<UserMovieData[]>([]);
   const [liked, setLiked] = useState<UserMovieData[]>([]);
   const [disliked, setDisliked] = useState<UserMovieData[]>([]);
 
@@ -59,7 +56,6 @@ export function BlendFeed({ friendId }: { friendId: string }) {
     const unsubscribe = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
             const data = doc.data();
-            setWatched(data.watchedMovies || []);
             setLiked(data.likedMovies || []);
             setDisliked(data.dislikedMovies || []);
         }
@@ -98,15 +94,15 @@ export function BlendFeed({ friendId }: { friendId: string }) {
     try {
       // 1. Fetch friend data
       setLoadingMessage('Finding your friend...');
-      const friendDoc = await getDoc(doc(db, 'users', friendId));
-      if (!friendDoc.exists()) throw new Error("Could not find your friend's profile.");
-      const friendData = friendDoc.data() as UserProfile;
+      const friendDocSnap = await doc(db, 'users', friendId).get();
+      if (!friendDocSnap.exists()) throw new Error("Could not find your friend's profile.");
+      const friendData = friendDocSnap.data() as UserProfile;
       setFriendProfile(friendData);
 
       setLoadingMessage('Analyzing your movie tastes...');
-      const currentUserDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      if (!currentUserDoc.exists()) throw new Error("Could not find your profile.");
-      const currentUserData = currentUserDoc.data() as UserProfile;
+      const currentUserDocSnap = await doc(db, 'users', firebaseUser.uid).get();
+      if (!currentUserDocSnap.exists()) throw new Error("Could not find your profile.");
+      const currentUserData = currentUserDocSnap.data() as UserProfile;
 
       const currentUserLiked = currentUserData.likedMovies || [];
       const friendLiked = friendData.likedMovies || [];
@@ -154,9 +150,8 @@ export function BlendFeed({ friendId }: { friendId: string }) {
     createBlend();
   }, [createBlend]);
   
-  const watchedIds = new Set(watched.map(item => String(item.movieId)));
   const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
-  const dislikedIds = new Set(disliked.map(item => String(item.movieId)));
+  const dislikedIds = new Set(disliked.map(item => `${item.movieId}-${item.mediaType}`));
   
   if (loading || authLoading) {
      return (
@@ -170,10 +165,10 @@ export function BlendFeed({ friendId }: { friendId: string }) {
   
   if (error) {
     return (
-        <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-4 pt-8 text-center text-muted-foreground">
             <Combine className="h-16 w-16" />
             <p className="text-lg font-semibold">Could Not Create Blend</p>
-            <p className="text-sm max-w-md">{error}</p>
+            <p className="max-w-md text-sm">{error}</p>
         </div>
     );
   }
@@ -183,32 +178,28 @@ export function BlendFeed({ friendId }: { friendId: string }) {
   return (
     <div className="space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">
-          A Blend for You & {friendDisplayName}
+        <h1 className="text-3xl font-bold tracking-tight font-headline md:text-4xl">
+          A Blend for You &amp; {friendDisplayName}
         </h1>
-        <p className="mt-2 text-md md:text-lg text-muted-foreground">
+        <p className="mt-2 text-md text-muted-foreground md:text-lg">
           Movies and shows you might both enjoy, based on your liked movies.
         </p>
       </div>
 
       {blendMovies.length === 0 ? (
-        <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-4 pt-8 text-center text-muted-foreground">
             <Film className="h-16 w-16" />
             <p className="text-lg">No Recommendations Found</p>
             <p className="text-sm">The AI couldn't find a good match. Try liking more movies!</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {blendMovies.map((item) => (
             <MovieResultCard
               key={item.id}
               item={item}
-              isWatched={watchedIds.has(String(item.id))}
-              isLiked={likedIds.has(`${item.id}-${item.media_type}`)}
-              isDisliked={dislikedIds.has(String(item.id))}
-              onToggleWatched={() => { /* Not implemented for simplicity */ }}
-              onToggleLike={() => { /* Not implemented for simplicity */ }}
-              onToggleDislike={() => { /* Not implemented for simplicity */ }}
+              isLiked={likedIds.has(`${item.id}-${item.mediaType}`)}
+              isDisliked={dislikedIds.has(`${item.id}-${item.mediaType}`)}
             />
           ))}
         </div>

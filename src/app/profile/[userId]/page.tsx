@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Loader2, User, LogOut, Star, Users, Gift, Combine, ArrowLeft, Tv, Clapperboard, Check, Heart, Settings, Inbox } from 'lucide-react';
+import { Loader2, User, LogOut, Users, Combine, ArrowLeft, Settings, Heart, ThumbsDown } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -18,9 +17,8 @@ import { ProfileLikes } from '@/components/profile/ProfileLikes';
 import { ProfileFriends } from '@/components/profile/ProfileFriends';
 import { ProfileBlends } from '@/components/profile/ProfileBlends';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ProfileWatched } from '@/components/profile/ProfileWatched';
-import { RecommendationList } from '@/components/recommendations/RecommendationList';
+import { Card, CardContent } from '@/components/ui/card';
+import { ProfileDislikes } from '@/components/profile/ProfileDislikes';
 
 interface UserProfileData {
     username?: string;
@@ -29,7 +27,7 @@ interface UserProfileData {
     bio?: string;
     displayName?: string;
     likedMovies?: any[];
-    watchedMovies?: any[];
+    dislikedMovies?: any[];
     friends?: string[];
     activeBlendsWith?: string[];
 }
@@ -105,7 +103,7 @@ export default function ProfilePage() {
         <div className="min-h-screen w-full bg-background">
           <Header />
           <main className="container mx-auto max-w-2xl px-4 py-16 text-center">
-            <h1 className="text-3xl font-bold font-headline text-destructive">{error}</h1>
+            <h1 className="text-3xl font-bold text-destructive font-headline">{error}</h1>
              <Button asChild className="mt-6">
                 <Link href="/search">Go Home</Link>
             </Button>
@@ -119,14 +117,14 @@ export default function ProfilePage() {
         <div className="min-h-screen w-full bg-background">
           <Header />
           <main className="container mx-auto max-w-2xl px-4 py-16">
-            <Card className="text-center p-8">
-                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
+            <Card className="p-8 text-center">
+                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
                     <User className="h-8 w-8 text-primary" />
                 </div>
-                <CardTitle className="text-2xl font-bold font-headline">You are browsing as a guest</CardTitle>
-                <CardDescription className="mt-2 text-lg text-muted-foreground">
+                <h2 className="text-2xl font-bold font-headline">You are browsing as a guest</h2>
+                <p className="mt-2 text-lg text-muted-foreground">
                     Create a free account to get a profile, save your watchlists, likes, and recommendations permanently.
-                </CardDescription>
+                </p>
                 <Button asChild size="lg" className="mt-6">
                     <Link href="/register">Create Account</Link>
                 </Button>
@@ -137,7 +135,7 @@ export default function ProfilePage() {
   }
 
   const likedCount = profileData?.likedMovies?.length || 0;
-  const watchedCount = profileData?.watchedMovies?.length || 0;
+  const dislikedCount = profileData?.dislikedMovies?.length || 0;
   const displayName = profileData?.displayName || profileData?.username;
 
   return (
@@ -151,21 +149,21 @@ export default function ProfilePage() {
                 </Button>
              </div>
         )}
-        <div className="flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-12">
-            <div className="flex-shrink-0 flex flex-col items-center w-full md:w-64">
-                <Avatar className="h-24 w-24 md:h-32 md:w-32 text-4xl md:text-5xl border-4 border-primary/20">
+        <div className="flex flex-col gap-8 md:flex-row md:items-start md:gap-12">
+            <div className="flex w-full flex-shrink-0 flex-col items-center md:w-64">
+                <Avatar className="h-24 w-24 border-4 border-primary/20 text-4xl md:h-32 md:w-32 md:text-5xl">
                     {profileData?.photoURL && <AvatarImage src={profileData.photoURL} alt={displayName} />}
                     <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
                 </Avatar>
-                <h1 className="mt-4 text-2xl md:text-3xl font-bold font-headline text-center">{displayName}</h1>
-                <p className="text-muted-foreground text-center">@{profileData?.username}</p>
+                <h1 className="mt-4 text-center text-2xl font-bold font-headline md:text-3xl">{displayName}</h1>
+                <p className="text-center text-muted-foreground">@{profileData?.username}</p>
                 {profileData?.bio && <p className="mt-2 text-center text-sm text-foreground/80">{profileData.bio}</p>}
                  
-                <Card className="w-full mt-6 text-sm">
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Heart /> Liked</span> <Badge variant="secondary">{likedCount}</Badge></div>
-                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Check /> Watched</span> <Badge variant="secondary">{watchedCount}</Badge></div>
-                    <div className="flex justify-between items-center"><span className="flex items-center gap-2 text-muted-foreground"><Users /> Friends</span> <Badge variant="secondary">{profileData?.friends?.length || 0}</Badge></div>
+                <Card className="mt-6 w-full text-sm">
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-muted-foreground"><Heart /> Liked</span> <Badge variant="secondary">{likedCount}</Badge></div>
+                    <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-muted-foreground"><ThumbsDown /> Disliked</span> <Badge variant="secondary">{dislikedCount}</Badge></div>
+                    <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-muted-foreground"><Users /> Friends</span> <Badge variant="secondary">{profileData?.friends?.length || 0}</Badge></div>
                   </CardContent>
                 </Card>
 
@@ -181,19 +179,19 @@ export default function ProfilePage() {
                     </>
                 )}
             </div>
-            <div className="flex-grow w-full">
+            <div className="w-full flex-grow">
                 <Tabs defaultValue="likes" className="w-full">
-                    <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-3 md:grid-cols-4' : 'grid-cols-3'}`}>
+                    <TabsList className={`grid w-full ${isOwnProfile ? 'grid-cols-4' : 'grid-cols-4'}`}>
                         <TabsTrigger value="likes"><Heart className="mr-2 h-4 w-4" />Likes</TabsTrigger>
-                        <TabsTrigger value="watched"><Check className="mr-2 h-4 w-4" />Watched</TabsTrigger>
+                        <TabsTrigger value="dislikes"><ThumbsDown className="mr-2 h-4 w-4" />Dislikes</TabsTrigger>
                         <TabsTrigger value="friends"><Users className="mr-2 h-4 w-4" />Friends</TabsTrigger>
                         {isOwnProfile && <TabsTrigger value="blends"><Combine className="mr-2 h-4 w-4" />Blends</TabsTrigger>}
                     </TabsList>
                     <TabsContent value="likes" className="mt-6">
                        <ProfileLikes userId={profileUserId} />
                     </TabsContent>
-                    <TabsContent value="watched" className="mt-6">
-                       <ProfileWatched userId={profileUserId} />
+                    <TabsContent value="dislikes" className="mt-6">
+                       <ProfileDislikes userId={profileUserId} />
                     </TabsContent>
                     <TabsContent value="friends" className="mt-6">
                         <ProfileFriends userId={profileUserId} />

@@ -1,15 +1,17 @@
-
 'use client';
 
 import Image from 'next/image';
 import Link from 'next/link';
 import { Film, Tv, Star, Heart, ThumbsDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '../ui/skeleton';
-import { Checkbox } from '@/components/ui/checkbox';
 import { AddToWatchlistButton } from '../watchlists/AddToWatchlistButton';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
+
 
 interface SearchResult {
   id: number;
@@ -23,17 +25,23 @@ interface SearchResult {
   first_air_date?: string;
 }
 
-interface MovieResultCardProps {
-  item: SearchResult;
-  isWatched: boolean;
-  isLiked: boolean;
-  isDisliked: boolean;
-  onToggleWatched: (watched: boolean) => void;
-  onToggleLike: (liked: boolean) => void;
-  onToggleDislike: (disliked: boolean) => void;
+interface UserMovieData {
+  movieId: string;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  poster: string | null;
 }
 
-export function MovieResultCard({ item, isWatched, isLiked, isDisliked, onToggleWatched, onToggleLike, onToggleDislike }: MovieResultCardProps) {
+interface MovieResultCardProps {
+  item: SearchResult;
+  isLiked: boolean;
+  isDisliked: boolean;
+}
+
+export function MovieResultCard({ item, isLiked, isDisliked }: MovieResultCardProps) {
+  const { firebaseUser } = useAuth();
+  const { toast } = useToast();
+
   const title = item.title || item.name || 'Untitled';
   const releaseYear = item.release_date?.substring(0, 4) || item.first_air_date?.substring(0, 4);
   const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://placehold.co/500x750.png';
@@ -48,27 +56,77 @@ export function MovieResultCard({ item, isWatched, isLiked, isDisliked, onToggle
     release_date: item.release_date,
     first_air_date: item.first_air_date,
   };
+  
+  const handleToggleLike = async () => {
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const movieIdentifier: UserMovieData = {
+      movieId: String(item.id),
+      mediaType: item.media_type,
+      title: item.title || item.name || 'Untitled',
+      poster: item.poster_path,
+    };
+  
+    try {
+      if (!isLiked) {
+        await updateDoc(userDocRef, { 
+            likedMovies: arrayUnion(movieIdentifier),
+            dislikedMovies: arrayRemove(movieIdentifier)
+        });
+        toast({ title: 'Liked!', description: `Added "${movieIdentifier.title}" to your likes.`});
+      } else {
+        await updateDoc(userDocRef, { likedMovies: arrayRemove(movieIdentifier) });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update like status.' });
+    }
+  };
+
+  const handleToggleDislike = async () => {
+    if (!firebaseUser) return;
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const movieIdentifier: UserMovieData = {
+      movieId: String(item.id),
+      mediaType: item.media_type,
+      title: item.title || item.name || 'Untitled',
+      poster: item.poster_path,
+    };
+  
+    try {
+      if (!isDisliked) {
+        await updateDoc(userDocRef, { 
+            dislikedMovies: arrayUnion(movieIdentifier),
+            likedMovies: arrayRemove(movieIdentifier)
+        });
+        toast({ title: 'Disliked!', description: `You won't see recommendations for "${movieIdentifier.title}".`});
+      } else {
+        await updateDoc(userDocRef, { dislikedMovies: arrayRemove(movieIdentifier) });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not update dislike status.' });
+    }
+  };
 
   return (
-    <Card className="shadow-md overflow-hidden hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 flex flex-col h-full bg-card group border-border/60 hover:border-primary/40">
-      <Link href={href} className="block relative">
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        <div className="relative w-full aspect-[2/3] bg-muted overflow-hidden">
+    <Card className="flex h-full flex-col overflow-hidden border-border/60 bg-card shadow-md transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/20 group">
+      <Link href={href} className="relative block">
+        <div className="absolute inset-0 z-10 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <div className="relative aspect-[2/3] w-full overflow-hidden bg-muted">
           <Image
             src={posterUrl}
             alt={title}
             fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
             data-ai-hint="movie poster"
           />
         </div>
       </Link>
-      <CardContent className="p-3 flex flex-col flex-grow">
+      <CardContent className="flex flex-grow flex-col p-3">
         <Link href={href} className="flex-grow">
-          <h3 className="font-bold font-headline line-clamp-2 leading-tight hover:text-primary transition-colors">{title}</h3>
+          <h3 className="font-headline font-bold leading-tight line-clamp-2 transition-colors hover:text-primary">{title}</h3>
         </Link>
-        <div className="mt-auto pt-2 space-y-2">
+        <div className="mt-auto space-y-2 pt-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                     {item.media_type === 'movie' ? <Film className="h-3 w-3" /> : <Tv className="h-3 w-3" />}
@@ -80,16 +138,13 @@ export function MovieResultCard({ item, isWatched, isLiked, isDisliked, onToggle
                 </div>
             </div>
           
-            <div className="flex items-center justify-between mt-2 border-t border-border/60 pt-2">
+            <div className="flex items-center justify-between border-t border-border/60 pt-2">
                 <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleLike(!isLiked);
-                      }}
+                      onClick={handleToggleLike}
                     >
                       <Heart className={cn("h-4 w-4", isLiked ? 'text-red-500 fill-current' : 'text-muted-foreground')} />
                     </Button>
@@ -97,25 +152,10 @@ export function MovieResultCard({ item, isWatched, isLiked, isDisliked, onToggle
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleDislike(!isDisliked);
-                      }}
+                      onClick={handleToggleDislike}
                     >
                       <ThumbsDown className={cn("h-4 w-4", isDisliked ? 'text-blue-500 fill-current' : 'text-muted-foreground')} />
                     </Button>
-                    <Checkbox
-                        id={`watched-card-${item.id}`}
-                        checked={isWatched}
-                        onCheckedChange={onToggleWatched}
-                        aria-label="Mark as watched"
-                    />
-                    <label
-                        htmlFor={`watched-card-${item.id}`}
-                        className="text-xs text-muted-foreground cursor-pointer"
-                    >
-                        Watched
-                    </label>
                 </div>
                 <AddToWatchlistButton movie={movieDetails} isIconOnly={true} />
             </div>

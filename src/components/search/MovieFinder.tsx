@@ -1,16 +1,15 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { debounce } from 'lodash';
 
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, Film, Filter, X, Tv, RefreshCw } from 'lucide-react';
+import { Loader2, Search, Filter, X, RefreshCw, Heart, ThumbsDown } from 'lucide-react';
 import { MovieResultCard } from './MovieResultCard';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -56,7 +55,7 @@ interface Filters {
   genres: number[];
   platforms: number[];
   year: [number, number];
-  hideWatched: boolean;
+  hideInteracted: boolean;
   mediaType: 'all' | 'movie' | 'tv';
 }
 
@@ -66,7 +65,6 @@ const RESULTS_PER_PAGE = 10;
 export function MovieFinder() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const pathname = usePathname();
   const urlQuery = searchParams.get('query') || '';
 
   const [query, setQuery] = useState(urlQuery);
@@ -80,14 +78,13 @@ export function MovieFinder() {
     genres: [],
     platforms: [],
     year: [1980, new Date().getFullYear()],
-    hideWatched: true,
+    hideInteracted: true,
     mediaType: 'all',
   });
   
   const { toast } = useToast();
   const { firebaseUser, loading: authLoading } = useAuth();
 
-  const [watched, setWatched] = useState<UserMovieData[]>([]);
   const [liked, setLiked] = useState<UserMovieData[]>([]);
   const [disliked, setDisliked] = useState<UserMovieData[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
@@ -106,7 +103,6 @@ export function MovieFinder() {
     const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setWatched(data.watchedMovies || []);
         setLiked(data.likedMovies || []);
         setDisliked(data.dislikedMovies || []);
       }
@@ -296,80 +292,6 @@ export function MovieFinder() {
 
   }, [urlQuery, filters, loadingUserData, liked, searchMovies, fetchDiscoverData]);
 
-
-  const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
-    if (!firebaseUser) return;
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieData = results.find(r => r.id === movieId && r.media_type === mediaType);
-    if(!movieData) return;
-
-    const movieIdentifier: UserMovieData = { 
-        movieId: String(movieId), 
-        mediaType: mediaType,
-        title: movieData.title || movieData.name || 'Untitled',
-        poster: movieData.poster_path
-    };
-
-    try {
-      if (isWatched) {
-        await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
-      } else {
-        await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
-      }
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
-    }
-  };
-
-  const handleToggleLike = async (item: SearchResult, isLiked: boolean) => {
-    if (!firebaseUser) return;
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier: UserMovieData = {
-      movieId: String(item.id),
-      mediaType: item.media_type,
-      title: item.title || item.name || 'Untitled',
-      poster: item.poster_path,
-    };
-  
-    try {
-      if (isLiked) {
-        await updateDoc(userDocRef, { 
-            likedMovies: arrayUnion(movieIdentifier),
-            dislikedMovies: arrayRemove(movieIdentifier)
-        });
-        toast({ title: 'Liked!', description: `Added "${movieIdentifier.title}" to your likes.`});
-      } else {
-        await updateDoc(userDocRef, { likedMovies: arrayRemove(movieIdentifier) });
-      }
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not update like status.' });
-    }
-  };
-
-  const handleToggleDislike = async (item: SearchResult, isDisliked: boolean) => {
-    if (!firebaseUser) return;
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier: UserMovieData = {
-      movieId: String(item.id),
-      mediaType: item.media_type,
-      title: item.title || item.name || 'Untitled',
-      poster: item.poster_path,
-    };
-
-    try {
-      if (isDisliked) {
-        await updateDoc(userDocRef, {
-            dislikedMovies: arrayUnion(movieIdentifier),
-            likedMovies: arrayRemove(movieIdentifier)
-        });
-      } else {
-        await updateDoc(userDocRef, { dislikedMovies: arrayRemove(movieIdentifier) });
-      }
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not update dislike status.' });
-    }
-  };
-
   const handleFilterChange = (newFilters: Partial<Filters>) => {
     const updatedFilters = { ...filters, ...newFilters };
     setFilters(updatedFilters);
@@ -398,14 +320,12 @@ export function MovieFinder() {
 
 
   const activeFilterCount = filters.genres.length + filters.platforms.length + (filters.mediaType !== 'all' ? 1 : 0);
-  const watchedIds = new Set(watched.map(item => String(item.movieId)));
   const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
-  const dislikedIds = new Set(disliked.map(item => String(item.movieId)));
+  const dislikedIds = new Set(disliked.map(item => `${item.movieId}-${item.mediaType}`));
   
-  const filteredResults = hasSearched
-    ? results // Show all results for explicit search
-    : results.filter(movie => !dislikedIds.has(String(movie.id)) && !likedIds.has(`${movie.id}-${movie.media_type}`))
-             .filter(movie => !filters.hideWatched || !watchedIds.has(String(movie.id)));
+  const filteredResults = filters.hideInteracted 
+    ? results.filter(movie => !likedIds.has(`${movie.id}-${movie.media_type}`) && !dislikedIds.has(`${movie.id}-${movie.media_type}`))
+    : results;
   
   const visibleResults = filteredResults.slice(0, visibleResultsCount);
 
@@ -464,7 +384,7 @@ export function MovieFinder() {
                 setQuery(e.target.value);
                 debouncedSearch(e.target.value, filters);
               }}
-              className="h-14 w-full rounded-full bg-card py-3 pl-12 pr-4 text-base md:text-sm shadow-lg shadow-black/20"
+              className="h-14 w-full rounded-full bg-card py-3 pl-12 pr-4 text-base shadow-lg shadow-black/20 md:text-sm"
             />
           </div>
         </form>
@@ -530,8 +450,8 @@ export function MovieFinder() {
             </Popover>
 
             <div className="flex items-center space-x-2">
-                <Switch id="hide-watched" checked={filters.hideWatched} onCheckedChange={(checked) => handleFilterChange({ hideWatched: checked })} disabled={isLoading} />
-                <Label htmlFor="hide-watched">Hide Watched</Label>
+                <Switch id="hide-interacted" checked={filters.hideInteracted} onCheckedChange={(checked) => handleFilterChange({ hideInteracted: checked })} disabled={isLoading} />
+                <Label htmlFor="hide-interacted">Hide Liked/Disliked</Label>
             </div>
         </div>
       </div>
@@ -549,17 +469,13 @@ export function MovieFinder() {
 
       {visibleResults.length > 0 && (
          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {visibleResults.map((item) => (
                     <MovieResultCard
                         key={`${item.id}-${item.media_type}`}
                         item={item}
-                        isWatched={watchedIds.has(String(item.id))}
                         isLiked={likedIds.has(`${item.id}-${item.media_type}`)}
-                        isDisliked={dislikedIds.has(String(item.id))}
-                        onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
-                        onToggleLike={(isLiked) => handleToggleLike(item, isLiked)}
-                        onToggleDislike={(isDisliked) => handleToggleDislike(item, isDisliked)}
+                        isDisliked={dislikedIds.has(`${item.id}-${item.media_type}`)}
                     />
                 ))}
             </div>

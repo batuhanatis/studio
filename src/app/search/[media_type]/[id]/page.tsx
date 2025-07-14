@@ -1,22 +1,19 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Star, Eye, Heart, ThumbsDown } from 'lucide-react';
+import { ArrowLeft, Star, Heart, ThumbsDown } from 'lucide-react';
 import Image from 'next/image';
 import { AddToWatchlistButton } from '@/components/watchlists/AddToWatchlistButton';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { Card } from '@/components/ui/card';
 import { SendRecommendationButton } from '@/components/recommendations/SendRecommendationButton';
 import { cn } from '@/lib/utils';
 
@@ -46,7 +43,6 @@ export default function DetailPage() {
   const [platforms, setPlatforms] = useState<WatchProvider[] | null>(null);
   const [loading, setLoading] = useState(true);
   
-  const [isWatched, setIsWatched] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [isDisliked, setIsDisliked] = useState(false);
   const [loadingUserData, setLoadingUserData] = useState(true);
@@ -100,10 +96,8 @@ export default function DetailPage() {
         if (docSnap.exists()) {
             const data = docSnap.data();
             const movieIdentifier = `${id}-${media_type}`;
-            const watchedMovie = (data.watchedMovies || []).some((m: any) => `${m.movieId}-${m.mediaType}` === movieIdentifier);
             const likedMovie = (data.likedMovies || []).some((m: any) => `${m.movieId}-${m.mediaType}` === movieIdentifier);
             const dislikedMovie = (data.dislikedMovies || []).some((m: any) => `${m.movieId}-${m.mediaType}` === movieIdentifier);
-            setIsWatched(watchedMovie);
             setIsLiked(likedMovie);
             setIsDisliked(dislikedMovie);
         }
@@ -117,28 +111,6 @@ export default function DetailPage() {
     return () => unsubscribe();
   }, [firebaseUser, id, media_type, toast, authLoading]);
   
-  const handleToggleWatched = async (watched: boolean) => {
-    if (!firebaseUser || !details) return;
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier = { 
-        movieId: id, 
-        mediaType: media_type, 
-        title: details.title || details.name,
-        poster: details.poster_path
-    };
-
-    try {
-      if (watched) {
-        await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
-      } else {
-        await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
-      }
-    } catch (error) {
-        console.error("Toggle watched failed: ", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
-    }
-  };
-
   const handleToggleLike = async () => {
     if (!firebaseUser || !details) return;
     const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -219,7 +191,7 @@ export default function DetailPage() {
 
         {loading ? (
             <div className="flex flex-col gap-8 md:flex-row md:gap-12">
-                <Skeleton className="relative aspect-[2/3] w-full md:w-64 flex-shrink-0 rounded-lg" />
+                <Skeleton className="relative aspect-[2/3] w-full flex-shrink-0 rounded-lg md:w-64" />
                 <div className="flex-grow space-y-4">
                     <Skeleton className="h-10 w-3/4" />
                     <Skeleton className="h-5 w-1/2" />
@@ -257,16 +229,16 @@ export default function DetailPage() {
                             </>
                         )}
                     </div>
-                    <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl mt-1">{title}</h1>
+                    <h1 className="mt-1 text-3xl font-bold tracking-tight font-headline md:text-4xl">{title}</h1>
                     
-                    <div className="mt-4 flex flex-wrap items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-4 mt-4">
                         {details.genres.map((genre: Genre) => (
                             <Badge key={genre.id} variant="secondary">{genre.name}</Badge>
                         ))}
                     </div>
 
                     <div className="flex items-center gap-2 mt-4">
-                        <Star className="h-6 w-6 text-accent fill-accent md:h-7 md:w-7" />
+                        <Star className="w-6 h-6 text-accent md:h-7 md:w-7 fill-accent" />
                         <span className="text-2xl font-bold text-foreground md:text-3xl">{details.vote_average.toFixed(1)}</span>
                         <span className="text-base text-foreground/80">/ 10</span>
                     </div>
@@ -274,64 +246,37 @@ export default function DetailPage() {
                     <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{details.overview || 'No description available.'}</p>
                     
                     <div className="mt-6 space-y-4">
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={handleToggleLike}
-                            disabled={loadingUserData}
-                            aria-label="Like or unlike"
-                        >
-                            <Heart className={cn("h-5 w-5", isLiked ? 'text-red-500 fill-current' : 'text-muted-foreground')} />
-                        </Button>
-                         <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={handleToggleDislike}
-                            disabled={loadingUserData}
-                            aria-label="Dislike or un-dislike"
-                        >
-                            <ThumbsDown className={cn("h-5 w-5", isDisliked ? 'text-blue-500 fill-current' : 'text-muted-foreground')} />
-                        </Button>
-                        {movieDetailsForButton && <AddToWatchlistButton movie={{...movieDetailsForButton, id: Number(id), release_date: details.release_date, first_air_date: details.first_air_date, vote_average: details.vote_average}} />}
-                        {movieDetailsForButton && <SendRecommendationButton movie={{...movieDetailsForButton, id: String(id)}} />}
-                    </div>
-
-                    <Card>
-                        <CardContent className="space-y-4 p-4">
-                        {authLoading || loadingUserData ? (
-                            <div className="flex justify-center items-center h-10">
-                                <Loader2 className="animate-spin text-primary" />
-                            </div>
-                        ) : (
-                            <>
-                            <div className="flex items-center space-x-2">
-                                <Checkbox
-                                id={`watched-detail-${id}`}
-                                checked={isWatched}
-                                onCheckedChange={handleToggleWatched}
-                                />
-                                <label
-                                htmlFor={`watched-detail-${id}`}
-                                className="flex cursor-pointer items-center gap-2 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                <Eye className="h-4 w-4" />
-                                Mark as Watched
-                                </label>
-                            </div>
-                            </>
-                        )}
-                        </CardContent>
-                    </Card>
+                      <div className="flex gap-2">
+                          <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={handleToggleLike}
+                              disabled={loadingUserData}
+                              aria-label="Like or unlike"
+                          >
+                              <Heart className={cn("h-5 w-5", isLiked ? 'text-red-500 fill-current' : 'text-muted-foreground')} />
+                          </Button>
+                          <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={handleToggleDislike}
+                              disabled={loadingUserData}
+                              aria-label="Dislike or un-dislike"
+                          >
+                              <ThumbsDown className={cn("h-5 w-5", isDisliked ? 'text-blue-500 fill-current' : 'text-muted-foreground')} />
+                          </Button>
+                          {movieDetailsForButton && <AddToWatchlistButton movie={{...movieDetailsForButton, id: Number(id), release_date: details.release_date, first_air_date: details.first_air_date, vote_average: details.vote_average}} />}
+                          {movieDetailsForButton && <SendRecommendationButton movie={{...movieDetailsForButton, id: String(id)}} />}
+                      </div>
                     </div>
                     
                     {platforms && platforms.length > 0 && (
                         <div className="mt-8">
                             <h2 className="text-xl font-bold font-headline">Watch in Türkiye</h2>
-                            <div className="mt-4 grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-5">
+                            <div className="grid grid-cols-3 gap-4 mt-4 sm:grid-cols-4 md:grid-cols-5">
                             {platforms.map((p) => (
                                 <div key={p.provider_id} className="flex flex-col items-center gap-2 text-center">
-                                <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-secondary/50 shadow-sm">
+                                <div className="relative w-16 h-16 overflow-hidden rounded-lg shadow-sm bg-secondary/50">
                                     <Image
                                     src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
                                     alt={`${p.provider_name} logo`}

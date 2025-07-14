@@ -1,19 +1,16 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { MovieResultCard } from '@/components/search/MovieResultCard';
-import { Loader2, Film, Wand2, ArrowLeft, Heart, ThumbsDown } from 'lucide-react';
+import { Loader2, Film, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { getWatchlistRecommendations } from '@/ai/flows/watchlist-recommendations';
-
-const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
 interface MovieDetails {
   id: number;
@@ -39,12 +36,6 @@ interface UserMovieData {
   mediaType: 'movie' | 'tv';
 }
 
-interface MovieApiResult extends MovieDetails {
-    name?: string;
-    popularity: number;
-    genre_ids: number[];
-}
-
 export function WatchlistDetail({ listId }: { listId: string }) {
   const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -55,7 +46,6 @@ export function WatchlistDetail({ listId }: { listId: string }) {
   const [allRecommendations, setAllRecommendations] = useState<MovieDetails[]>([]);
   const [visibleRecommendationsCount, setVisibleRecommendationsCount] = useState(5);
   
-  const [watched, setWatched] = useState<UserMovieData[]>([]);
   const [liked, setLiked] = useState<UserMovieData[]>([]);
   const [disliked, setDisliked] = useState<UserMovieData[]>([]);
 
@@ -66,7 +56,6 @@ export function WatchlistDetail({ listId }: { listId: string }) {
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
-            setWatched(data.watchedMovies || []);
             setLiked(data.likedMovies || []);
             setDisliked(data.dislikedMovies || []);
         }
@@ -102,7 +91,7 @@ export function WatchlistDetail({ listId }: { listId: string }) {
   
   const searchMovieByTitle = useCallback(async (title: string): Promise<MovieDetails | null> => {
      try {
-        const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=${API_KEY}&query=${encodeURIComponent(title)}`);
+        const res = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=a13668181ace74d6999323ca0c6defbe&query=${encodeURIComponent(title)}`);
         if (!res.ok) return null;
         const data = await res.json();
         const result = (data.results || []).find((item: any) => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path);
@@ -148,94 +137,19 @@ export function WatchlistDetail({ listId }: { listId: string }) {
 
   }, [watchlist, searchMovieByTitle, toast]);
 
-
-  const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
-    if (!firebaseUser) return;
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieData = watchlist?.movies.find(r => r.id === movieId && r.media_type === mediaType);
-    if (!movieData) return;
-
-    const movieIdentifier = { 
-        movieId: String(movieId), 
-        mediaType: mediaType,
-        title: movieData.title,
-        poster: movieData.poster_path || movieData.poster
-    };
-
-    try {
-      if (isWatched) {
-        await updateDoc(userDocRef, { watchedMovies: arrayUnion(movieIdentifier) });
-      } else {
-        await updateDoc(userDocRef, { watchedMovies: arrayRemove(movieIdentifier) });
-      }
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
-    }
-  };
-
-  const handleToggleLike = async (item: MovieDetails, isLiked: boolean) => {
-    if (!firebaseUser) return;
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier = {
-      movieId: String(item.id),
-      mediaType: item.media_type,
-      title: item.title,
-      poster: item.poster_path || item.poster,
-    };
-  
-    try {
-      if (isLiked) {
-        await updateDoc(userDocRef, { 
-            likedMovies: arrayUnion(movieIdentifier),
-            dislikedMovies: arrayRemove(movieIdentifier)
-        });
-        toast({ title: 'Liked!', description: `Added "${movieIdentifier.title}" to your likes.`});
-      } else {
-        await updateDoc(userDocRef, { likedMovies: arrayRemove(movieIdentifier) });
-      }
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not update like status.' });
-    }
-  };
-
-  const handleToggleDislike = async (item: MovieDetails, isDisliked: boolean) => {
-    if (!firebaseUser) return;
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier = {
-      movieId: String(item.id),
-      mediaType: item.media_type,
-      title: item.title,
-      poster: item.poster_path || item.poster,
-    };
-
-    try {
-      if (isDisliked) {
-        await updateDoc(userDocRef, {
-            dislikedMovies: arrayUnion(movieIdentifier),
-            likedMovies: arrayRemove(movieIdentifier)
-        });
-      } else {
-        await updateDoc(userDocRef, { dislikedMovies: arrayRemove(movieIdentifier) });
-      }
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not update dislike status.' });
-    }
-  };
-
-  const watchedIds = new Set(watched.map(item => String(item.movieId)));
   const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
-  const dislikedIds = new Set(disliked.map(item => String(item.movieId)));
+  const dislikedIds = new Set(disliked.map(item => `${item.movieId}-${item.mediaType}`));
   
   if (loading.list || authLoading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
   
   if (error) {
-    return <div className="text-center py-12 text-destructive">{error}</div>;
+    return <div className="py-12 text-center text-destructive">{error}</div>;
   }
 
   if (!watchlist) {
-    return <div className="text-center py-12 text-muted-foreground">Watchlist not found.</div>;
+    return <div className="py-12 text-center text-muted-foreground">Watchlist not found.</div>;
   }
 
   const visibleRecommendations = allRecommendations.slice(0, visibleRecommendationsCount);
@@ -246,59 +160,51 @@ export function WatchlistDetail({ listId }: { listId: string }) {
         <Button asChild variant="outline" size="sm" className="mb-4">
           <Link href="/watchlists"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Watchlists</Link>
         </Button>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                 <h1 className="text-3xl font-bold font-headline tracking-tight md:text-4xl">{watchlist.name}</h1>
-                 <p className="mt-2 text-md md:text-lg text-muted-foreground">{watchlist.movies.length} {watchlist.movies.length === 1 ? 'item' : 'items'}</p>
+                 <h1 className="text-3xl font-bold tracking-tight font-headline md:text-4xl">{watchlist.name}</h1>
+                 <p className="mt-2 text-md text-muted-foreground md:text-lg">{watchlist.movies.length} {watchlist.movies.length === 1 ? 'item' : 'items'}</p>
             </div>
         </div>
       </div>
       
       {watchlist.movies.length === 0 ? (
-        <div className="pt-8 text-center text-muted-foreground flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-4 pt-8 text-center text-muted-foreground">
             <Film className="h-16 w-16" />
             <p className="text-lg">This list is empty</p>
             <p className="text-sm">Add movies and shows from the Search page.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {watchlist.movies.map((item) => (
             <MovieResultCard
               key={`${item.id}-${item.media_type}`}
               item={{...item, poster_path: item.poster || item.poster_path}}
-              isWatched={watchedIds.has(String(item.id))}
               isLiked={likedIds.has(`${item.id}-${item.media_type}`)}
-              isDisliked={dislikedIds.has(String(item.id))}
-              onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
-              onToggleLike={(isLiked) => handleToggleLike(item, isLiked)}
-              onToggleDislike={(isDisliked) => handleToggleDislike(item, isDisliked)}
+              isDisliked={dislikedIds.has(`${item.id}-${item.media_type}`)}
             />
           ))}
         </div>
       )}
 
       {loading.recommendations ? (
-        <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
+        <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin" /></div>
       ) : allRecommendations.length > 0 && (
-        <div className="space-y-6 pt-8">
+        <div className="pt-8 space-y-6">
             <Separator />
             <h2 className="text-2xl font-bold font-headline">AI Recommendations for You</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {visibleRecommendations.map((item) => (
                 <MovieResultCard
-                key={`${item.id}-${item.media_type}`}
-                item={item}
-                isWatched={watchedIds.has(String(item.id))}
-                isLiked={likedIds.has(`${item.id}-${item.media_type}`)}
-                isDisliked={dislikedIds.has(String(item.id))}
-                onToggleWatched={(isWatched) => handleToggleWatched(item.id, item.media_type, isWatched)}
-                onToggleLike={(isLiked) => handleToggleLike(item, isLiked)}
-                onToggleDislike={(isDisliked) => handleToggleDislike(item, isDisliked)}
+                  key={`${item.id}-${item.media_type}`}
+                  item={item}
+                  isLiked={likedIds.has(`${item.id}-${item.media_type}`)}
+                  isDisliked={dislikedIds.has(`${item.id}-${item.media_type}`)}
                 />
             ))}
             </div>
             {visibleRecommendationsCount < allRecommendations.length && (
-                <div className="text-center mt-6">
+                <div className="mt-6 text-center">
                     <Button
                         variant="secondary"
                         onClick={() => setVisibleRecommendationsCount(prev => prev + 5)}

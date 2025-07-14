@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
@@ -49,7 +48,6 @@ function DiscoverFeedContent() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [userWatched, setUserWatched] = useState<UserMovieData[]>([]);
   
   const [lastSwipedMovie, setLastSwipedMovie] = useState<{movie: Movie; direction: 'left' | 'right' } | null>(null);
   
@@ -78,11 +76,9 @@ function DiscoverFeedContent() {
             const data = userDoc.data();
             const likedMovies = data.likedMovies || [];
             const disliked = data.dislikedMovies || [];
-            const watched = data.watchedMovies || [];
             seenMovieIds = new Set([
                 ...likedMovies.map((m: any) => m.movieId), 
-                ...disliked.map((m: any) => m.movieId), 
-                ...watched.map((m: any) => m.movieId)
+                ...disliked.map((m: any) => m.movieId)
             ]);
         }
     } catch {}
@@ -166,65 +162,41 @@ function DiscoverFeedContent() {
     fetchMovies(true);
   }, [triggerFetch, firebaseUser]); // Re-fetch when user changes
 
-  useEffect(() => {
-    if (!firebaseUser) return;
-    const ref = doc(db, 'users', firebaseUser.uid);
-    const unsub = onSnapshot(ref, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setUserWatched(data.watchedMovies || []);
-      }
-    });
-    return () => unsub();
-  }, [firebaseUser]);
-
-  const handleLikeMovie = async (movie: Movie) => {
+  const handleInteraction = async (movie: Movie, type: 'like' | 'dislike') => {
     if (!firebaseUser) return;
     const ref = doc(db, 'users', firebaseUser.uid);
     try {
-      const newLike: UserMovieData = {
+      const interactionData: UserMovieData = {
         movieId: String(movie.id),
         mediaType: movie.media_type,
         title: movie.title || movie.name || 'Untitled',
         poster: movie.poster_path,
       };
-      
-      await updateDoc(ref, { 
-          likedMovies: arrayUnion(newLike),
-          dislikedMovies: arrayRemove(newLike)
-      });
-      toast({ title: 'Liked!', description: `Added "${newLike.title}" to your likes.`});
 
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Like failed', description: e.message });
-    }
-  };
-
-  const handleToggleWatched = async (movie: Movie, watched: boolean) => {
-    if (!firebaseUser) return;
-    const ref = doc(db, 'users', firebaseUser.uid);
-    const movieIdentifier: UserMovieData = {
-        movieId: String(movie.id),
-        mediaType: movie.media_type,
-        title: movie.title || movie.name || 'Untitled',
-        poster: movie.poster_path
-    };
-
-    try {
-      if (watched) {
-        await updateDoc(ref, { watchedMovies: arrayUnion(movieIdentifier) });
-      } else {
-        await updateDoc(ref, { watchedMovies: arrayRemove(movieIdentifier) });
+      if (type === 'like') {
+        await updateDoc(ref, { 
+            likedMovies: arrayUnion(interactionData),
+            dislikedMovies: arrayRemove(interactionData)
+        });
+        toast({ title: 'Liked!', description: `Added "${interactionData.title}" to your likes.`});
+      } else { // 'dislike'
+        await updateDoc(ref, { 
+            dislikedMovies: arrayUnion(interactionData),
+            likedMovies: arrayRemove(interactionData)
+        });
       }
+
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not update watched status.' });
+      toast({ variant: 'destructive', title: 'Action failed', description: e.message });
     }
   };
 
   const swiped = (direction: 'left' | 'right', movie: Movie) => {
     setLastSwipedMovie({movie, direction});
     if (direction === 'right') {
-      handleLikeMovie(movie);
+      handleInteraction(movie, 'like');
+    } else {
+      handleInteraction(movie, 'dislike');
     }
 
     setMovies((prevMovies) => prevMovies.filter(m => m.id !== movie.id));
@@ -249,8 +221,8 @@ function DiscoverFeedContent() {
   const restoreCard = async () => {
     if(lastSwipedMovie) {
         const { movie, direction } = lastSwipedMovie;
-        // Undo the like if it was a right swipe
-        if (direction === 'right' && firebaseUser) {
+        // Undo the like/dislike
+        if (firebaseUser) {
             const ref = doc(db, 'users', firebaseUser.uid);
             const movieIdentifier = {
                 movieId: String(movie.id),
@@ -259,8 +231,13 @@ function DiscoverFeedContent() {
                 poster: movie.poster_path,
             };
             try {
-                await updateDoc(ref, { likedMovies: arrayRemove(movieIdentifier) });
-                toast({ title: 'Like Undone' });
+                if (direction === 'right') {
+                    await updateDoc(ref, { likedMovies: arrayRemove(movieIdentifier) });
+                    toast({ title: 'Like Undone' });
+                } else {
+                     await updateDoc(ref, { dislikedMovies: arrayRemove(movieIdentifier) });
+                     toast({ title: 'Dislike Undone' });
+                }
             } catch (e) {
                 // handle error if needed
             }
@@ -280,9 +257,9 @@ function DiscoverFeedContent() {
   const renderContent = () => {
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center text-center h-full">
+            <div className="flex flex-col items-center justify-center h-full text-center">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="text-lg text-muted-foreground mt-4">Finding new titles...</p>
+                <p className="mt-4 text-lg text-muted-foreground">Finding new titles...</p>
             </div>
         );
     }
@@ -290,14 +267,14 @@ function DiscoverFeedContent() {
     if (movies.length === 0) {
         if (loadingMore) {
             return (
-                <div className="flex flex-col items-center justify-center text-center h-full">
+                <div className="flex flex-col items-center justify-center h-full text-center">
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                    <p className="text-lg text-muted-foreground mt-4">Finding more titles...</p>
+                    <p className="mt-4 text-lg text-muted-foreground">Finding more titles...</p>
                 </div>
             );
         }
         return (
-            <div className="flex flex-col items-center justify-center text-center h-full">
+            <div className="flex flex-col items-center justify-center h-full text-center">
                 <p className="text-lg text-muted-foreground">You've seen everything for now!</p>
                 <Button onClick={() => setTriggerFetch(c => c + 1)} className="mt-4"><RefreshCw className="mr-2 h-4 w-4" /> Reload</Button>
             </div>
@@ -306,7 +283,6 @@ function DiscoverFeedContent() {
 
     return movies.map((movie, index) => {
         const isTopCard = index === movies.length - 1;
-        const isWatched = userWatched.some(w => w.movieId === String(movie.id));
         
         return (
             <TinderCard
@@ -320,9 +296,7 @@ function DiscoverFeedContent() {
             >
                 <DiscoverCard
                     movie={movie}
-                    isWatched={isWatched}
                     platforms={isTopCard ? platforms : undefined}
-                    onToggleWatched={(watched) => handleToggleWatched(movie, watched)}
                     swipeDirection={isTopCard ? swipeDirection : null}
                     swipeOpacity={isTopCard ? swipeOpacity : 0}
                 />
@@ -334,21 +308,21 @@ function DiscoverFeedContent() {
   const isNewUser = searchParams.get('new_user') === 'true';
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col w-full h-full">
       {isNewUser && <NewUserOnboarding />}
       <div className="relative flex-grow w-full max-w-lg mx-auto aspect-[3/5]">
         {renderContent()}
       </div>
 
-      <div className="flex justify-center items-center gap-6 py-4 flex-shrink-0">
-        <Button variant="outline" size="icon" className="h-16 w-16 rounded-full border-2 border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/20" onClick={() => swipe('left')} disabled={movies.length === 0}>
-            <XIcon className="h-8 w-8" />
+      <div className="flex items-center justify-center flex-shrink-0 gap-6 py-4">
+        <Button variant="outline" size="icon" className="w-16 h-16 rounded-full border-2 border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/20" onClick={() => swipe('left')} disabled={movies.length === 0}>
+            <XIcon className="w-8 h-8" />
         </Button>
-        <Button variant="outline" size="icon" className="h-12 w-12 rounded-full border-2" onClick={restoreCard} disabled={!lastSwipedMovie}>
-            <Undo className="h-6 w-6" />
+        <Button variant="outline" size="icon" className="w-12 h-12 rounded-full border-2" onClick={restoreCard} disabled={!lastSwipedMovie}>
+            <Undo className="w-6 h-6" />
         </Button>
-        <Button variant="outline" size="icon" className="h-16 w-16 rounded-full border-2 border-green-500/50 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => swipe('right')} disabled={movies.length === 0}>
-            <Heart className="h-8 w-8" />
+        <Button variant="outline" size="icon" className="w-16 h-16 rounded-full border-2 border-green-500/50 bg-green-500/10 text-green-600 hover:bg-green-500/20" onClick={() => swipe('right')} disabled={movies.length === 0}>
+            <Heart className="w-8 h-8" />
         </Button>
       </div>
     </div>

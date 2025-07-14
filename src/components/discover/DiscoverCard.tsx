@@ -1,24 +1,20 @@
-
 'use client';
 
 import React, { forwardRef } from 'react';
 import Image from 'next/image';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Eye, Star, ListPlus } from 'lucide-react';
+import { Star, ListPlus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { AddToWatchlistButton } from '../watchlists/AddToWatchlistButton';
 import { Separator } from '../ui/separator';
 
 interface DiscoverCardProps {
     movie: any;
-    isWatched?: boolean;
     platforms?: any[];
-    onToggleWatched: (watched: boolean) => void;
     swipeDirection: 'left' | 'right' | null;
     swipeOpacity: number;
 }
 
-export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(function DiscoverCard({ movie, isWatched = false, platforms, onToggleWatched, swipeDirection, swipeOpacity }, ref) {
+export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(function DiscoverCard({ movie, platforms, swipeDirection, swipeOpacity }, ref) {
 
   if (!movie) return null;
 
@@ -39,9 +35,9 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
   return (
     <Card
       ref={ref}
-      className="h-full w-full overflow-y-auto bg-card shadow-2xl scrollbar-hide"
+      className="w-full h-full overflow-y-auto shadow-2xl bg-card scrollbar-hide"
     >
-      <div className="relative aspect-[2/3] w-full flex-shrink-0">
+      <div className="relative flex-shrink-0 w-full aspect-[2/3]">
         <Image
           src={posterUrl}
           alt={title}
@@ -58,40 +54,34 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
           style={{ opacity: swipeOpacity }}
         >
           {swipeDirection === 'right' && (
-            <div className="transform -rotate-12 rounded-lg border-4 border-green-500 bg-green-500/10 px-6 py-3 font-bold text-green-500 text-4xl md:px-8 md:py-4 md:text-5xl tracking-widest">
+            <div className="px-6 py-3 font-bold tracking-widest text-green-500 transform border-4 border-green-500 rounded-lg -rotate-12 bg-green-500/10 text-4xl md:px-8 md:py-4 md:text-5xl">
               LIKE
             </div>
           )}
           {swipeDirection === 'left' && (
-            <div className="transform rotate-12 rounded-lg border-4 border-destructive bg-destructive/10 px-6 py-3 font-bold text-destructive text-4xl md:px-8 md:py-4 md:text-5xl tracking-widest">
+            <div className="px-6 py-3 font-bold tracking-widest text-destructive transform border-4 border-destructive rounded-lg rotate-12 bg-destructive/10 text-4xl md:px-8 md:py-4 md:text-5xl">
               NOPE
             </div>
           )}
         </div>
       </div>
 
-      <div className="w-full bg-card p-4 text-white">
-        <h1 className="text-2xl md:text-3xl font-bold font-headline mb-1">{title}</h1>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+      <div className="w-full p-4 text-white bg-card">
+        <h1 className="mb-1 text-2xl font-bold md:text-3xl font-headline">{title}</h1>
+        <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
             <span>{year}</span>
             <div className="flex items-center gap-1.5 text-foreground">
-                <Star className="h-4 w-4 md:h-5 md:w-5 text-accent fill-accent" />
-                <span className="font-bold text-base md:text-lg">{movie.vote_average.toFixed(1)}</span>
+                <Star className="w-4 h-4 text-accent md:h-5 md:w-5 fill-accent" />
+                <span className="text-base font-bold md:text-lg">{movie.vote_average.toFixed(1)}</span>
                 <span className="text-sm text-muted-foreground">/ 10</span>
             </div>
         </div>
 
-        <p className="text-base leading-relaxed line-clamp-4 text-foreground/80">{movie.overview}</p>
+        <p className="text-base leading-relaxed text-foreground/80 line-clamp-4">{movie.overview}</p>
 
-        <div className="space-y-4 pt-6">
+        <div className="pt-6 space-y-4">
           <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Checkbox id={`watched-${movie.id}`} checked={isWatched} onCheckedChange={onToggleWatched} />
-                <label htmlFor={`watched-${movie.id}`} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                  <Eye className="w-4 h-4" /> Watched
-                </label>
-              </div>
-              <AddToWatchlistButton movie={movieDetailsForButton} isIconOnly />
+              <AddToWatchlistButton movie={movieDetailsForButton} />
           </div>
         </div>
         
@@ -99,11 +89,11 @@ export const DiscoverCard = forwardRef<HTMLDivElement, DiscoverCardProps>(functi
             <div className="pt-6">
                 <Separator />
                 <div className="mt-4">
-                    <h2 className="text-sm font-semibold text-muted-foreground mb-3">Available on</h2>
+                    <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Available on</h2>
                     <div className="flex flex-wrap gap-3">
                     {platforms.map((p) => (
-                        <div key={p.provider_id} className="flex flex-col items-center gap-2 text-center w-16">
-                            <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-secondary/50 shadow-sm">
+                        <div key={p.provider_id} className="flex flex-col items-center w-16 gap-2 text-center">
+                            <div className="relative w-12 h-12 overflow-hidden rounded-lg shadow-sm bg-secondary/50">
                                 <Image
                                 src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
                                 alt={`${p.provider_name} logo`}
