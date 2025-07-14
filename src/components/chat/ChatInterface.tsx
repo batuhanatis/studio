@@ -155,7 +155,7 @@ export function ChatInterface({ chatId, recipientId }: ChatInterfaceProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Chat Header */}
-      <div className="flex items-center gap-4 border-b p-3">
+      <div className="flex flex-shrink-0 items-center gap-4 border-b p-3">
         <Button asChild variant="ghost" size="icon" className="md:hidden">
             <Link href="/chat"><ArrowLeft/></Link>
         </Button>
@@ -170,62 +170,64 @@ export function ChatInterface({ chatId, recipientId }: ChatInterfaceProps) {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {messages.map((msg, index) => {
-          const isSender = msg.senderId === firebaseUser?.uid;
-          const showAvatar = index === messages.length - 1 || messages[index + 1]?.senderId !== msg.senderId;
+      <div className="flex-grow overflow-y-auto p-4">
+        <div className="flex-1 space-y-4">
+            {messages.map((msg, index) => {
+            const isSender = msg.senderId === firebaseUser?.uid;
+            const showAvatar = index === messages.length - 1 || messages[index + 1]?.senderId !== msg.senderId;
 
-          if (msg.type === 'recommendation' && msg.movie) {
-             const movie = msg.movie;
-             const href = `/search/${movie.mediaType}/${movie.id}`;
-             const posterUrl = movie.poster ? `https://image.tmdb.org/t/p/w200${movie.poster}` : 'https://placehold.co/200x300.png';
-             return (
-                 <div key={msg.id} className={cn('flex items-end gap-2 my-2', isSender ? 'justify-end' : 'justify-start')}>
-                     <Card className="max-w-xs p-2 bg-secondary">
-                        <p className="text-sm text-muted-foreground px-1 pb-2">{isSender ? "You recommended:" : `${recipient?.username} recommended:`}</p>
-                        <Link href={href} className="group flex items-start gap-3">
-                             <div className="relative w-20 aspect-[2/3] bg-muted rounded-md overflow-hidden flex-shrink-0">
-                                <Image src={posterUrl} alt={movie.title} fill className="object-cover" sizes="80px" />
-                             </div>
-                             <div>
-                                <h4 className="font-semibold text-sm mb-1 group-hover:underline">{movie.title}</h4>
-                                <p className="text-xs text-muted-foreground">{movie.mediaType === 'movie' ? 'Movie' : 'TV Show'}</p>
-                             </div>
-                        </Link>
-                     </Card>
-                 </div>
-             )
-          }
+            if (msg.type === 'recommendation' && msg.movie) {
+                const movie = msg.movie;
+                const href = `/search/${movie.mediaType}/${movie.id}`;
+                const posterUrl = movie.poster ? `https://image.tmdb.org/t/p/w200${movie.poster}` : 'https://placehold.co/200x300.png';
+                return (
+                    <div key={msg.id} className={cn('flex items-end gap-2 my-2', isSender ? 'justify-end' : 'justify-start')}>
+                        <Card className="max-w-xs p-2 bg-secondary">
+                            <p className="text-sm text-muted-foreground px-1 pb-2">{isSender ? "You recommended:" : `${recipient?.username} recommended:`}</p>
+                            <Link href={href} className="group flex items-start gap-3">
+                                <div className="relative w-20 aspect-[2/3] bg-muted rounded-md overflow-hidden flex-shrink-0">
+                                    <Image src={posterUrl} alt={movie.title} fill className="object-cover" sizes="80px" />
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-sm mb-1 group-hover:underline">{movie.title}</h4>
+                                    <p className="text-xs text-muted-foreground">{movie.mediaType === 'movie' ? 'Movie' : 'TV Show'}</p>
+                                </div>
+                            </Link>
+                        </Card>
+                    </div>
+                )
+            }
 
-          return (
-            <div key={msg.id} className={cn('flex items-end gap-2 my-1', isSender ? 'justify-end' : 'justify-start')}>
-              {/* Other user's avatar */}
-              {!isSender && (
-                 <div className="w-8">
-                    {showAvatar && (
-                        <Avatar className="h-8 w-8">
-                            {recipient?.photoURL && <AvatarImage src={recipient.photoURL} />}
-                            <AvatarFallback>{getInitials(recipient?.username)}</AvatarFallback>
-                        </Avatar>
-                    )}
-                 </div>
-              )}
-              <div
-                className={cn(
-                  'max-w-xs rounded-lg px-4 py-2 break-words',
-                  isSender ? 'bg-primary text-primary-foreground' : 'bg-secondary'
+            return (
+                <div key={msg.id} className={cn('flex items-end gap-2 my-1', isSender ? 'justify-end' : 'justify-start')}>
+                {/* Other user's avatar */}
+                {!isSender && (
+                    <div className="w-8">
+                        {showAvatar && (
+                            <Avatar className="h-8 w-8">
+                                {recipient?.photoURL && <AvatarImage src={recipient.photoURL} />}
+                                <AvatarFallback>{getInitials(recipient?.username)}</AvatarFallback>
+                            </Avatar>
+                        )}
+                    </div>
                 )}
-              >
-                {msg.text}
-              </div>
-            </div>
-          );
-        })}
-        <div ref={messagesEndRef} />
+                <div
+                    className={cn(
+                    'max-w-xs rounded-lg px-4 py-2 break-words',
+                    isSender ? 'bg-primary text-primary-foreground' : 'bg-secondary'
+                    )}
+                >
+                    {msg.text}
+                </div>
+                </div>
+            );
+            })}
+            <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Message Input */}
-      <div className="border-t p-4">
+      <div className="flex-shrink-0 border-t p-4 bg-background">
         <form onSubmit={handleSendMessage} className="flex items-center gap-2">
           <Input
             value={newMessage}
