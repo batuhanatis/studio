@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
@@ -10,6 +10,8 @@ import { Heart, X as XIcon, RefreshCw, Loader2, Undo } from 'lucide-react';
 import TinderCard from 'react-tinder-card';
 import { DiscoverCard } from './DiscoverCard';
 import { Button } from '@/components/ui/button';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { NewUserOnboarding } from './NewUserOnboarding';
 
 const API_KEY = 'a13668181ace74d6999323ca0c6defbe';
 
@@ -38,9 +40,11 @@ interface UserMovieData {
   poster: string | null;
 }
 
-export function DiscoverFeed() {
+function DiscoverFeedContent() {
   const { firebaseUser, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
@@ -327,8 +331,11 @@ export function DiscoverFeed() {
     });
   }
 
+  const isNewUser = searchParams.get('new_user') === 'true';
+
   return (
     <div className="flex flex-col h-full w-full">
+      {isNewUser && <NewUserOnboarding />}
       <div className="relative flex-grow w-full max-w-lg mx-auto aspect-[3/5]">
         {renderContent()}
       </div>
@@ -346,4 +353,12 @@ export function DiscoverFeed() {
       </div>
     </div>
   );
+}
+
+export function DiscoverFeed() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <DiscoverFeedContent />
+        </Suspense>
+    )
 }

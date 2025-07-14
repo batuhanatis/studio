@@ -105,7 +105,7 @@ export function RegisterForm() {
         title: 'Account Created!',
         description: 'Your progress is now saved to your new account.',
       });
-      router.push('/search');
+      router.push('/discover?new_user=true');
     } catch (error: any) {
       let title = 'Registration Failed';
       let description = 'An unexpected error occurred. Please try again.';
@@ -149,7 +149,7 @@ export function RegisterForm() {
             isAnonymous: false,
         });
         toast({ title: 'Account Created!', description: 'Your progress is now saved to your Google account.' });
-        router.push('/search');
+        router.push('/discover?new_user=true');
     } catch (error: any) {
         let description = 'An unexpected error occurred. Please try again.';
         if (error.code === 'auth/popup-closed-by-user') {
