@@ -95,8 +95,6 @@ export function MovieFinder() {
   const [hasSearched, setHasSearched] = useState(false);
   
   const initialFetchDone = useRef(false);
-  const [refreshCount, setRefreshCount] = useState(0);
-
 
   // User data listener
   useEffect(() => {
@@ -197,8 +195,9 @@ export function MovieFinder() {
     }
   }, [searchMovieByTitle, toast]);
   
-  const fetchDiscoverData = useCallback(async (currentFilters: Filters, userLikedMovies: UserMovieData[], existingResults: SearchResult[]) => {
+  const fetchDiscoverData = useCallback(async (currentFilters: Filters, userLikedMovies: UserMovieData[]) => {
     setIsLoading(true);
+    setHasSearched(false);
     setVisibleResultsCount(RESULTS_PER_PAGE); // Reset visible count on new fetch
     try {
         let items: SearchResult[];
@@ -208,10 +207,7 @@ export function MovieFinder() {
             items = await fetchGenericDiscoverData(currentFilters);
         }
         
-        const existingResultIds = new Set(existingResults.map(r => r.id));
-        const newItems = items.filter(item => !existingResultIds.has(item.id));
-        
-        setResults(newItems.length > 0 ? newItems : items);
+        setResults(items);
 
     } catch (error: any) {
         console.error("Error fetching recommendations:", error);
@@ -225,8 +221,7 @@ export function MovieFinder() {
   const searchMovies = useCallback(async (searchQuery: string, currentFilters: Filters) => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
-        setHasSearched(false);
-        fetchDiscoverData(currentFilters, liked, results);
+        fetchDiscoverData(currentFilters, liked);
         return;
     }
     
@@ -264,29 +259,42 @@ export function MovieFinder() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, liked, results, fetchDiscoverData]);
+  }, [toast, liked, fetchDiscoverData]);
 
-  const debouncedSearch = useCallback(debounce((q: string, f: Filters) => {
-    const newParams = new URLSearchParams(searchParams.toString());
-    if (q) {
-      newParams.set('query', q);
-    } else {
-      newParams.delete('query');
-    }
-    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
-    searchMovies(q, f);
-  }, 300), [router, pathname, searchParams, searchMovies]);
+  const debouncedSearch = useRef(
+    debounce((q: string, f: Filters) => {
+      const newParams = new URLSearchParams(window.location.search);
+      if (q) {
+        newParams.set('query', q);
+      } else {
+        newParams.delete('query');
+      }
+      router.replace(`${window.location.pathname}?${newParams.toString()}`, { scroll: false });
+      searchMovies(q, f);
+    }, 300)
+  ).current;
+
+  useEffect(() => {
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [debouncedSearch]);
+
 
   useEffect(() => {
     setQuery(urlQuery);
     if (loadingUserData) return;
     
-    if (!initialFetchDone.current || (results.length === 0 && !urlQuery)) {
-        searchMovies(urlQuery, filters);
+    if (!initialFetchDone.current) {
+        if (urlQuery) {
+            searchMovies(urlQuery, filters);
+        } else {
+            fetchDiscoverData(filters, liked);
+        }
         initialFetchDone.current = true;
     }
 
-  }, [urlQuery, filters, loadingUserData, searchMovies, results.length]);
+  }, [urlQuery, filters, loadingUserData, liked, searchMovies, fetchDiscoverData]);
 
 
   const handleToggleWatched = async (movieId: number, mediaType: 'movie' | 'tv', isWatched: boolean) => {
@@ -369,7 +377,7 @@ export function MovieFinder() {
     if (urlQuery) {
         searchMovies(urlQuery, updatedFilters);
     } else {
-        fetchDiscoverData(updatedFilters, liked, []);
+        fetchDiscoverData(updatedFilters, liked);
     }
   };
   
@@ -384,15 +392,9 @@ export function MovieFinder() {
   
   const handleRefresh = useCallback(() => {
     if (!loadingUserData && !isLoading) {
-      fetchDiscoverData(filters, liked, results);
+      fetchDiscoverData(filters, liked);
     }
-  }, [loadingUserData, isLoading, fetchDiscoverData, filters, liked, results]);
-  
-  useEffect(() => {
-    if (refreshCount > 0) {
-        handleRefresh();
-    }
-  }, [refreshCount, handleRefresh]);
+  }, [loadingUserData, isLoading, fetchDiscoverData, filters, liked]);
 
 
   const activeFilterCount = filters.genres.length + filters.platforms.length + (filters.mediaType !== 'all' ? 1 : 0);
@@ -400,8 +402,10 @@ export function MovieFinder() {
   const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
   const dislikedIds = new Set(disliked.map(item => String(item.movieId)));
   
-  const filteredResults = results.filter(movie => !dislikedIds.has(String(movie.id)))
-                                 .filter(movie => !filters.hideWatched || !watchedIds.has(String(movie.id)));
+  const filteredResults = hasSearched
+    ? results // Show all results for explicit search
+    : results.filter(movie => !dislikedIds.has(String(movie.id)) && !likedIds.has(`${movie.id}-${movie.media_type}`))
+             .filter(movie => !filters.hideWatched || !watchedIds.has(String(movie.id)));
   
   const visibleResults = filteredResults.slice(0, visibleResultsCount);
 
@@ -425,7 +429,7 @@ export function MovieFinder() {
       );
     }
     
-    if (hasSearched && visibleResults.length === 0) {
+    if (hasSearched && visibleResults.length === 0 && query.length >= 2) {
       return (
         <div className="pt-16 text-center text-muted-foreground flex flex-col items-center gap-4">
           <Search className="h-16 w-16 text-muted-foreground/30" />
@@ -440,10 +444,10 @@ export function MovieFinder() {
   return (
     <div className="flex flex-col items-center gap-8">
       <div className="w-full text-center max-w-3xl">
-        <h1 className="text-3xl font-bold font-headline tracking-tight text-center md:text-5xl">
+        <h1 className="text-3xl md:text-5xl font-bold font-headline tracking-tight text-center">
           Find Your Next Watch
         </h1>
-        <p className="mt-4 text-md text-muted-foreground text-center md:text-lg">
+        <p className="mt-4 text-md md:text-lg text-muted-foreground text-center">
           Search for titles or browse recommendations tailored to your taste.
         </p>
       </div>
@@ -460,7 +464,7 @@ export function MovieFinder() {
                 setQuery(e.target.value);
                 debouncedSearch(e.target.value, filters);
               }}
-              className="h-14 w-full rounded-full bg-card py-3 pl-12 pr-4 text-base shadow-lg shadow-black/20"
+              className="h-14 w-full rounded-full bg-card py-3 pl-12 pr-4 text-base md:text-sm shadow-lg shadow-black/20"
             />
           </div>
         </form>
@@ -562,7 +566,7 @@ export function MovieFinder() {
          </div>
       )}
       
-      {!hasSearched && filteredResults.length > visibleResultsCount && (
+      {filteredResults.length > visibleResultsCount && (
         <div className="mt-6">
             <Button onClick={() => setVisibleResultsCount(prev => prev + RESULTS_PER_PAGE)} disabled={isLoading}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Load More'}
