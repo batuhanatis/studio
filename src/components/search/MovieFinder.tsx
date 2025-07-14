@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -9,7 +10,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { debounce } from 'lodash';
 
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, Filter, X, RefreshCw, Heart, ThumbsDown } from 'lucide-react';
+import { Loader2, Search, Filter, X, RefreshCw } from 'lucide-react';
 import { MovieResultCard } from './MovieResultCard';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -32,6 +33,7 @@ interface SearchResult {
   release_date?: string;
   first_air_date?: string;
   genre_ids?: number[];
+  origin_country?: string[];
 }
 
 interface UserMovieData {
@@ -51,9 +53,15 @@ interface Platform {
   provider_name: string;
 }
 
+interface Country {
+  iso_3166_1: string;
+  english_name: string;
+}
+
 interface Filters {
   genres: number[];
   platforms: number[];
+  countries: string[];
   year: [number, number];
   hideInteracted: boolean;
   mediaType: 'all' | 'movie' | 'tv';
@@ -73,10 +81,12 @@ export function MovieFinder() {
   
   const [allGenres, setAllGenres] = useState<Genre[]>([]);
   const [allPlatforms, setAllPlatforms] = useState<Platform[]>([]);
+  const [allCountries, setAllCountries] = useState<Country[]>([]);
 
   const [filters, setFilters] = useState<Filters>({
     genres: [],
     platforms: [],
+    countries: [],
     year: [1980, new Date().getFullYear()],
     hideInteracted: true,
     mediaType: 'all',
@@ -114,20 +124,22 @@ export function MovieFinder() {
     return () => unsubscribe();
   }, [firebaseUser, authLoading]);
 
-  // Fetch genres and platforms for filter controls
+  // Fetch genres, platforms, and countries for filter controls
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
-        const [movieGenresRes, tvGenresRes, providersRes] = await Promise.all([
+        const [movieGenresRes, tvGenresRes, providersRes, countriesRes] = await Promise.all([
           fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${API_KEY}`),
           fetch(`https://api.themoviedb.org/3/genre/tv/list?api_key=${API_KEY}`),
-          fetch(`https://api.themoviedb.org/3/watch/providers/movie?api_key=${API_KEY}&watch_region=TR`)
+          fetch(`https://api.themoviedb.org/3/watch/providers/movie?api_key=${API_KEY}&watch_region=TR`),
+          fetch(`https://api.themoviedb.org/3/configuration/countries?api_key=${API_KEY}`)
         ]);
 
-        const [movieGenres, tvGenres, providersData] = await Promise.all([
+        const [movieGenres, tvGenres, providersData, countriesData] = await Promise.all([
           movieGenresRes.json(),
           tvGenresRes.json(),
-          providersRes.json()
+          providersRes.json(),
+          countriesRes.json()
         ]);
         
         const combinedGenres = [...(movieGenres.genres || []), ...(tvGenres.genres || [])];
@@ -135,6 +147,7 @@ export function MovieFinder() {
         
         setAllGenres(uniqueGenres);
         setAllPlatforms((providersData.results || []).sort((a:Platform, b:Platform) => a.provider_name.localeCompare(b.provider_name)));
+        setAllCountries((countriesData || []).sort((a:Country, b:Country) => a.english_name.localeCompare(b.english_name)));
       } catch (error) {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load filter options.' });
       }
@@ -144,12 +157,32 @@ export function MovieFinder() {
   
   const fetchGenericDiscoverData = useCallback(async (currentFilters: Filters) => {
     const genreQuery = currentFilters.genres.join(',');
+    const countryQuery = currentFilters.countries.join(',');
     const mediaTypePath = currentFilters.mediaType === 'all' ? 'trending/all/week' : `discover/${currentFilters.mediaType}`;
     const page = Math.floor(Math.random() * 20) + 1;
 
-    const discoverUrl = currentFilters.mediaType === 'all'
-        ? `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US&page=${page}`
-        : `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc&include_adult=false&page=${page}&watch_region=TR&with_genres=${genreQuery}&with_watch_providers=${currentFilters.platforms.join('|')}&${currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date'}.gte=${currentFilters.year[0]}-01-01&${currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date'}.lte=${currentFilters.year[1]}-12-31`;
+    let discoverUrl;
+    if (currentFilters.mediaType === 'all') {
+        discoverUrl = `https://api.themoviedb.org/3/${mediaTypePath}?api_key=${API_KEY}&language=en-US&page=${page}`;
+    } else {
+        const dateParam = currentFilters.mediaType === 'movie' ? 'primary_release_date' : 'first_air_date';
+        const params = new URLSearchParams({
+            api_key: API_KEY,
+            language: 'en-US',
+            sort_by: 'popularity.desc',
+            include_adult: 'false',
+            page: String(page),
+            watch_region: 'TR',
+            [`${dateParam}.gte`]: `${currentFilters.year[0]}-01-01`,
+            [`${dateParam}.lte`]: `${currentFilters.year[1]}-12-31`,
+        });
+        if (genreQuery) params.set('with_genres', genreQuery);
+        if (currentFilters.platforms.length > 0) params.set('with_watch_providers', currentFilters.platforms.join('|'));
+        if (countryQuery) params.set('with_origin_country', countryQuery);
+        
+        discoverUrl = `https://api.themoviedb.org/3/${mediaTypePath}?${params.toString()}`;
+    }
+
 
     const res = await fetch(discoverUrl);
     if (!res.ok) throw new Error('Failed to fetch from TMDB');
@@ -194,10 +227,10 @@ export function MovieFinder() {
   const fetchDiscoverData = useCallback(async (currentFilters: Filters, userLikedMovies: UserMovieData[]) => {
     setIsLoading(true);
     setHasSearched(false);
-    setVisibleResultsCount(RESULTS_PER_PAGE); // Reset visible count on new fetch
+    setVisibleResultsCount(RESULTS_PER_PAGE);
     try {
         let items: SearchResult[];
-        if (userLikedMovies.length > 0) {
+        if (userLikedMovies.length > 5 && currentFilters.genres.length === 0 && currentFilters.countries.length === 0) {
             items = await fetchAiDiscoverData(userLikedMovies);
         } else {
             items = await fetchGenericDiscoverData(currentFilters);
@@ -241,14 +274,15 @@ export function MovieFinder() {
       if (!res.ok) throw new Error('Failed to fetch search results');
       const data = await res.json();
       
-      const filteredResults = (data.results || [])
+      const filteredByGenre = (data.results || [])
         .filter((item: SearchResult) => 
             item.poster_path &&
             (!currentFilters.genres.length || (item.genre_ids && currentFilters.genres.every(g => item.genre_ids?.includes(g))))
-        )
-        .sort((a: SearchResult, b: SearchResult) => b.popularity - a.popularity);
-
-      setResults(filteredResults);
+        );
+      
+      const finalResults = filteredByGenre.sort((a: SearchResult, b: SearchResult) => b.popularity - a.popularity);
+        
+      setResults(finalResults);
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Search Failed', description: error.message });
         setResults([]);
@@ -295,7 +329,6 @@ export function MovieFinder() {
   const handleFilterChange = (newFilters: Partial<Filters>) => {
     const updatedFilters = { ...filters, ...newFilters };
     setFilters(updatedFilters);
-    // Re-run search/discover with new filters
     if (urlQuery) {
         searchMovies(urlQuery, updatedFilters);
     } else {
@@ -304,12 +337,14 @@ export function MovieFinder() {
   };
   
   const resetFilters = () => {
-    handleFilterChange({
+    const newFilters = {
         genres: [],
         platforms: [],
+        countries: [],
         year: [1980, new Date().getFullYear()],
         mediaType: 'all'
-    });
+    };
+    handleFilterChange(newFilters);
   }
   
   const handleRefresh = useCallback(() => {
@@ -319,15 +354,16 @@ export function MovieFinder() {
   }, [loadingUserData, isLoading, fetchDiscoverData, filters, liked]);
 
 
-  const activeFilterCount = filters.genres.length + filters.platforms.length + (filters.mediaType !== 'all' ? 1 : 0);
+  const activeFilterCount = filters.genres.length + filters.platforms.length + filters.countries.length + (filters.mediaType !== 'all' ? 1 : 0);
   const likedIds = new Set(liked.map(item => `${item.movieId}-${item.mediaType}`));
   const dislikedIds = new Set(disliked.map(item => `${item.movieId}-${item.mediaType}`));
   
-  const filteredResults = filters.hideInteracted 
-    ? results.filter(movie => !likedIds.has(`${movie.id}-${movie.media_type}`) && !dislikedIds.has(`${movie.id}-${movie.media_type}`))
-    : results;
+  let finalResults = results;
+  if(filters.hideInteracted) {
+    finalResults = finalResults.filter(movie => !likedIds.has(`${movie.id}-${movie.media_type}`) && !dislikedIds.has(`${movie.id}-${movie.media_type}`));
+  }
   
-  const visibleResults = filteredResults.slice(0, visibleResultsCount);
+  const visibleResults = finalResults.slice(0, visibleResultsCount);
 
 
   const renderStatus = () => {
@@ -349,14 +385,14 @@ export function MovieFinder() {
       );
     }
     
-    if (hasSearched && visibleResults.length === 0 && query.length >= 2) {
-      return (
-        <div className="pt-16 text-center text-muted-foreground flex flex-col items-center gap-4">
-          <Search className="h-16 w-16 text-muted-foreground/30" />
-          <p className="text-lg font-medium text-foreground">No results found.</p>
-          <p>Try adjusting your search or filters.</p>
-        </div>
-      );
+    if (visibleResults.length === 0 && (hasSearched || filters.countries.length > 0 || filters.genres.length > 0)) {
+        return (
+            <div className="pt-16 text-center text-muted-foreground flex flex-col items-center gap-4">
+            <Search className="h-16 w-16 text-muted-foreground/30" />
+            <p className="text-lg font-medium text-foreground">No results found.</p>
+            <p>Try adjusting your search or filters.</p>
+            </div>
+        );
     }
     return null;
   };
@@ -428,6 +464,17 @@ export function MovieFinder() {
                                     ))}
                                 </ScrollArea>
                             </div>
+                             <div className="grid gap-3">
+                                <Label>Yapım Yeri Ülke <span className="text-xs text-muted-foreground">(sadece keşfet)</span></Label>
+                                <ScrollArea className="h-40 rounded-md border p-2">
+                                    {allCountries.map((c) => (
+                                    <div key={c.iso_3166_1} className="flex items-center space-x-2 py-1">
+                                        <Checkbox id={`country-${c.iso_3166_1}`} checked={filters.countries.includes(c.iso_3166_1)} onCheckedChange={(checked) => handleFilterChange({ countries: checked ? [...filters.countries, c.iso_3166_1] : filters.countries.filter(id => id !== c.iso_3166_1) })} />
+                                        <Label htmlFor={`country-${c.iso_3166_1}`} className="font-normal">{c.english_name}</Label>
+                                    </div>
+                                    ))}
+                                </ScrollArea>
+                            </div>
                             <div className="grid gap-3">
                                 <Label>Streaming On</Label>
                                 <ScrollArea className="h-40 rounded-md border p-2">
@@ -482,7 +529,7 @@ export function MovieFinder() {
          </div>
       )}
       
-      {filteredResults.length > visibleResultsCount && (
+      {finalResults.length > visibleResultsCount && (
         <div className="mt-6">
             <Button onClick={() => setVisibleResultsCount(prev => prev + RESULTS_PER_PAGE)} disabled={isLoading}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Load More'}
@@ -495,3 +542,5 @@ export function MovieFinder() {
     </div>
   );
 }
+
+    
