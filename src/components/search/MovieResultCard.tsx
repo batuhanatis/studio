@@ -1,8 +1,9 @@
+
 'use client';
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Film, Tv, Star, Heart, ThumbsDown } from 'lucide-react';
+import { Film, Tv, Star, Heart, ThumbsDown, Send } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { AddToWatchlistButton } from '../watchlists/AddToWatchlistButton';
 import { Button } from '../ui/button';
@@ -11,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { SendRecommendationButton } from '../recommendations/SendRecommendationButton';
 
 
 interface SearchResult {
@@ -157,7 +159,10 @@ export function MovieResultCard({ item, isLiked, isDisliked }: MovieResultCardPr
                       <ThumbsDown className={cn("h-4 w-4", isDisliked ? 'text-blue-500 fill-current' : 'text-muted-foreground')} />
                     </Button>
                 </div>
-                <AddToWatchlistButton movie={movieDetails} isIconOnly={true} />
+                <div className="flex items-center gap-1">
+                    <SendRecommendationButton movie={{...movieDetails, id: String(item.id)}} isIconOnly={true} />
+                    <AddToWatchlistButton movie={movieDetails} isIconOnly={true} />
+                </div>
             </div>
         </div>
       </CardContent>
