@@ -1,15 +1,15 @@
 rules_version = '2';
-
 service firebase.storage {
   match /b/{bucket}/o {
     match /profile-pictures/{userId} {
-      // Allow the user to read and write their own profile picture
+      // Allow read access to anyone
       allow read;
+      
+      // Allow write access only to the authenticated user who owns the profile
+      // and if the uploaded file is under 5MB.
+      // Removed contentType check for better compatibility.
       allow write: if request.auth != null && request.auth.uid == userId
-                   // Check for file size (max 5MB)
-                   && request.resource.size < 5 * 1024 * 1024
-                   // Check for file type (JPEG or PNG)
-                   && request.resource.contentType.matches('image/jpeg|image/png');
+                   && request.resource.size < 5 * 1024 * 1024;
     }
   }
 }
